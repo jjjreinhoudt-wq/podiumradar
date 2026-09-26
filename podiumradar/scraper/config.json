@@ -1,0 +1,24 @@
+{
+  "base": "https://www.podiuminfo.nl",
+  "user_agent": "Podiumradar/1.0 (persoonlijke agenda-app; 1 verzoek per 1,5 sec)",
+  "delay_seconds": 1.5,
+  "days_ahead": 120,
+  "max_pages_per_list": 40,
+  "provinces": {
+    "drenthe": "Drenthe", "flevoland": "Flevoland", "friesland": "Friesland", "gelderland": "Gelderland",
+    "groningen": "Groningen", "limburg": "Limburg", "noord-brabant": "Noord-Brabant", "noord-holland": "Noord-Holland",
+    "overijssel": "Overijssel", "utrecht": "Utrecht", "zeeland": "Zeeland", "zuid-holland": "Zuid-Holland"
+  },
+  "genres": {
+    "pop": "Pop", "rock": "Rock", "metal": "Metal", "punk": "Punk", "dance": "Dance",
+    "soul-rnb-hiphop": "Soul/R&B/Hiphop", "reggae": "Reggae", "folk-wereldmuziek": "Folk/Wereld",
+    "nederlandstalig": "Nederlandstalig", "roots-americana": "Roots/Americana", "covers-tribute": "Tribute",
+    "klassiek": "Klassiek", "cabaret": "Cabaret", "musical": "Musical", "experimenteel": "Experimenteel"
+  },
+  "detail_days": 21,
+  "detail_max": 500,
+  "geocode_max_per_run": 300,
+  "theater_keywords": ["theater", "theatre", "schouwburg", "concertzaal", "muziekgebouw", "cultuurcentrum", "cultureel centrum", "kunstcentrum", "tejater", "stadsgehoorzaal", "carré", "carre", "chassé", "chasse"],
+  "venue_type_overrides": {"013": "pop", "TivoliVredenburg": "pop"},
+  "min_ratio_vs_previous": 0.5
+}
