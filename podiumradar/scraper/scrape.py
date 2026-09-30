@@ -4,11 +4,12 @@ Gebruik:
   python scraper/scrape.py                                           # volledige run
   python scraper/scrape.py --only noord-brabant --max-pages 2 --dry-run --dump /tmp/pr   # snelle test
 """
-import argparse, datetime as dt, json, pathlib, re, sys, time
+import argparse, datetime as dt, hashlib, json, pathlib, re, sys, time
 from html import unescape
 from urllib import robotparser
 import requests
 from bs4 import BeautifulSoup
+import sources
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CFG = json.loads((ROOT / "scraper/config.json").read_text(encoding="utf-8"))
@@ -21,6 +22,8 @@ ap.add_argument("--dry-run", action="store_true", help="niets wegschrijven, alle
 ap.add_argument("--dump", help="map om opgehaalde HTML te bewaren (om selectors te controleren)")
 ap.add_argument("--no-details", action="store_true")
 ap.add_argument("--only", help="alleen deze provincie-slug (test)")
+ap.add_argument("--source", help="alleen bronnen waarvan de naam dit bevat (test)")
+ap.add_argument("--podiuminfo", action="store_true", help="podiuminfo.nl ook meenemen (werkt niet vanaf GitHub)")
 ARGS = ap.parse_args()
 
 S = requests.Session()
@@ -172,9 +175,37 @@ def slug(s):
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:48]
 
 
-def main():
-    prev = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() else {"events": []}
-    first_seen = {e["id"]: e.get("first_seen", TODAY.isoformat()) for e in prev.get("events", [])}
+GENRE_WORDS = [  # (genre, trefwoorden in titel) - eerste treffer wint
+    ("Musical", ["musical"]), ("Opera", ["opera"]), ("Dans", ["dans", "ballet", "dance company"]),
+    ("Cabaret", ["cabaret", "comedy", "stand-up", "standup", "try-out", "oudejaars"]),
+    ("Klassiek", ["symfon", "orkest", "philharmon", "strijkkwartet", "kamermuziek", "concertgebouw", "requiem",
+                  "passion", "matthäus", "bach", "mozart", "beethoven", "recital", "koor"]),
+    ("Jazz", ["jazz", "big band", "bigband"]), ("Jeugd", ["kinder", "familie", "(4+)", "(6+)", "(8+)", "jeugd"]),
+    ("Tribute", ["tribute", "undercover", "coverband", "plays the music of", "a tribute", "celebrating"]),
+    ("Feest", ["party", "feest", "fuif", "silent disco", "jukebox", "bingo", "afterparty", "karaoke"]),
+    ("Dance", ["techno", "house", " dj", "rave", "hardstyle", "drum & bass", "dnb"]),
+    ("Metal", ["metal", "doom", "sludge", "grindcore"]), ("Punk", ["punk", "hardcore"]),
+    ("Nederlandstalig", ["hollandse", "toppers", "nederlandstalig", "smartlap"]),
+    ("Film", ["film", "cinema", "screening"]), ("Lezing", ["lezing", "talk", "podcast", "debat", "college"]),
+    ("Toneel", ["toneel", "voorstelling", "theater"]),
+]
+DEFAULT_GENRE = {"pop": "Overig", "concert": "Klassiek", "arena": "Overig", "cafe": "Overig",
+                 "thea": "Theater", "museum": "Tentoonstelling", "festival": "Festival", "film": "Film"}
+
+
+def guess_genre(title, vtype):
+    low = " " + title.lower()
+    for g, words in GENRE_WORDS:
+        if any(w in low for w in words):
+            return g
+    return DEFAULT_GENRE.get(vtype, "Overig")
+
+
+def norm(t):
+    return re.sub(r"[^a-z0-9]+", "", unescape(t).lower())[:14]
+
+
+def podiuminfo_events():
     events = {}
     provs = {k: v for k, v in CFG["provinces"].items() if not ARGS.only or k == ARGS.only}
     for s, name in provs.items():
@@ -203,6 +234,46 @@ def main():
             # (lijst toont soms de laatste set of een verkeerde tijd).
             if e.get("start") or e.get("doors"):
                 e["time"] = e.get("start") or e.get("doors")
+    for e in events.values():
+        low = e["venue"].lower()
+        e["vtype"] = CFG["venue_type_overrides"].get(e["venue"]) or \
+            ("thea" if any(k in low for k in CFG["theater_keywords"]) else "pop")
+    return events
+
+
+def own_events():
+    """Events van de eigen sites van podia, theaters, musea en festivals (scraper/bronnen.json)."""
+    events = {}
+    for src, evs in sources.collect(CFG, only=ARGS.source):
+        for ev in evs:
+            e = dict(ev, venue=src["name"], city=src.get("city", ""), prov=src.get("prov", ""),
+                     vtype=src.get("type", "pop"), kind=src.get("type", "pop"))
+            e["genre"] = src.get("genre") or guess_genre(e["title"], e["vtype"])
+            e["id"] = "s" + hashlib.sha1(f"{src['name']}|{e['date']}|{e['title']}".encode()).hexdigest()[:10]
+            events[e["id"]] = e
+    return events
+
+
+def main():
+    prev = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() else {"events": []}
+    first_seen = {e["id"]: e.get("first_seen", TODAY.isoformat()) for e in prev.get("events", [])}
+
+    events = own_events()
+    print(f"Eigen bronnen: {len(events)} items")
+    if CFG.get("use_podiuminfo") or ARGS.podiuminfo:
+        # Podiuminfo vult alleen aan: wat we al van de eigen site hebben, slaan we over.
+        have = {(slug(e["venue"] + "-" + e["city"]), e["date"], norm(e["title"])) for e in events.values()}
+        extra = podiuminfo_events()
+        for eid, e in extra.items():
+            if (slug(e["venue"] + "-" + (e["city"] or "")), e["date"], norm(e["title"])) not in have:
+                events.setdefault(eid, e)
+        print(f"Podiuminfo: {len(extra)} items opgehaald")
+
+    # Houd wat nog loopt of binnen de horizon begint (tentoonstellingen en festivals lopen soms al).
+    t0, hz = TODAY.isoformat(), HORIZON.isoformat()
+    hz_long = (TODAY + dt.timedelta(days=400)).isoformat()  # festivals en tentoonstellingen worden ver vooruit aangekondigd
+    events = {k: v for k, v in events.items() if (v.get("end") or v["date"]) >= t0
+              and v["date"] <= (hz_long if v["vtype"] in ("festival", "museum") else hz)}
 
     cache = json.loads(VCACHE.read_text(encoding="utf-8")) if VCACHE.exists() else {}
     venues, budget = {}, CFG["geocode_max_per_run"]
@@ -215,20 +286,17 @@ def main():
                 budget -= 1
                 geocode(e["venue"], city or e["prov"], cache)
             ll = cache.get(key)
-            low = e["venue"].lower()
-            vtype = CFG["venue_type_overrides"].get(e["venue"]) or \
-                ("thea" if any(k in low for k in CFG["theater_keywords"]) else "pop")
-            venues[vid] = {"name": e["venue"], "city": city, "prov": e["prov"], "type": vtype,
+            venues[vid] = {"name": e["venue"], "city": city, "prov": e["prov"], "type": e["vtype"],
                            "lat": ll[0] if ll else None, "lon": ll[1] if ll else None}
         e["v"] = vid
         e["first_seen"] = first_seen.get(e["id"], TODAY.isoformat())
-        for k in ("venue", "city", "prov", "kind"):
+        for k in ("venue", "city", "prov", "kind", "vtype"):
             e.pop(k, None)
 
     out = {"updated": dt.datetime.now().strftime("%Y-%m-%d %H:%M"), "venues": venues,
            "events": sorted(events.values(), key=lambda e: (e["date"], e["time"] or "99"))}
     n_prev, n_new = len(prev.get("events", [])), len(out["events"])
-    print(f"Klaar: {n_new} shows op {len(venues)} podia (vorige keer {n_prev})")
+    print(f"Klaar: {n_new} items op {len(venues)} locaties (vorige keer {n_prev})")
     no_time = sum(1 for e in out["events"] if not e["time"])
     no_city = sum(1 for v in venues.values() if not v["city"])
     print(f"Controle: {no_time} shows zonder tijd, {no_city} podia zonder plaats")

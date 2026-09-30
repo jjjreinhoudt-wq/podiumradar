@@ -4,22 +4,30 @@ let DATA;
 try{ DATA=await fetch("data.json",{cache:"no-store"}).then(r=>r.json()); }
 catch(e){ document.querySelector("#main").innerHTML='<div class="empty"><strong>De agenda kon niet laden</strong>Controleer je verbinding en ververs de pagina.</div>'; return; }
 const V={}, EV=[];
-const THEATER_GENRES=new Set(["Cabaret","Comedy","Musical","Toneel"]);
+const THEATER_GENRES=new Set(["Cabaret","Comedy","Musical","Toneel","Dans","Opera","Theater","Jeugd"]);
+// Soort locatie (uit de bron) -> tabblad in de app
+const TYPE_OF={thea:"thea",film:"thea",museum:"expo",festival:"fest"};
+const LBL={pop:["concert","concerten"],thea:["voorstelling","voorstellingen"],expo:["tentoonstelling","tentoonstellingen"],fest:["festival","festivals"]};
 const today=new Date(); today.setHours(0,0,0,0);
 const toMin=t=>t?(+t.slice(0,2))*60+(+t.slice(3,5)):null;
+const dayNr=s=>{const [y,m,dd]=s.split("-").map(Number);return Math.round((new Date(y,m-1,dd)-today)/864e5)};
 Object.entries(DATA.venues).forEach(([id,v])=>V[id]={id,...v});
 DATA.events.forEach(r=>{
-  const [y,m,dd]=r.date.split("-").map(Number); const date=new Date(y,m-1,dd);
-  const d=Math.round((date-today)/864e5); if(d<0) return;
+  const [y,m,dd]=r.date.split("-").map(Number);
+  const endD=r.end?dayNr(r.end):null;
+  let d=dayNr(r.date); if((endD??d)<0) return;
   const v=V[r.v]; if(!v) return;
-  const type=(v.type==="thea"||THEATER_GENRES.has(r.genre))?"thea":"pop";
+  // Loopt al (tentoonstelling, festival): toon hem vanaf vandaag
+  const date=d<0?new Date(today):new Date(y,m-1,dd); const started=d<0; if(d<0) d=0;
+  const type=TYPE_OF[v.type]||(THEATER_GENRES.has(r.genre)?"thea":"pop");
   let head=r.title.replace(/\s*\((festival|festival, dag \d)\)$/i,"").split(" - ")[0].trim();
   let acts=head.replace(/^Popronde:\s*/,"").split(/\s\+\s/).map(s=>s.trim());
   const im=r.title.match(/Instore:\s*(.+)$/); if(im) acts=[im[1]];
   const support=(r.support&&r.support.length)?r.support:acts.slice(1);
   EV.push({id:r.id,title:r.title,artist:acts[0],support,v:r.v,genre:r.genre,type,date,d,
     time:toMin(r.time)??toMin(r.start)??toMin(r.doors), doors:toMin(r.doors), start:toMin(r.start),
-    url:r.url,isFest:r.id[0]==="f",status:r.status||null,firstSeen:r.first_seen});
+    url:r.url,isFest:r.id[0]==="f"||type==="fest",status:r.status||null,firstSeen:r.first_seen,
+    endD,endDate:r.end?new Date(...r.end.split("-").map((x,i)=>i===1?x-1:+x)):null,started});
 });
 const SNAPSHOT=(()=>{const [dpart,t]=DATA.updated.split(" ");const [y,m,d]=dpart.split("-").map(Number);return d+" "+["januari","februari","maart","april","mei","juni","juli","augustus","september","oktober","november","december"][m-1]+" om "+t})();
 const recent=e=>e.firstSeen&&(today-new Date(e.firstSeen))/864e5<=3;
@@ -54,6 +62,10 @@ const dateOf=d=>{const x=new Date(today);x.setDate(today.getDate()+d);return x};
 const dayLabel=d=>{const x=dateOf(d);const b=WDL[x.getDay()]+" "+x.getDate()+" "+MON[x.getMonth()]+(x.getFullYear()!==today.getFullYear()?" "+x.getFullYear():"");
   return d===0?"Vandaag, "+b:d===1?"Morgen, "+b:b.charAt(0).toUpperCase()+b.slice(1)};
 const short=e=>WD[e.date.getDay()]+" "+e.date.getDate()+" "+MON[e.date.getMonth()];
+const dm=x=>x.getDate()+" "+MON[x.getMonth()]+(x.getFullYear()!==today.getFullYear()?" "+x.getFullYear():"");
+// Periode-tekst voor tentoonstellingen en meerdaagse festivals
+const range=e=>!e.endDate?null:e.started?"t/m "+dm(e.endDate):dm(e.date)+" – "+dm(e.endDate);
+const onDay=(e,day)=>e.endD!=null?e.d<=day&&day<=e.endD:e.d===day;
 function toast(t){const el=$("#toast");el.textContent=t;el.classList.add("on");clearTimeout(toast.h);toast.h=setTimeout(()=>el.classList.remove("on"),2200)}
 const isFav=e=>S.fav.has(e.ak)||e.support.some(s=>S.fav.has(artistKey(s)));
 function toggleFav(ak,name){ if(S.fav.has(ak)){S.fav.delete(ak);toast(name+" niet meer gevolgd")} else {S.fav.add(ak);toast("Je volgt nu "+name)}
@@ -83,7 +95,7 @@ function filtered(ignoreDay){
   let list=EV.filter(e=>{
     if(e.type!==S.type) return false;
     const v=V[e.v];
-    if(!ignoreDay&&S.day>=0&&e.d!==S.day) return false;
+    if(!ignoreDay&&S.day>=0&&!onDay(e,S.day)) return false;
     if(S.regio.size&&!S.regio.has(v.prov)) return false;
     if(S.venue&&e.v!==S.venue) return false;
     if(S.genre.size&&!S.genre.has(e.genre)) return false;
@@ -97,7 +109,7 @@ function filtered(ignoreDay){
     return true;
   });
   const tm=e=>e.time==null?20*60:e.time;
-  const cmp={date:(a,b)=>a.d-b.d||tm(a)-tm(b),
+  const cmp={date:(a,b)=>(b.started-a.started)||a.d-b.d||tm(a)-tm(b),
     az:(a,b)=>a.artist.localeCompare(b.artist,"nl")||a.d-b.d,
     venue:(a,b)=>V[a.v].name.localeCompare(V[b.v].name,"nl")||a.d-b.d,
     near:(a,b)=>(travel(a.v).car??999)-(travel(b.v).car??999)||a.d-b.d}[S.sort];
@@ -125,7 +137,8 @@ function evRow(e,o={}){
   const v=V[e.v], tr=travel(e.v);
   const flag=(NEW.has(e.id)||recent(e))?'<span class="new">Nieuw</span>':"";
   return `<div class="ev" role="button" tabindex="0" data-ev="${e.id}">
-    <div class="t">${e.time==null?"—":hm(e.time)}<small>${o.showDate?short(e):(e.time==null?"tijd volgt":"aanvang")}</small></div>
+    ${e.endDate?`<div class="t" style="font-size:13px;line-height:1.2">${e.started?"nu":short(e)}<small>t/m ${dm(e.endDate)}</small></div>`
+      :`<div class="t">${e.time==null?"—":hm(e.time)}<small>${o.showDate?short(e):(e.time==null?"tijd volgt":"aanvang")}</small></div>`}
     <div><div class="a">${esc(e.artist)}${flag}</div>
       ${e.support.length?`<div class="s">met ${esc(e.support.join(", "))}</div>`:(e.title!==e.artist&&!e.title.startsWith(e.artist+" +")?`<div class="s">${esc(e.title.slice(e.artist.length).replace(/^\s*-\s*/,""))}</div>`:"")}
       <div class="v">${esc(v.name)}, ${esc(v.city)}</div>
@@ -134,21 +147,21 @@ function evRow(e,o={}){
     <button class="star" data-fav="${e.ak}" data-name="${esc(e.artist)}" aria-pressed="${S.fav.has(e.ak)}" aria-label="Volg ${esc(e.artist)}">★</button>
   </div>`;
 }
-function emptyState(){return `<div class="empty"><strong>Niets gevonden</strong>Geen ${S.type==="pop"?"concert":"voorstelling"} dat bij deze filters past. Kies een andere datum of haal een filter weg.<br><button class="btn ghost" id="clearAll2" style="display:inline-flex;flex:0">Filters wissen</button></div>`}
-const srcNote=()=>`<p class="note">Bron: Podiuminfo, bijgewerkt op ${SNAPSHOT}. ${EV.length} shows op ${Object.keys(V).length} podia. Elke nacht komt er nieuwe data bij. Tijden met ~ zijn geschat.</p>`;
+function emptyState(){return `<div class="empty"><strong>Niets gevonden</strong>Geen ${LBL[S.type][0]} dat bij deze filters past. Kies een andere datum of haal een filter weg.<br><button class="btn ghost" id="clearAll2" style="display:inline-flex;flex:0">Filters wissen</button></div>`}
+const srcNote=()=>`<p class="note">Rechtstreeks van de sites van ${Object.keys(V).length} podia, theaters, musea en festivals, bijgewerkt op ${SNAPSHOT}. ${EV.length} items in totaal. Elke nacht komt er nieuwe data bij. Tijden met ~ zijn geschat.</p>`;
 
 function viewList(){
   const list=filtered(false);
-  let h=`<div class="meta"><span>${list.length} ${S.type==="pop"?"shows":"voorstellingen"}</span>${fcount()||S.q?'<button id="clearAll">Alles wissen</button>':""}</div>`;
+  let h=`<div class="meta"><span>${list.length} ${LBL[S.type][1]}</span>${fcount()||S.q?'<button id="clearAll">Alles wissen</button>':""}</div>`;
   if(!list.length) return h+emptyState()+srcNote();
-  if(S.sort==="date"){let cur=null; list.slice(0,300).forEach(e=>{if(e.d!==cur){cur=e.d;h+=`<h2 class="dh">${dayLabel(e.d)}</h2>`} h+=evRow(e)}); if(list.length>300) h+=`<p class="note">De eerste 300 van ${list.length} getoond. Kies een datum of filter om verder te kijken.</p>`}
+  if(S.sort==="date"){let cur=null; list.slice(0,300).forEach(e=>{const k=e.started&&S.day<0?"nu":e.d; if(k!==cur){cur=k;h+=`<h2 class="dh">${k==="nu"?"Nu te zien":dayLabel(e.d)}</h2>`} h+=evRow(e)}); if(list.length>300) h+=`<p class="note">De eerste 300 van ${list.length} getoond. Kies een datum of filter om verder te kijken.</p>`}
   else list.slice(0,300).forEach(e=>h+=evRow(e,{showDate:true}));
   if(list.length>300) h+=`<p class="note">De eerste 300 van ${list.length} getoond. Verfijn met datum of filters.</p>`;
   return h+srcNote();
 }
 function viewGrid(){
   const all=filtered(false), list=all.filter(e=>e.time!=null), unk=all.filter(e=>e.time==null);
-  let h=`<div class="meta"><span>${dayLabel(S.day)}: ${all.length} ${S.type==="pop"?"shows":"voorstellingen"}</span></div>`;
+  let h=`<div class="meta"><span>${dayLabel(S.day)}: ${all.length} ${LBL[S.type][1]}</span></div>`;
   if(!all.length) return h+emptyState();
   if(list.length){
     const from=Math.floor(Math.min(...list.map(e=>e.time-(e.type==="thea"?30:0)))/60)*60;
@@ -187,7 +200,7 @@ function viewFav(){
   // favorieten
   const favs=[...S.fav];
   h+=`<h2 class="dh">Artiesten die je volgt</h2>`;
-  if(!favs.length) return h+`<div class="empty"><strong>Nog niemand gevolgd</strong>Tik op de ster bij een ${S.type==="pop"?"artiest":"voorstelling"}. Daarna zie je hier hun shows en tips.</div>`;
+  if(!favs.length) return h+`<div class="empty"><strong>Nog niemand gevolgd</strong>Tik op de ster bij een ${S.type==="pop"?"artiest":LBL[S.type][0]}. Daarna zie je hier hun shows en tips.</div>`;
   h+=`<div class="favhead">${favs.map(ak=>`<span class="favchip">${esc(favName(ak))}<button data-fav="${ak}" data-name="${esc(favName(ak))}" aria-label="Ontvolg">✕</button></span>`).join("")}</div>`;
   const own=EV.filter(e=>e.type===S.type&&isFav(e)).sort((a,b)=>a.d-b.d||(a.time??0)-(b.time??0));
   h+=`<h2 class="dh">Waar ze spelen <small>${own.length}</small></h2>`+(own.length?own.map(e=>evRow(e,{showDate:true})).join(""):`<p class="s">Geen shows in de huidige agenda.</p>`);
@@ -200,8 +213,8 @@ function viewFav(){
   return h;
 }
 function render(){
-  document.body.classList.toggle("thea",S.type==="thea");
-  $("#segPop").setAttribute("aria-pressed",S.type==="pop"); $("#segThea").setAttribute("aria-pressed",S.type==="thea");
+  ["thea","expo","fest"].forEach(t=>document.body.classList.toggle(t,S.type===t));
+  document.querySelectorAll(".seg [data-type]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.type===S.type));
   document.querySelectorAll("nav.tabs button").forEach(b=>b.dataset.view===S.view?b.setAttribute("aria-current","page"):b.removeAttribute("aria-current"));
   const n=fcount(); $("#fcount").hidden=!n; $("#fcount").textContent=n;
   $("#newDot").hidden=!EV.some(e=>NEW.has(e.id)&&(isFav(e)||alarmHit(e)));
@@ -263,7 +276,7 @@ function openDetail(id){
     :`<p class="s">De tijden zijn nog niet bekend bij de bron. Check de pagina van het podium.</p>`;
   const sims=similar(e);
   $("#detailSheet").innerHTML=`<div class="grab"></div>
-   <div class="dhead"><div><div class="dsub">${dayLabel(e.d)}</div><div class="dtitle">${esc(e.artist)}</div>
+   <div class="dhead"><div><div class="dsub">${range(e)?(e.started?"Nu te zien, ":"")+range(e):dayLabel(e.d)}</div><div class="dtitle">${esc(e.artist)}</div>
      ${e.title!==e.artist?`<div class="dsub">${esc(e.title)}</div>`:""}
      <div class="dsub">${esc(v.name)}, ${esc(v.city)}</div></div>
      <button class="star" data-fav="${e.ak}" data-name="${esc(e.artist)}" aria-pressed="${S.fav.has(e.ak)}" aria-label="Volg ${esc(e.artist)}" style="font-size:30px">★</button></div>
@@ -339,8 +352,7 @@ document.addEventListener("click",e=>{
   if(e.target.id==="clearAll"||e.target.id==="clearAll2"){resetFilters();S.q="";$("#q").value="";if(S.view!=="grid")S.day=-1;render()}
 });
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheets();if(e.key==="Enter"&&e.target.matches(".ev[data-ev]"))openDetail(e.target.dataset.ev)});
-$("#segPop").onclick=()=>{S.type="pop";S.genre.clear();S.venue="";if(S.view!=="grid")S.day=-1;render()};
-$("#segThea").onclick=()=>{S.type="thea";S.genre.clear();S.venue="";if(S.view!=="grid")S.day=-1;render()};
+document.querySelectorAll(".seg [data-type]").forEach(b=>b.onclick=()=>{S.type=b.dataset.type;S.genre.clear();S.venue="";if(S.view!=="grid")S.day=-1;render()});
 let qt;$("#q").oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{S.q=e.target.value;render()},150)};
 
 buildHome(); render();

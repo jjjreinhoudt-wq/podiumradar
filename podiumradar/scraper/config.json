@@ -2,7 +2,7 @@
   "base": "https://www.podiuminfo.nl",
   "user_agent": "Podiumradar/1.0 (persoonlijke agenda-app; 1 verzoek per 1,5 sec)",
   "delay_seconds": 1.5,
-  "days_ahead": 120,
+  "days_ahead": 240,
   "max_pages_per_list": 40,
   "provinces": {
     "drenthe": "Drenthe", "flevoland": "Flevoland", "friesland": "Friesland", "gelderland": "Gelderland",
@@ -20,5 +20,11 @@
   "geocode_max_per_run": 300,
   "theater_keywords": ["theater", "theatre", "schouwburg", "concertzaal", "muziekgebouw", "cultuurcentrum", "cultureel centrum", "kunstcentrum", "tejater", "stadsgehoorzaal", "carré", "carre", "chassé", "chasse"],
   "venue_type_overrides": {"013": "pop", "TivoliVredenburg": "pop"},
-  "min_ratio_vs_previous": 0.5
+  "min_ratio_vs_previous": 0.5,
+  "use_podiuminfo": false,
+  "source_workers": 16,
+  "source_max_pages": 8,
+  "source_max_details": 250,
+  "detail_refresh_days": 7,
+  "cache_keep_days": 30
 }
