@@ -5,6 +5,7 @@ Gebruik:
   python scraper/scrape.py --only noord-brabant --max-pages 2 --dry-run --dump /tmp/pr   # snelle test
 """
 import argparse, datetime as dt, json, pathlib, re, sys, time
+from html import unescape
 from urllib import robotparser
 import requests
 from bs4 import BeautifulSoup
@@ -24,10 +25,16 @@ ARGS = ap.parse_args()
 
 S = requests.Session()
 S.headers["User-Agent"] = CFG["user_agent"]
-RP = robotparser.RobotFileParser(CFG["base"] + "/robots.txt")
+# robots.txt ophalen met onze eigen User-Agent: RobotFileParser.read() gebruikt
+# de standaard Python-UA, krijgt dan een 403 en verbiedt vervolgens alles.
+RP = robotparser.RobotFileParser()
 try:
-    RP.read()
-except Exception:
+    _r = S.get(CFG["base"] + "/robots.txt", timeout=30)
+    if _r.status_code == 200:
+        RP.parse(_r.text.splitlines())
+    else:
+        RP = None
+except requests.RequestException:
     RP = None
 _last = [0.0]
 
@@ -55,69 +62,53 @@ def get(url):
     return r.text
 
 
-MONTHS = {m: i + 1 for i, m in enumerate("jan feb mrt apr mei jun jul aug sep okt nov dec".split())}
-DATE_RE = re.compile(r"\b(ma|di|wo|do|vr|za|zo)\s+(\d{1,2})\s+(jan|feb|mrt|apr|mei|jun|jul|aug|sep|okt|nov|dec)\b(?:\s*'(\d{2}))?", re.I)
-TIME_RE = re.compile(r"\b([01]\d|2[0-3])[:.]([0-5]\d)\b")
 LINK_RE = re.compile(r"/(concert|cabaret/voorstelling|festival)/(\d+)/")
 TITLE_RE = re.compile(r"^(Concert|Event|Cabaret|Festival)\s+(.*)\s+in\s+(.+)$", re.S)
 TODAY = dt.date.today()
 HORIZON = TODAY + dt.timedelta(days=CFG["days_ahead"])
 
 
-def mkdate(day, mon, yy):
-    m = MONTHS[mon.lower()]
-    if yy:
-        y = 2000 + int(yy)
-    else:
-        y = TODAY.year + (1 if m < TODAY.month - 1 else 0)
-    try:
-        return dt.date(y, m, int(day))
-    except ValueError:
-        return None
+FULL_MONTHS = {m: i + 1 for i, m in enumerate(
+    "januari februari maart april mei juni juli augustus september oktober november december".split())}
+# aria-label van elke agendalink, bv.
+# "Concert PAUW, woensdag 30 september 2026 om 20:00, Mezz, Breda, tickets beschikbaar"
+ARIA_RE = re.compile(r",\s*(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\s+(\d{1,2})\s+("
+                     + "|".join(FULL_MONTHS) + r")\s+(\d{4})(?:\s+om\s+([01]\d|2[0-3]):([0-5]\d))?,\s*(.*)$", re.I | re.S)
 
 
 def parse_listing(html):
-    """Loopt in documentvolgorde door de pagina: een datumkop geldt voor alle rijen erna."""
+    """Leest elke agendalink uit via zijn title (soort, titel, podium) en aria-label (datum, tijd, plaats)."""
     soup = BeautifulSoup(html, "html.parser")
-    events, cur = {}, None
-    for node in soup.descendants:
-        if isinstance(node, str):
-            m = DATE_RE.search(node)
-            if m and len(node.strip()) < 40:
-                d = mkdate(m.group(2), m.group(3), m.group(4))
-                if d:
-                    cur = d
-            continue
-        if node.name != "a" or not node.get("href"):
-            continue
+    events, last = {}, None
+    for node in soup.find_all("a", href=True, attrs={"aria-label": True}):
         lm = LINK_RE.search(node["href"])
-        tm = TITLE_RE.match((node.get("title") or "").strip())
-        if not lm or not tm or cur is None:
+        tm = TITLE_RE.match(unescape(node.get("title") or "").strip())
+        am = ARIA_RE.search(unescape(node["aria-label"]))
+        if not lm or not tm or not am:
             continue
         kind = {"concert": "p", "cabaret/voorstelling": "c", "festival": "f"}[lm.group(1)]
         eid = kind + lm.group(2)
         if eid in events:
             continue
-        row = node.find_parent("tr") or node.find_parent("li") or node.parent
-        ids = {LINK_RE.search(a["href"]).group(2) for a in row.find_all("a", href=True) if LINK_RE.search(a["href"])}
-        t = None
-        if len(ids) <= 1:
-            mt = TIME_RE.search(row.get_text(" "))
-            if mt:
-                t = f"{mt.group(1)}:{mt.group(2)}"
+        try:
+            d = dt.date(int(am.group(3)), FULL_MONTHS[am.group(2).lower()], int(am.group(1)))
+        except ValueError:
+            continue
+        last = max(last, d) if last else d
+        t = f"{am.group(4)}:{am.group(5)}" if am.group(4) else None
         venue = tm.group(3).strip()
-        city = None
-        if row.name == "tr":
-            cells = [c.get_text(" ", strip=True) for c in row.find_all("td")]
-            for i, c in enumerate(cells):
-                if c == venue and i + 1 < len(cells):
-                    city = cells[i + 1]
-                    break
+        rest = am.group(6).strip()
+        # Na het podium volgt de plaats; het podium zelf kan ook komma's bevatten.
+        rest = rest[len(venue):].lstrip(", ") if rest.startswith(venue) else rest.split(",", 1)[-1].strip()
+        city = rest.split(",")[0].strip() or None
         title = re.sub(r"(Event|Cabaret|Festival)$", "", tm.group(2)).strip()
         href = node["href"] if node["href"].startswith("http") else CFG["base"] + node["href"]
-        events[eid] = {"id": eid, "date": cur.isoformat(), "time": t, "title": title,
-                       "venue": venue, "city": city, "kind": tm.group(1), "url": href}
-    return events, cur
+        ev = {"id": eid, "date": d.isoformat(), "time": t, "title": title,
+              "venue": venue, "city": city, "kind": tm.group(1), "url": href}
+        if "uitverkocht" in rest.lower():
+            ev["status"] = "sold"
+        events[eid] = ev
+    return events, last
 
 
 def crawl(path, label):
