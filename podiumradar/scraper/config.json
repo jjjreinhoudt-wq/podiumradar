@@ -86,5 +86,6 @@
     "werkgroep",
     "open maaltijd",
     "koffie en een goed gesprek"
-  ]
+  ],
+  "film_days_ahead": 10
 }

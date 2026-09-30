@@ -8,7 +8,9 @@ Dit project is van Jasper. Hij wil **zo min mogelijk techniek uitgelegd krijgen*
   - Jasper wil uitdrukkelijk **geen kopie van een andere agendasite**: geen podiuminfo, partyflock, uitagenda's e.d. als bron. Podiuminfo-code staat er nog (`--podiuminfo`), maar staat uit en podiuminfo blokkeert GitHub (403).
   - `sources.py` leest per bron: JSON-LD (schema.org Event) op de agendapagina, anders de losse voorstellingspagina's (JSON-LD of datum/tijd uit de tekst). Festivals worden één item met een periode. Detailpagina's worden gecachet in `scraper/detail_cache.json`.
   - Bron werkt niet (0 items)? Meestal laadt de site zijn agenda met JavaScript. Voeg dan in `bronnen.json` een `link_pattern`, `extra_urls` of een eigen aanpak toe. Test één bron met `python scraper/scrape.py --source "<naam>" --dry-run`.
-  - Soorten in `bronnen.json`: pop, concert, arena, cafe → tab Muziek; thea, film → Theater; museum → Musea; festival → Festivals. `"local": true` = binnen 15 km van Tilburg.
+  - Soorten in `bronnen.json`: pop, concert, arena, cafe → tab Muziek; thea → Theater; film → Film; museum → Musea; festival → Festivals. `"local": true` = binnen 15 km van Tilburg.
+  - Film: `scraper/film.py` heeft per kaartverkoopsysteem een uitlezer (`"platform"` in bronnen.json: pathe, cinecitta, tribe, ticketlab, cinelink, wpgraphql, fraterhuis). Filmhuizen zonder platform gaan via de algemene uitlezer (JSON-LD ScreeningEvent). Draaitijden alleen voor de komende `film_days_ahead` dagen.
+  - Beleefdheid: pauze per server (IP), niet per site, want veel filmhuizen/theaters delen een server. Crawl-delay uit robots.txt wordt gevolgd (max 10 s). Sites die bots blokkeren (Chassé, De Leest, De Bussel, Cinerama, MIMIK, FC Hyena) staan er bewust niet in: niet omzeilen.
 - `.github/workflows/update.yml` draait de scraper elke nacht en zet de site opnieuw online.
 
 ## Als Jasper zegt "zet dit online" (eerste keer)

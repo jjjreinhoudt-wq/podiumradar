@@ -254,7 +254,9 @@ def own_events():
             e = dict(ev, venue=src["name"], city=src.get("city", ""), prov=src.get("prov", ""),
                      vtype=src.get("type", "pop"), kind=src.get("type", "pop"))
             e["genre"] = src.get("genre") or guess_genre(e["title"], e["vtype"])
-            e["id"] = "s" + hashlib.sha1(f"{src['name']}|{e['date']}|{e['title']}".encode()).hexdigest()[:10]
+            # Films draaien meerdere keren per dag: tijd hoort dan bij de id
+            idkey = f"{src['name']}|{e['date']}|{e['title']}" + (f"|{e['time']}" if e["vtype"] == "film" else "")
+            e["id"] = "s" + hashlib.sha1(idkey.encode()).hexdigest()[:10]
             events[e["id"]] = e
     return events
 
@@ -277,8 +279,9 @@ def main():
     # Houd wat nog loopt of binnen de horizon begint (tentoonstellingen en festivals lopen soms al).
     t0, hz = TODAY.isoformat(), HORIZON.isoformat()
     hz_long = (TODAY + dt.timedelta(days=400)).isoformat()  # festivals en tentoonstellingen worden ver vooruit aangekondigd
+    hz_film = (TODAY + dt.timedelta(days=CFG.get("film_days_ahead", 10))).isoformat()  # draaitijden: alleen komende dagen
     events = {k: v for k, v in events.items() if (v.get("end") or v["date"]) >= t0
-              and v["date"] <= (hz_long if v["vtype"] in ("festival", "museum") else hz)}
+              and v["date"] <= {"festival": hz_long, "museum": hz_long, "film": hz_film}.get(v["vtype"], hz)}
 
     cache = json.loads(VCACHE.read_text(encoding="utf-8")) if VCACHE.exists() else {}
     venues, budget = {}, CFG["geocode_max_per_run"]

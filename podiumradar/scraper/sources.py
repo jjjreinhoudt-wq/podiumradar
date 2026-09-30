@@ -8,13 +8,14 @@ Werkwijze per bron (scraper/bronnen.json):
   4. Lukt JSON-LD niet, dan zoeken we datum en tijd in de tekst van de pagina.
 Elke site krijgt hoogstens één verzoek per `delay_seconds`; verschillende sites lopen parallel.
 """
-import datetime as dt, json, pathlib, re, threading, time
+import datetime as dt, json, pathlib, re, socket, threading, time
 from concurrent.futures import ThreadPoolExecutor
 from html import unescape
 from urllib import robotparser
 from urllib.parse import urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
+import film
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BRONNEN = ROOT / "scraper/bronnen.json"
@@ -22,7 +23,7 @@ CACHE = ROOT / "scraper/detail_cache.json"
 TODAY = dt.date.today()
 CACHE_V = 2  # ophogen als het uitlezen verandert, zodat gecachte pagina's opnieuw worden gelezen
 
-DETAIL_RE = re.compile(r"/(agenda|programma|programme|event|events|evenement|evenementen|concert|concerten|"
+DETAIL_RE = re.compile(r"/(agenda|programma|programme|event|events|evenement|evenementen|concert|concerten|film|films|movies?|"
                        r"voorstelling|voorstellingen|show|shows|tentoonstelling|tentoonstellingen|exhibition|"
                        r"exhibitions|activiteit|activiteiten|nu-te-zien|productie|producties)/[^?#]{3,}", re.I)
 SKIP_RE = re.compile(r"\.(jpe?g|png|gif|svg|pdf|ics|zip|mp[34])$|/(tag|categor(y|ie)|genre|page|zoeken|search|"
@@ -45,7 +46,7 @@ class Fetcher:
         self.S = requests.Session()
         self.S.headers.update({"User-Agent": ua, "Accept-Language": "nl,en;q=0.5"})
         self.ua, self.delay = ua, delay
-        self.robots, self.last, self.locks = {}, {}, {}
+        self.robots, self.last, self.locks, self.ip_locks, self.host_ip = {}, {}, {}, {}, {}
         self.guard = threading.Lock()
 
     def _host(self, url):
@@ -53,7 +54,15 @@ class Fetcher:
         host = f"{p.scheme}://{p.netloc}"
         with self.guard:
             if host not in self.locks:
-                self.locks[host] = threading.Lock()
+                # Veel filmhuizen/theaters delen één server: de pauze geldt per server (IP), niet per sitenaam
+                try:
+                    ip = socket.gethostbyname(p.hostname or "")
+                except OSError:
+                    ip = host
+                if ip not in self.ip_locks:
+                    self.ip_locks[ip] = threading.Lock()
+                self.locks[host] = self.ip_locks[ip]
+                self.host_ip[host] = ip
         return host
 
     def allowed(self, url):
@@ -68,23 +77,37 @@ class Fetcher:
             self.robots[host] = rp
         return self.robots[host].can_fetch(self.ua, url)
 
-    def get(self, url):
+    def _fetch(self, url, params=None):
         host = self._host(url)
         with self.locks[host]:
             if not self.allowed(url):
                 return None
-            wait = self.delay - (time.time() - self.last.get(host, 0))
+            # Vraagt de site in robots.txt om meer tijd tussen verzoeken, dan houden we ons daaraan (max 10 s)
+            delay = max(self.delay, min(10, self.robots[host].crawl_delay(self.ua) or 0))
+            ip = self.host_ip[host]
+            wait = delay - (time.time() - self.last.get(ip, 0))
             if wait > 0:
                 time.sleep(wait)
-            self.last[host] = time.time()
+            self.last[ip] = time.time()
             try:
-                r = self.S.get(url, timeout=30)
+                r = self.S.get(url, params=params, timeout=30)
             except requests.RequestException:
                 return None
-        if r.status_code != 200 or "html" not in r.headers.get("content-type", "html"):
+        return r if r.status_code == 200 else None
+
+    def get(self, url):
+        r = self._fetch(url)
+        if r is None or "html" not in r.headers.get("content-type", "html"):
             return None
         r.encoding = r.apparent_encoding if not r.encoding or r.encoding.lower() == "iso-8859-1" else r.encoding
         return r.text
+
+    def get_json(self, url, params=None):
+        r = self._fetch(url, params)
+        try:
+            return r.json() if r is not None else None
+        except ValueError:
+            return None
 
 
 # ---------------------------------------------------------------- uitlezen
@@ -150,7 +173,9 @@ def from_jsonld(o, page_url):
     end, end_t = _iso(o.get("endDate"))
     if end and end_t and end_t < "08:00" and (end - d).days == 1:
         end = None  # nachtprogramma, geen meerdaags evenement
-    title = unescape(_name(o.get("name")) or "").strip()
+    # Bij een filmvoorstelling (ScreeningEvent) is de film de titel, niet "Voorstelling 20:15"
+    wp, nm = _name(o.get("workPresented")), _name(o.get("name"))
+    title = unescape(wp if wp and not re.fullmatch(r"[\d\s#-]+", wp) else nm or wp or "").strip()
     if not title:
         return None
     ev = {"date": d.isoformat(), "time": t, "title": title,
@@ -158,7 +183,7 @@ def from_jsonld(o, page_url):
     if end and end > d:
         ev["end"] = end.isoformat()
     perf = [p for p in re.split(r"\s*,\s*", _name(o.get("performer"))) if p and p.lower() != title.lower()]
-    if len(perf) > 1:
+    if len(perf) > 1 and "Screening" not in str(o.get("@type")):  # bij films zijn dit acteurs
         ev["support"] = perf[1:4]
     status = json.dumps([o.get("eventStatus"), o.get("offers")]).lower()
     if "soldout" in status or "uitverkocht" in status:
@@ -194,8 +219,9 @@ def _txt_date(txt):
     return best[1] if best else None
 
 
-GENERIC_TITLE = re.compile(r"^(agenda|programma|programme|overzicht|evenementen|events?|tickets?|kaarten|nu te zien|"
-                           r"tentoonstellingen?|voorstellingen?|concerten|home|welkom|\s|[^\w])+$", re.I)
+GENERIC_TITLE = re.compile(r"^(agenda|programma|programme|overzicht|evenementen|events?|tickets?|kaarten|koop|nu te zien|"
+                           r"tentoonstellingen?|voorstellingen?|concerten|films?|filmagenda|theateragenda|weekladder|"
+                           r"specials?|archief|home|welkom|verwacht|binnenkort|\d+|\s|[^\w])+$", re.I)
 
 
 def _slug_title(url):
@@ -365,6 +391,11 @@ def festival_event(src, F, log):
 def scrape_source(src, F, cache, cfg, log):
     if src.get("type") == "festival" and src.get("mode") != "agenda":
         return festival_event(src, F, log)
+    if src.get("platform") in film.PLATFORMS:
+        return film.scrape(src, F, cfg, log)
+    # Films draaien vaak meerdere keren per dag: dan hoort de tijd bij de sleutel
+    k = (lambda e: (e["date"], e["time"], e["title"].lower())) if src.get("type") == "film" \
+        else (lambda e: (e["date"], e["title"].lower()))
     events, pages = {}, [src["agenda_url"]] + src.get("extra_urls", [])
     seen_pages, links = set(), []
     max_pages = src.get("max_pages", cfg.get("source_max_pages", 8))
@@ -379,8 +410,9 @@ def scrape_source(src, F, cache, cfg, log):
         soup = BeautifulSoup(html, "html.parser")
         for o in jsonld_events(soup):
             ev = from_jsonld(o, url)
-            if ev:
-                events.setdefault((ev["date"], ev["title"].lower()), ev)
+            # Nummer als naam (sommige filmsites): die voorstelling halen we van de filmpagina zelf
+            if ev and not re.fullmatch(r"[\d\s#-]+", ev["title"]):
+                events.setdefault(k(ev), ev)
         for u in detail_links(soup, url, src.get("link_pattern")):
             if u not in links:
                 links.append(u)
@@ -404,6 +436,10 @@ def scrape_source(src, F, cache, cfg, log):
             if html:
                 soup = BeautifulSoup(html, "html.parser")
                 evs = [e for e in (from_jsonld(o, u) for o in jsonld_events(soup)) if e]
+                for e in evs:
+                    # Sommige sites zetten een nummer of kopje als naam in de JSON-LD; neem dan de paginatitel
+                    if re.fullmatch(r"[\d\s#-]+", e["title"]) or GENERIC_TITLE.match(e["title"]):
+                        e["title"] = pick_title(soup, u)
                 if not evs:
                     e = from_text(soup, u)
                     evs = [e] if e else []
@@ -415,7 +451,7 @@ def scrape_source(src, F, cache, cfg, log):
         if c and c.get("evs"):
             evs = c["evs"]
         for ev in evs:
-            events.setdefault((ev["date"], ev["title"].lower()), ev)
+            events.setdefault(k(ev), ev)
     skip = re.compile("|".join(map(re.escape, cfg.get("skip_title_words", []))) or "(?!)", re.I)
     out = []
     for e in events.values():
@@ -423,6 +459,14 @@ def scrape_source(src, F, cache, cfg, log):
         head = re.split(r"\s+[—|]\s+", e["title"])[0].strip()
         if len(head) >= 3:
             e["title"] = head
+        if src.get("type") == "film":
+            # "The Incomer - Filmvoorstelling" / "Film: Pressure" -> filmtitel
+            e["title"] = re.sub(r"\s+-\s+(filmvoorstelling|film|voorstelling)\b.*$|^film:\s*", "", e["title"], flags=re.I).strip()
+            # Een 'tijd' vóór 9 uur is bij film vrijwel altijd de speelduur (1:35), geen aanvang
+            if e.get("time") and e["time"] < "09:00":
+                e["time"] = None
+        if GENERIC_TITLE.match(e["title"]) or re.match(r"(programma|studio/k)\s*-", e["title"], re.I):
+            continue  # kopje van de site, geen voorstelling
         out.append(e)
     # Vangnet: dezelfde titel bij 3+ pagina's waarvan de link niets met die titel te maken heeft,
     # is een sitekopje ("Agenda overzicht"), geen voorstellingsnaam. Een reeks van één voorstelling
@@ -433,8 +477,12 @@ def scrape_source(src, F, cache, cfg, log):
     for e in out:
         urls = count[e["title"]]
         key = re.sub(r"[^a-z0-9]", "", e["title"].lower())[:8]
+        if src.get("type") == "film":
+            break  # films draaien vaak, met een ticketnummer als link: dat is geen sitekopje
         if len(urls) >= 3 and sum(key in re.sub(r"[^a-z0-9]", "", u.lower()) for u in urls) < len(urls) / 2:
-            e["title"] = _slug_title(e["url"]) or e["title"]
+            slug = _slug_title(e["url"])
+            if slug and not re.fullmatch(r"[\d\s]+", slug):
+                e["title"] = slug
     out = [e for e in out if not skip.search(e["title"])]  # geen bibliotheekdiensten, spreekuren e.d.
     log(f"  {src['name']}: {len(out)} items ({len(links)} links, {fetched} opgehaald)")
     return out
