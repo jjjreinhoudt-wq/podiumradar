@@ -351,6 +351,35 @@ document.addEventListener("click",e=>{
   const t=e.target.closest("nav.tabs button"); if(t){S.view=t.dataset.view;render();try{window.scrollTo(0,0)}catch{};return}
   if(e.target.id==="clearAll"||e.target.id==="clearAll2"){resetFilters();S.q="";$("#q").value="";if(S.view!=="grid")S.day=-1;render()}
 });
+/* Slepen met de muis om blokkenschema en datumrij opzij te schuiven (touch scrolt al vanzelf) */
+let drag=null;
+document.addEventListener("pointerdown",e=>{
+  if(e.pointerType!=="mouse"||e.button!==0) return;
+  const el=e.target.closest(".grid-wrap,.dates"); if(!el||el.scrollWidth<=el.clientWidth) return;
+  drag={el,x:e.clientX,left:el.scrollLeft,moved:false};
+  e.preventDefault(); // geen tekstselectie; klikken werkt gewoon
+});
+// Anders start de browser "tekst/link slepen" en breekt het schuiven af
+document.addEventListener("dragstart",e=>{if(e.target.closest&&e.target.closest(".grid-wrap,.dates")) e.preventDefault()});
+document.addEventListener("pointercancel",()=>{if(drag){drag.el.classList.remove("dragging");drag=null}});
+document.addEventListener("pointermove",e=>{
+  if(!drag) return; const dx=e.clientX-drag.x;
+  if(!drag.moved&&Math.abs(dx)<5) return;
+  drag.moved=true; drag.el.classList.add("dragging"); drag.el.scrollLeft=drag.left-dx; e.preventDefault();
+});
+document.addEventListener("pointerup",()=>{
+  if(!drag) return; drag.el.classList.remove("dragging");
+  // Na slepen geen klik laten doorgaan op het blok/de datum waar je losliet
+  if(drag.moved) noClickUntil=Date.now()+60;
+  drag=null;
+});
+let noClickUntil=0;
+document.addEventListener("click",ev=>{if(Date.now()<noClickUntil){ev.stopPropagation();ev.preventDefault()}},{capture:true});
+/* Scrollwiel boven de datumrij schuift die opzij */
+document.addEventListener("wheel",e=>{
+  const el=e.target.closest(".dates"); if(!el||el.scrollWidth<=el.clientWidth||e.shiftKey||Math.abs(e.deltaX)>Math.abs(e.deltaY)) return;
+  el.scrollLeft+=e.deltaY; e.preventDefault();
+},{passive:false});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheets();if(e.key==="Enter"&&e.target.matches(".ev[data-ev]"))openDetail(e.target.dataset.ev)});
 document.querySelectorAll(".seg [data-type]").forEach(b=>b.onclick=()=>{S.type=b.dataset.type;S.genre.clear();S.venue="";if(S.view!=="grid")S.day=-1;render()});
 let qt;$("#q").oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{S.q=e.target.value;render()},150)};

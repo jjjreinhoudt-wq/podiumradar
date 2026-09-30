@@ -92,6 +92,8 @@ h2.dh small{font-weight:400;color:var(--muted)}
 .empty button{margin-top:12px}
 
 /* schema */
+@media (pointer:fine){.grid-wrap,.dates{cursor:grab}}
+.grid-wrap.dragging,.dates.dragging{cursor:grabbing;user-select:none}
 .grid-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card);margin-top:10px}
 .grid{position:relative;min-width:calc(120px + var(--hours)*96px)}
 .ruler,.lane{display:grid;grid-template-columns:120px 1fr}
