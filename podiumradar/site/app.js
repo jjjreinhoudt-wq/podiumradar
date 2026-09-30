@@ -6,8 +6,8 @@ catch(e){ document.querySelector("#main").innerHTML='<div class="empty"><strong>
 const V={}, EV=[];
 const THEATER_GENRES=new Set(["Cabaret","Comedy","Musical","Toneel","Dans","Opera","Theater","Jeugd"]);
 // Soort locatie (uit de bron) -> tabblad in de app
-const TYPE_OF={thea:"thea",film:"thea",museum:"expo",festival:"fest"};
-const LBL={pop:["concert","concerten"],thea:["voorstelling","voorstellingen"],expo:["tentoonstelling","tentoonstellingen"],fest:["festival","festivals"]};
+const TYPE_OF={thea:"thea",film:"film",museum:"expo",festival:"fest"};
+const LBL={pop:["concert","concerten"],thea:["voorstelling","voorstellingen"],film:["filmvoorstelling","filmvoorstellingen"],expo:["tentoonstelling","tentoonstellingen"],fest:["festival","festivals"]};
 const today=new Date(); today.setHours(0,0,0,0);
 const toMin=t=>t?(+t.slice(0,2))*60+(+t.slice(3,5)):null;
 const dayNr=s=>{const [y,m,dd]=s.split("-").map(Number);return Math.round((new Date(y,m-1,dd)-today)/864e5)};
@@ -27,7 +27,7 @@ DATA.events.forEach(r=>{
   EV.push({id:r.id,title:r.title,artist:acts[0],support,v:r.v,genre:r.genre,type,date,d,
     time:toMin(r.time)??toMin(r.start)??toMin(r.doors), doors:toMin(r.doors), start:toMin(r.start),
     url:r.url,isFest:r.id[0]==="f"||type==="fest",status:r.status||null,firstSeen:r.first_seen,
-    endD,endDate:r.end?new Date(...r.end.split("-").map((x,i)=>i===1?x-1:+x)):null,started});
+    dur:r.dur||null,endD,endDate:r.end?new Date(...r.end.split("-").map((x,i)=>i===1?x-1:+x)):null,started});
 });
 const SNAPSHOT=(()=>{const [dpart,t]=DATA.updated.split(" ");const [y,m,d]=dpart.split("-").map(Number);return d+" "+["januari","februari","maart","april","mei","juni","juli","augustus","september","oktober","november","december"][m-1]+" om "+t})();
 const recent=e=>e.firstSeen&&(today-new Date(e.firstSeen))/864e5<=3;
@@ -77,6 +77,7 @@ const alarmHit=e=>S.alarms.find(a=>(e.title+" "+V[e.v].name+" "+V[e.v].city).toL
 function slots(e){
   if(e.time==null) return [];
   const t=e.start??e.time;
+  if(e.type==="film") return [{k:"main",l:"Film",a:e.artist,s:t,e:t+(e.dur||120),est:!e.dur}];
   if(e.type==="thea") return [{k:"door",l:"Zaal open",s:e.doors??t-30,e:t,est:e.doors==null},{k:"main",l:"Voorstelling",a:e.artist,s:t,e:t+120,est:false}];
   if(e.genre==="Feest"||(e.genre==="Dance"&&t>=22*60)) return [{k:"main",l:"Feest",a:e.artist,s:t,e:t+240}];
   if(e.isFest) return [{k:"main",l:"Festival",a:e.artist,s:t,e:t+360}];
@@ -213,7 +214,7 @@ function viewFav(){
   return h;
 }
 function render(){
-  ["thea","expo","fest"].forEach(t=>document.body.classList.toggle(t,S.type===t));
+  ["thea","film","expo","fest"].forEach(t=>document.body.classList.toggle(t,S.type===t));
   document.querySelectorAll(".seg [data-type]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.type===S.type));
   document.querySelectorAll("nav.tabs button").forEach(b=>b.dataset.view===S.view?b.setAttribute("aria-current","page"):b.removeAttribute("aria-current"));
   const n=fcount(); $("#fcount").hidden=!n; $("#fcount").textContent=n;

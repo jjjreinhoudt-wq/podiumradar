@@ -20,6 +20,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 BRONNEN = ROOT / "scraper/bronnen.json"
 CACHE = ROOT / "scraper/detail_cache.json"
 TODAY = dt.date.today()
+CACHE_V = 2  # ophogen als het uitlezen verandert, zodat gecachte pagina's opnieuw worden gelezen
 
 DETAIL_RE = re.compile(r"/(agenda|programma|programme|event|events|evenement|evenementen|concert|concerten|"
                        r"voorstelling|voorstellingen|show|shows|tentoonstelling|tentoonstellingen|exhibition|"
@@ -193,16 +194,50 @@ def _txt_date(txt):
     return best[1] if best else None
 
 
+GENERIC_TITLE = re.compile(r"^(agenda|programma|programme|overzicht|evenementen|events?|tickets?|kaarten|nu te zien|"
+                           r"tentoonstellingen?|voorstellingen?|concerten|home|welkom|\s|[^\w])+$", re.I)
+
+
+def _slug_title(url):
+    last = [p for p in urlparse(url).path.split("/") if p][-1:] or [""]
+    s = re.sub(r"[-_]+", " ", re.sub(r"^\d+-|-\d+$|\.\w+$", "", last[0])).strip()
+    return s[:1].upper() + s[1:]
+
+
+def clean_title(t, site=""):
+    t = unescape(t or "").strip()
+    if site:
+        t = re.sub(r"\s*[|–—:-]\s*" + re.escape(site) + r"\s*$", "", t, flags=re.I)
+    t = re.sub(r"\s*[|–—]\s*[^|–—]{2,40}$", "", t) if re.search(r"\s[|–—]\s", t) else t
+    # "Spiritbox op 3 oktober 2026 naar AFAS Live!" -> "Spiritbox"
+    t = re.sub(r"\s+(op|on|in|at|@)\s+(ma|di|wo|do|vr|za|zo|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)?\.?\s*"
+               r"\d{1,2}[\s./-]+\w+[\s./-]+\d{2,4}\b.*$", "", t, flags=re.I)
+    if site:
+        t = re.sub(r"\s+(naar|in|bij|live in|@)\s+" + re.escape(site) + r".*$", "", t, flags=re.I)
+    return t.strip(" -|!")
+
+
+def pick_title(soup, url):
+    """Titel van een voorstellingspagina: h1, tenzij dat een algemeen kopje is ('Agenda overzicht')."""
+    site = (soup.find("meta", property="og:site_name") or {}).get("content", "")
+    h1 = soup.find("h1")
+    cands = [h1.get_text(" ", strip=True) if h1 else "",
+             (soup.find("meta", property="og:title") or {}).get("content", ""),
+             soup.title.get_text(" ", strip=True) if soup.title else ""]
+    for c in cands:
+        c = clean_title(c, site)
+        if c and len(c) > 1 and not GENERIC_TITLE.match(c) and c.lower() != site.lower():
+            return c
+    return _slug_title(url)
+
+
 def from_text(soup, url):
     """Terugval als er geen bruikbare JSON-LD is: titel uit og:title/h1, datum en tijd uit de tekst."""
     main = soup.find("main") or soup.find("article") or soup.body or soup
     for bad in main.find_all(["nav", "footer", "header", "script", "style", "form"]):
         bad.decompose()
     txt = main.get_text("\n", strip=True)[:6000]
-    h1 = soup.find("h1")
-    og = soup.find("meta", property="og:title")
-    title = (h1.get_text(" ", strip=True) if h1 else "") or (og.get("content", "") if og else "")
-    title = re.split(r"\s+[|–—-]\s+(?=[^|–—-]*$)", title)[0].strip() if "|" in title else title.strip()
+    title = pick_title(soup, url)
     d = _txt_date(txt)
     end = None
     # Periode, bv. "12 sep 2026 t/m 10 jan 2027" of "nog t/m 10 januari 2027" (tentoonstellingen, festivals)
@@ -360,7 +395,7 @@ def scrape_source(src, F, cache, cfg, log):
         c = cache.get(u)
         # Opnieuw ophalen als de cache oud is, of als de voorstelling binnen twee weken is (tijden/uitverkocht).
         soon = c and c.get("ev") and c["ev"]["date"] <= (TODAY + dt.timedelta(days=14)).isoformat()
-        if c and c.get("at", "") >= fresh and not (soon and c.get("at") != TODAY.isoformat()):
+        if c and c.get("v") == CACHE_V and c.get("at", "") >= fresh and not (soon and c.get("at") != TODAY.isoformat()):
             evs = [c["ev"]] if c.get("ev") else []
         else:
             html = F.get(u)
@@ -372,7 +407,7 @@ def scrape_source(src, F, cache, cfg, log):
                 if not evs:
                     e = from_text(soup, u)
                     evs = [e] if e else []
-            cache[u] = {"at": TODAY.isoformat(), "ev": evs[0] if len(evs) == 1 else None}
+            cache[u] = {"at": TODAY.isoformat(), "v": CACHE_V, "ev": evs[0] if len(evs) == 1 else None}
             if len(evs) > 1:
                 cache[u]["evs"] = evs
             elif not evs:
@@ -381,8 +416,28 @@ def scrape_source(src, F, cache, cfg, log):
             evs = c["evs"]
         for ev in evs:
             events.setdefault((ev["date"], ev["title"].lower()), ev)
-    log(f"  {src['name']}: {len(events)} items ({len(links)} links, {fetched} opgehaald)")
-    return list(events.values())
+    skip = re.compile("|".join(map(re.escape, cfg.get("skip_title_words", []))) or "(?!)", re.I)
+    out = []
+    for e in events.values():
+        # "Meeuw — Het Nationale Theater | regie Nina Spijkers" -> "Meeuw"
+        head = re.split(r"\s+[—|]\s+", e["title"])[0].strip()
+        if len(head) >= 3:
+            e["title"] = head
+        out.append(e)
+    # Vangnet: dezelfde titel bij 3+ pagina's waarvan de link niets met die titel te maken heeft,
+    # is een sitekopje ("Agenda overzicht"), geen voorstellingsnaam. Een reeks van één voorstelling
+    # (zelfde titel, link met die titel erin) blijft gewoon staan.
+    count = {}
+    for e in out:
+        count.setdefault(e["title"], set()).add(e["url"])
+    for e in out:
+        urls = count[e["title"]]
+        key = re.sub(r"[^a-z0-9]", "", e["title"].lower())[:8]
+        if len(urls) >= 3 and sum(key in re.sub(r"[^a-z0-9]", "", u.lower()) for u in urls) < len(urls) / 2:
+            e["title"] = _slug_title(e["url"]) or e["title"]
+    out = [e for e in out if not skip.search(e["title"])]  # geen bibliotheekdiensten, spreekuren e.d.
+    log(f"  {src['name']}: {len(out)} items ({len(links)} links, {fetched} opgehaald)")
+    return out
 
 
 def collect(cfg, only=None, log=print):

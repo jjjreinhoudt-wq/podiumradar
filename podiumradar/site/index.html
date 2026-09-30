@@ -18,7 +18,7 @@
 :root{
   --paper:#EDEFF4; --card:#FFFFFF; --ink:#161A2C; --muted:#5B6178; --line:#D5D9E4;
   --pop:#2446F0; --pop-soft:#DCE2FF; --thea:#A32465; --thea-soft:#F7DCE9;
-  --expo:#1F7A4D; --expo-soft:#D6EFE1; --fest:#B8560A; --fest-soft:#FBE3CF;
+  --expo:#1F7A4D; --expo-soft:#D6EFE1; --fest:#B8560A; --fest-soft:#FBE3CF; --film:#5B3FB8; --film-soft:#E4DCFA;
   --star:#E89B00; --warn:#C43A1C;
   --acc:var(--pop); --acc-soft:var(--pop-soft);
   box-sizing:border-box;
@@ -29,16 +29,17 @@
   :root:not([data-theme="light"]){
     --paper:#10131F; --card:#1A1E2E; --ink:#EEF0F7; --muted:#9AA0B8; --line:#2C3147;
     --pop:#6F86FF; --pop-soft:#232B55; --thea:#E0679F; --thea-soft:#48213A; --star:#FFB829; --warn:#FF7A5C;
-    --expo:#4CC38A; --expo-soft:#1B3A2B; --fest:#F2934A; --fest-soft:#46301D;
+    --expo:#4CC38A; --expo-soft:#1B3A2B; --fest:#F2934A; --fest-soft:#46301D; --film:#A48BFF; --film-soft:#2E2552;
   }
 }
 :root[data-theme="dark"]{
   --paper:#10131F; --card:#1A1E2E; --ink:#EEF0F7; --muted:#9AA0B8; --line:#2C3147;
   --pop:#6F86FF; --pop-soft:#232B55; --thea:#E0679F; --thea-soft:#48213A; --star:#FFB829; --warn:#FF7A5C;
-  --expo:#4CC38A; --expo-soft:#1B3A2B; --fest:#F2934A; --fest-soft:#46301D;
+  --expo:#4CC38A; --expo-soft:#1B3A2B; --fest:#F2934A; --fest-soft:#46301D; --film:#A48BFF; --film-soft:#2E2552;
 }
 body.thea{--acc:var(--thea); --acc-soft:var(--thea-soft);}
 body.expo{--acc:var(--expo); --acc-soft:var(--expo-soft);}
+body.film{--acc:var(--film); --acc-soft:var(--film-soft);}
 body.fest{--acc:var(--fest); --acc-soft:var(--fest-soft);}
 *,*::before,*::after{box-sizing:inherit}
 html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -184,6 +185,7 @@ select.sel{width:100%;padding:10px;border-radius:10px;border:1px solid var(--lin
     <div class="seg" role="group" aria-label="Soort">
       <button data-type="pop" aria-pressed="true">Muziek</button>
       <button data-type="thea" aria-pressed="false">Theater</button>
+      <button data-type="film" aria-pressed="false">Film</button>
       <button data-type="expo" aria-pressed="false">Musea</button>
       <button data-type="fest" aria-pressed="false">Festivals</button>
     </div>
