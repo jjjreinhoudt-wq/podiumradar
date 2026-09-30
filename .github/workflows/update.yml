@@ -37,7 +37,8 @@ jobs:
           git config user.name "podiumradar-bot"
           git config user.email "actions@users.noreply.github.com"
           git add -A site scraper
-          git diff --cached --quiet || (git commit -m "Agenda bijgewerkt" && git push)
+          # Tijdens een lange run kan er intussen iets op main zijn gezet: eerst bijwerken, dan pushen
+          git diff --cached --quiet || (git commit -m "Agenda bijgewerkt" && git pull --rebase -X theirs origin main && git push)
 
   deploy:
     needs: scrape
