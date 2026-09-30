@@ -243,9 +243,14 @@ def podiuminfo_events():
 
 def own_events():
     """Events van de eigen sites van podia, theaters, musea en festivals (scraper/bronnen.json)."""
-    events = {}
+    events, seen = {}, set()
     for src, evs in sources.collect(CFG, only=ARGS.source):
         for ev in evs:
+            # Zelfde voorstelling via twee bronnen (bv. dubbel in de lijst): één keer tonen
+            key = (ev["url"].split("?")[0].rstrip("/"), ev["date"], ev.get("time"))
+            if key in seen:
+                continue
+            seen.add(key)
             e = dict(ev, venue=src["name"], city=src.get("city", ""), prov=src.get("prov", ""),
                      vtype=src.get("type", "pop"), kind=src.get("type", "pop"))
             e["genre"] = src.get("genre") or guess_genre(e["title"], e["vtype"])
