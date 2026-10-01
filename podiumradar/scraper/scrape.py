@@ -314,7 +314,9 @@ def own_events():
             e["genre"] = "Film" if is_film(e["title"], e["url"], e["vtype"], screening) \
                 else src.get("genre") or guess_genre(e["title"], e["vtype"])
             # Films draaien meerdere keren per dag: tijd hoort dan bij de id
-            idkey = f"{src['name']}|{e['date']}|{e['title']}" + (f"|{e['time']}" if e["vtype"] == "film" else "")
+            # Lopende tentoonstelling zonder bekende begindatum: id op de einddatum, anders is hij elke dag 'nieuw'
+            when = f"t/m {e['end']}" if e.pop("ongoing", False) and e.get("end") else e["date"]
+            idkey = f"{src['name']}|{when}|{e['title']}" + (f"|{e['time']}" if e["vtype"] == "film" else "")
             e["id"] = "s" + hashlib.sha1(idkey.encode()).hexdigest()[:10]
             events[e["id"]] = e
     return events

@@ -16,6 +16,8 @@ from urllib.parse import urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
 import film
+import museum
+import venues
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BRONNEN = ROOT / "scraper/bronnen.json"
@@ -32,10 +34,13 @@ SKIP_RE = re.compile(r"\.(jpe?g|png|gif|svg|pdf|ics|zip|mp[34])$|/(tag|categor(y
 
 MONTHS = {"jan": 1, "feb": 2, "mrt": 3, "maa": 3, "mar": 3, "apr": 4, "mei": 5, "may": 5, "jun": 6, "jul": 7,
           "aug": 8, "sep": 9, "okt": 10, "oct": 10, "nov": 11, "dec": 12}
-TXT_DATE_RE = re.compile(r"\b(\d{1,2})\s+(jan|feb|mrt|maa|mar|apr|mei|may|jun|jul|aug|sep|okt|oct|nov|dec)[a-z]*\.?"
-                         r"(?:\s+'?(\d{4}|\d{2}))?\b", re.I)
+# Alleen echte maandnamen met woordgrens: anders is "05 Maassilo" 5 maart en "12 Junior" 12 juni
+TXT_DATE_RE = re.compile(
+    r"\b(\d{1,2})\s+(jan(?:uari|uary)?|feb(?:ruari|ruary)?|mrt|maart|mar(?:ch)?|apr(?:il)?|mei|may|jun[ie]?|jul[iy]?|"
+    r"aug(?:ustus|ust)?|sep(?:t(?:ember)?)?|okt(?:ober)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\b"
+    r"(?:\s+'?(\d{4}|\d{2})(?![:.]\d))?\b", re.I)  # "3 okt 12:40": 12 is geen jaartal
 NUM_DATE_RE = re.compile(r"\b(\d{1,2})[-/.](\d{1,2})[-/.](20\d{2})\b")
-TIME_RE = re.compile(r"\b([01]?\d|2[0-3])[:.]([0-5]\d)\s*(?:uur|u\b)?", re.I)
+TIME_RE = re.compile(r"\b([01]?\d|2[0-3])[:.]([0-5]\d)(?![.\-/]\d)\s*(?:uur|u\b)?", re.I)  # "03.10.2026" is geen 03:10
 
 
 # ---------------------------------------------------------------- ophalen
@@ -84,7 +89,7 @@ class Fetcher:
             st = self.stats.setdefault(urlparse(host).netloc.removeprefix("www."), {})
             st[what] = st.get(what, 0) + 1
 
-    def _fetch(self, url, params=None):
+    def _fetch(self, url, params=None, json_body=None):
         host = self._host(url)
         with self.locks[host]:
             if not self.allowed(url):
@@ -98,7 +103,8 @@ class Fetcher:
                 time.sleep(wait)
             self.last[ip] = time.time()
             try:
-                r = self.S.get(url, params=params, timeout=30)
+                r = self.S.post(url, json=json_body, timeout=30) if json_body is not None \
+                    else self.S.get(url, params=params, timeout=30)
             except requests.RequestException as e:
                 self._note(host, "timeout" if isinstance(e, requests.Timeout) else "verbindingsfout")
                 return None
@@ -114,6 +120,14 @@ class Fetcher:
 
     def get_json(self, url, params=None):
         r = self._fetch(url, params)
+        try:
+            return r.json() if r is not None else None
+        except ValueError:
+            return None
+
+    def post_json(self, url, body):
+        """POST met JSON (sommige sites halen hun agenda zo op); zelfde pauze en robots-regels als get."""
+        r = self._fetch(url, json_body=body)
         try:
             return r.json() if r is not None else None
         except ValueError:
@@ -178,7 +192,7 @@ def _name(x):
 
 def from_jsonld(o, page_url):
     d, t = _iso(o.get("startDate"))
-    if not d:
+    if not d or d.year < 2000:  # kapotte JSON-LD (bv. 1970-01-01): dan liever de tekst lezen
         return None
     end, end_t = _iso(o.get("endDate"))
     if end and end_t and end_t < "08:00" and (end - d).days == 1:
@@ -288,6 +302,9 @@ def from_text(soup, url):
     """Terugval als er geen bruikbare JSON-LD is: titel uit og:title/h1, datum en tijd uit de tekst."""
     main = soup.find("main") or soup.find("article") or soup.body or soup
     for bad in main.find_all(["nav", "footer", "header", "script", "style", "form"]):
+        # Een <header> ín de voorstelling (Melkweg: datum en tijd staan daar) laten staan; alleen de sitekop weg
+        if bad.name == "header" and main.name in ("main", "article"):
+            continue
         bad.decompose()
     txt = main.get_text("\n", strip=True)[:6000]
     title = pick_title(soup, url)
@@ -310,7 +327,7 @@ def from_text(soup, url):
         return f"{int(m.group(2)):02d}:{m.group(3)}" if m else None
 
     doors = grab(r"(deuren open|zaal open|deur open|doors)")
-    start = grab(r"(aanvang|start|begint|showtime|begintijd)")
+    start = grab(r"(aanvang|start|begint|showtime|begintijd|tijd\s*:)")
     t = start or doors
     if not t:
         m = TIME_RE.search(txt)
@@ -327,13 +344,17 @@ def from_text(soup, url):
     return ev
 
 
-def detail_links(soup, page_url, pattern=None):
+def detail_links(soup, page_url, pattern=None, attrs=()):
+    """Links naar voorstellingspagina's. attrs: extra attributen met een link (bv. data-target bij Grenswerk)."""
     host = urlparse(page_url).netloc.removeprefix("www.")
     rx = re.compile(pattern, re.I) if pattern else DETAIL_RE
     base = page_url.split("#")[0].rstrip("/")
     seen = []
-    for a in soup.find_all("a", href=True):
-        u = urljoin(page_url, a["href"]).split("#")[0]
+    hrefs = [a["href"] for a in soup.find_all("a", href=True)]
+    for at in attrs:
+        hrefs += [x[at] for x in soup.find_all(attrs={at: True})]
+    for href in hrefs:
+        u = urljoin(page_url, href).split("#")[0]
         p = urlparse(u)
         if p.netloc.removeprefix("www.") != host or u.rstrip("/") == base or SKIP_RE.search(u):
             continue
@@ -362,9 +383,15 @@ MON = r"(jan|feb|mrt|maa|mar|apr|mei|may|jun|jul|aug|sep|okt|oct|nov|dec)[a-z]*\
 # "12, 13 & 14 juni 2027", "5 t/m 7 juni", "24-26 juli 2026", "vr 3 - zo 5 juli"
 FEST_RE = re.compile(r"\b(\d{1,2})(?:\s*(?:[-–—/&,]|t/m|tot en met|en|and)\s*(?:[a-z]{2,9}\.?\s+)?(\d{1,2}))*\s+"
                      + MON + r"(?:\s+'?(\d{4}|\d{2}))?\b", re.I)
-# "30 mei - 1 juni 2027"
-FEST2_RE = re.compile(r"\b(\d{1,2})\s+" + MON + r"(?:\s+(\d{4}))?\s*(?:[-–—]|t/m|tot en met)\s*(?:[a-z]{2,9}\.?\s+)?"
+# "30 mei - 1 juni 2027", "Fri 27 Aug till Mon 30 Aug"
+FEST2_RE = re.compile(r"\b(\d{1,2})\s+" + MON + r"(?:\s+(\d{4}))?\s*(?:[-–—]|t/m|tot en met|tot|till|until)\s*(?:[a-z]{2,9}\.?\s+)?"
                       r"(\d{1,2})\s+" + MON + r"(?:\s+(\d{4}))?", re.I)
+# Engels, maand eerst: "June 24 - 27", "April 15-18, 2027", "June 24-25-26", "August 14 2027"
+FEST3_RE = re.compile(r"\b" + MON + r"\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*(?:[-–—&/]|t/m|to|till|until)\s*(?:" + MON
+                      + r"\s+)?(\d{1,2})(?:st|nd|rd|th)?)*(?:,?\s+(\d{4}))?(?![\d:])", re.I)
+# Cijfers: "26.11.2026 t/m 17.01.2027", "14.08.2027"
+FESTNUM_RE = re.compile(r"\b(\d{1,2})[./-](\d{1,2})[./-](20\d{2})(?:\s*(?:[-–—]|t/m|tot en met|tot)\s*"
+                        r"(\d{1,2})[./-](\d{1,2})[./-](20\d{2}))?")
 
 
 def festival_event(src, F, log):
@@ -384,32 +411,71 @@ def festival_event(src, F, log):
                                       (soup.find("meta", property="og:description") or {}).get("content"),
                                       soup.get_text(" ", strip=True)[:8000]]))
 
-        def mk(day, mon, yy):
-            m = MONTHS[mon.lower()[:3]]
+        def mk(day, mon, yy, pos):
+            m = MONTHS[mon.lower()[:3]] if not str(mon).isdigit() else int(mon)
+            if not yy:
+                # "Noorderzon 2026 vindt plaats van 20 - 30 augustus": jaartal kort ervoor geldt. Dan niet
+                # doorschuiven naar volgend jaar (anders wordt een oude tekst een valse datum voor volgend jaar).
+                hint = re.findall(r"\b(20\d{2})\b", head[max(0, pos - 40):pos])
+                if hint:
+                    return dt.date(int(hint[-1]), m, int(day))
             y = (2000 + int(yy) if yy and len(yy) == 2 else int(yy)) if yy else TODAY.year
             d = dt.date(y, m, int(day))
             return d.replace(year=y + 1) if not yy and d < TODAY - dt.timedelta(days=7) else d
 
-        found = None
+        def ok(a, b, pos=None):
+            # "tickets on sale until June 2nd" / "t/m 5 mei bestellen": geen festivaldatum
+            if pos is not None and a == b and re.search(r"(until|till|tot|t/m|before|voor|deadline|uiterlijk)\s*$",
+                                                        head[max(0, pos - 12):pos], re.I):
+                return False
+            # Een eendaagse datum van vandaag komt vrijwel altijd uit een nieuwsbericht
+            if a == b == TODAY:
+                return False
+            # Bekend in welke maand het festival normaal is (bronnen.json "month")? Dan niet ver daarvandaan
+            # (alleen bij een losse datum: een duidelijke periode op de site is betrouwbaarder dan onze lijst)
+            usual = MONTHS.get(str(src.get("month", "")).lower()[:3])
+            if a == b and usual and min((a.month - usual) % 12, (usual - a.month) % 12) > 1:
+                return False
+            return a <= b and (b - a).days < 75 and b >= TODAY and a.year <= TODAY.year + 1
+
+        cands = []  # (positie, start, eind): de eerste geldige periode in de tekst wint
         for m in FEST2_RE.finditer(head):
             try:
-                a = mk(m.group(1), m.group(2), m.group(3) or m.group(6))
-                b = mk(m.group(4), m.group(5), m.group(6))
+                a = mk(m.group(1), m.group(2), m.group(3) or m.group(6), m.start())
+                b = mk(m.group(4), m.group(5), m.group(6), m.start())
             except ValueError:
                 continue
-            if a <= b and (b - a).days < 45 and b >= TODAY:
-                found = (a, b)
+            if ok(a, b, m.start()):
+                cands.append((m.start(), a, b))
                 break
-        if not found:
-            for m in FEST_RE.finditer(head):
-                try:
-                    a = mk(m.group(1), m.group(3), m.group(4))
-                    b = mk(m.group(2), m.group(3), m.group(4)) if m.group(2) else a
-                except ValueError:
-                    continue
-                if a <= b and (b - a).days < 45 and b >= TODAY and a.year <= TODAY.year + 1:
-                    found = (a, b)
-                    break
+        for m in FEST_RE.finditer(head):
+            try:
+                a = mk(m.group(1), m.group(3), m.group(4), m.start())
+                b = mk(m.group(2), m.group(3), m.group(4), m.start()) if m.group(2) else a
+            except ValueError:
+                continue
+            if ok(a, b, m.start()):
+                cands.append((m.start(), a, b))
+                break
+        for m in FEST3_RE.finditer(head):
+            try:
+                a = mk(m.group(2), m.group(1), m.group(5), m.start())
+                b = mk(m.group(4), m.group(3) or m.group(1), m.group(5), m.start()) if m.group(4) else a
+            except ValueError:
+                continue
+            if ok(a, b, m.start()):
+                cands.append((m.start(), a, b))
+                break
+        for m in FESTNUM_RE.finditer(head):
+            try:
+                a = dt.date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+                b = dt.date(int(m.group(6)), int(m.group(5)), int(m.group(4))) if m.group(4) else a
+            except ValueError:
+                continue
+            if ok(a, b, m.start()):
+                cands.append((m.start(), a, b))
+                break
+        found = min(cands, key=lambda c: c[0])[1:] if cands else None
         if not found:
             log(f"  {src['name']}: geen festivaldatum gevonden")
             return []
@@ -428,6 +494,12 @@ def scrape_source(src, F, cache, cfg, log):
         return festival_event(src, F, log)
     if src.get("platform") in film.PLATFORMS:
         return film.scrape(src, F, cfg, log)
+    if src.get("platform") in museum.PLATFORMS:
+        return museum.scrape(src, F, cfg, log)
+    if src.get("platform") in venues.PLATFORMS:
+        return venues.scrape(src, F, cfg, log)
+    # Tentoonstellingen: periode ("t/m ...") in plaats van één datum
+    text_reader = museum.from_text_museum if src.get("type") == "museum" else from_text
     # Films draaien vaak meerdere keren per dag: dan hoort de tijd bij de sleutel
     k = (lambda e: (e["date"], e["time"], e["title"].lower())) if src.get("type") == "film" \
         else (lambda e: (e["date"], e["title"].lower()))
@@ -448,7 +520,7 @@ def scrape_source(src, F, cache, cfg, log):
             # Nummer als naam (sommige filmsites): die voorstelling halen we van de filmpagina zelf
             if ev and not re.fullmatch(r"[\d\s#-]+", ev["title"]):
                 events.setdefault(k(ev), ev)
-        for u in detail_links(soup, url, src.get("link_pattern")):
+        for u in detail_links(soup, url, src.get("link_pattern"), src.get("link_attrs", ())):
             if u not in links:
                 links.append(u)
         pages += [p for p in next_pages(soup, url, html) if p not in seen_pages]
@@ -476,7 +548,7 @@ def scrape_source(src, F, cache, cfg, log):
                     if re.fullmatch(r"[\d\s#-]+", e["title"]) or GENERIC_TITLE.match(e["title"]):
                         e["title"] = pick_title(soup, u)
                 if not evs:
-                    e = from_text(soup, u)
+                    e = text_reader(soup, u)
                     evs = [e] if e else []
                 # Alleen een deel van het gebouw (bv. Willem Twee: "Locatie Poppodium", niet de Kunstruimte)
                 page_txt = soup.get_text(" ", strip=True)
@@ -494,9 +566,12 @@ def scrape_source(src, F, cache, cfg, log):
     for e in events.values():
         # "Meeuw — Het Nationale Theater | regie Nina Spijkers" -> "Meeuw"
         # "Wodan Boys // zaterdag 10 oktober, Willem Twee Den Bosch" -> "Wodan Boys"
-        head = re.split(r"\s+[—|]\s+|\s*//\s*", e["title"])[0].strip()
-        if len(head) >= 3:
-            e["title"] = head
+        parts = [p.strip() for p in re.split(r"\s+[—|]\s+|\s*//\s*", e["title"]) if p.strip()]
+        # "Jazz Podium Goirle | Laranja": is het eerste deel de naam van de bron zelf, dan het tweede deel
+        if len(parts) > 1 and re.sub(r"\W", "", parts[0].lower()) in re.sub(r"\W", "", src["name"].lower()):
+            parts = parts[1:]
+        if parts and len(parts[0]) >= 3:
+            e["title"] = parts[0]
         if src.get("type") == "film":
             # "The Incomer - Filmvoorstelling" / "Film: Pressure" -> filmtitel
             e["title"] = re.sub(r"\s+-\s+(filmvoorstelling|film|voorstelling)\b.*$|^film:\s*", "", e["title"], flags=re.I).strip()
