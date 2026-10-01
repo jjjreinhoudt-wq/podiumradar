@@ -20,6 +20,7 @@ import film
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BRONNEN = ROOT / "scraper/bronnen.json"
 CACHE = ROOT / "scraper/detail_cache.json"
+REPORT = ROOT / "scraper/rapport.json"
 TODAY = dt.date.today()
 CACHE_V = 3  # ophogen als het uitlezen verandert, zodat gecachte pagina's opnieuw worden gelezen
 
@@ -47,6 +48,7 @@ class Fetcher:
         self.S.headers.update({"User-Agent": ua, "Accept-Language": "nl,en;q=0.5"})
         self.ua, self.delay = ua, delay
         self.robots, self.last, self.locks, self.ip_locks, self.host_ip = {}, {}, {}, {}, {}
+        self.stats = {}  # per site: hoe vaak welke antwoordcode (voor scraper/rapport.json)
         self.guard = threading.Lock()
 
     def _host(self, url):
@@ -77,10 +79,16 @@ class Fetcher:
             self.robots[host] = rp
         return self.robots[host].can_fetch(self.ua, url)
 
+    def _note(self, host, what):
+        with self.guard:
+            st = self.stats.setdefault(urlparse(host).netloc.removeprefix("www."), {})
+            st[what] = st.get(what, 0) + 1
+
     def _fetch(self, url, params=None):
         host = self._host(url)
         with self.locks[host]:
             if not self.allowed(url):
+                self._note(host, "robots")
                 return None
             # Vraagt de site in robots.txt om meer tijd tussen verzoeken, dan houden we ons daaraan (max 10 s)
             delay = max(self.delay, min(10, self.robots[host].crawl_delay(self.ua) or 0))
@@ -91,8 +99,10 @@ class Fetcher:
             self.last[ip] = time.time()
             try:
                 r = self.S.get(url, params=params, timeout=30)
-            except requests.RequestException:
+            except requests.RequestException as e:
+                self._note(host, "timeout" if isinstance(e, requests.Timeout) else "verbindingsfout")
                 return None
+        self._note(host, str(r.status_code))
         return r if r.status_code == 200 else None
 
     def get(self, url):
@@ -544,4 +554,15 @@ def collect(cfg, only=None, log=print):
     horizon = (TODAY - dt.timedelta(days=cfg.get("cache_keep_days", 30))).isoformat()
     cache = {k: v for k, v in cache.items() if v.get("at", "") >= horizon}
     CACHE.write_text(json.dumps(cache, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    if not only:
+        # Rapport per bron: aantal items en de antwoorden van de site (403 = geblokkeerd, 404 = verkeerde link, ...)
+        rep = []
+        for src, evs in results:
+            site = urlparse(src["agenda_url"]).netloc.removeprefix("www.")
+            rep.append({"name": src["name"], "type": src.get("type"), "items": len(evs),
+                        "site": site, "antwoorden": F.stats.get(site, {})})
+        rep.sort(key=lambda r: (r["items"] > 0, r["type"] or "", r["name"]))
+        REPORT.write_text(json.dumps({"datum": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                      "werkt": sum(1 for r in rep if r["items"]), "totaal": len(rep), "bronnen": rep},
+                                     ensure_ascii=False, indent=1), encoding="utf-8")
     return results
