@@ -182,6 +182,8 @@ def from_jsonld(o, page_url):
           "url": o.get("url") if isinstance(o.get("url"), str) and o["url"].startswith("http") else page_url}
     if end and end > d:
         ev["end"] = end.isoformat()
+    if "ScreeningEvent" in str(o.get("@type")):
+        ev["screening"] = True  # de site zegt zelf dat het een filmvertoning is
     perf = [p for p in re.split(r"\s*,\s*", _name(o.get("performer"))) if p and p.lower() != title.lower()]
     if len(perf) > 1 and "Screening" not in str(o.get("@type")):  # bij films zijn dit acteurs
         ev["support"] = perf[1:4]

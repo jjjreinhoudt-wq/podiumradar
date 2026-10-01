@@ -43,7 +43,7 @@ function travel(vid){const v=V[vid], h=S.homeXY; if(v.lat==null) return {car:nul
 
 /* ---------- STATE ---------- */
 const store={get(k,f){try{const v=localStorage.getItem(k);return v?JSON.parse(v):f}catch{return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
-const S={type:"pop",view:"list",day:-1,q:"",sort:"date",regio:new Set(),venue:"",genre:new Set(),time:"",maxTravel:0,onlyFav:false,
+const S={type:"pop",view:"list",day:-1,q:"",sort:"date",regio:new Set(),venue:"",genre:new Set(),time:"",maxTravel:0,onlyFav:false,showFilm:false,
   fav:new Set(store.get("pr_fav2",[])), alarms:store.get("pr_alarms",[]), home:store.get("pr_home","Tilburg"), homeXY:null};
 S.homeXY = S.home==="__geo" ? store.get("pr_geo",HOMES.Tilburg) : (HOMES[S.home]||HOMES.Tilburg);
 // nieuw-sinds-laatste-bezoek
@@ -71,6 +71,8 @@ const isFav=e=>S.fav.has(e.ak)||e.support.some(s=>S.fav.has(artistKey(s)));
 function toggleFav(ak,name){ if(S.fav.has(ak)){S.fav.delete(ak);toast(name+" niet meer gevolgd")} else {S.fav.add(ak);toast("Je volgt nu "+name)}
   store.set("pr_fav2",[...S.fav]); store.set("pr_favnames",Object.assign(store.get("pr_favnames",{}),{[ak]:name})); render(); }
 const favName=ak=>store.get("pr_favnames",{})[ak]||(EV.find(e=>e.ak===ak)||{}).artist||ak;
+// Films tussen muziek/theater/festivals zijn standaard verborgen ("Toon films" in de filters); het tabblad Film toont ze altijd
+const inTab=(e,films=S.showFilm)=>e.type===S.type&&(films||e.type==="film"||e.genre!=="Film");
 const alarmHit=e=>S.alarms.find(a=>(e.title+" "+V[e.v].name+" "+V[e.v].city).toLowerCase().includes(a.toLowerCase()));
 
 /* timetable: bron geeft één tijd; de rest is een schatting */
@@ -91,10 +93,10 @@ function slots(e){
 }
 const endOf=e=>{const s=slots(e);return s.length?s[s.length-1].e:null};
 
-function filtered(ignoreDay){
+function filtered(ignoreDay,films=S.showFilm){
   const q=S.q.trim().toLowerCase();
   let list=EV.filter(e=>{
-    if(e.type!==S.type) return false;
+    if(!inTab(e,films)) return false;
     const v=V[e.v];
     if(!ignoreDay&&S.day>=0&&!onDay(e,S.day)) return false;
     if(S.regio.size&&!S.regio.has(v.prov)) return false;
@@ -125,14 +127,14 @@ function similar(e,n=4){
 
 /* ---------- RENDER ---------- */
 function renderDates(){
-  const ds=[...new Set(EV.filter(e=>e.type===S.type).map(e=>e.d))].sort((a,b)=>a-b).slice(0,70);
+  const ds=[...new Set(EV.filter(e=>inTab(e)).map(e=>e.d))].sort((a,b)=>a-b).slice(0,70);
   if(S.view==="grid"&&(S.day<0||!ds.includes(S.day))) S.day=ds[0]??0;
   let h=S.view!=="grid"?`<button class="day all" data-d="-1" aria-pressed="${S.day<0}">Alle data</button>`:"";
   ds.forEach(d=>{const x=dateOf(d),we=x.getDay()===5||x.getDay()===6;
     h+=`<button class="day${we?" we":""}" data-d="${d}" aria-pressed="${S.day===d}" aria-label="${dayLabel(d)}"><small>${d===0?"vand.":WD[x.getDay()]}</small><strong>${x.getDate()}</strong><small>${MON[x.getMonth()]}</small></button>`});
   $("#dates").innerHTML=h;
 }
-const fcount=()=>S.regio.size+S.genre.size+(S.venue?1:0)+(S.time?1:0)+(S.onlyFav?1:0)+(S.maxTravel?1:0);
+const fcount=()=>S.regio.size+S.genre.size+(S.venue?1:0)+(S.time?1:0)+(S.onlyFav?1:0)+(S.maxTravel?1:0)+(S.showFilm&&S.type!=="film"?1:0);
 
 function evRow(e,o={}){
   const v=V[e.v], tr=travel(e.v);
@@ -152,8 +154,8 @@ function emptyState(){return `<div class="empty"><strong>Niets gevonden</strong>
 const srcNote=()=>`<p class="note">Rechtstreeks van de sites van ${Object.keys(V).length} podia, theaters, musea en festivals, bijgewerkt op ${SNAPSHOT}. ${EV.length} items in totaal. Elke nacht komt er nieuwe data bij. Tijden met ~ zijn geschat.</p>`;
 
 function viewList(){
-  const list=filtered(false);
-  let h=`<div class="meta"><span>${list.length} ${LBL[S.type][1]}</span>${fcount()||S.q?'<button id="clearAll">Alles wissen</button>':""}</div>`;
+  const list=filtered(false), hidFilm=S.showFilm||S.type==="film"?0:filtered(false,true).length-list.length;
+  let h=`<div class="meta"><span>${list.length} ${LBL[S.type][1]}${hidFilm?` · <button id="showFilm">${hidFilm} ${hidFilm===1?"film":"films"} verborgen, toon</button>`:""}</span>${fcount()||S.q?'<button id="clearAll">Alles wissen</button>':""}</div>`;
   if(!list.length) return h+emptyState()+srcNote();
   if(S.sort==="date"){let cur=null; list.slice(0,300).forEach(e=>{const k=e.started&&S.day<0?"nu":e.d; if(k!==cur){cur=k;h+=`<h2 class="dh">${k==="nu"?"Nu te zien":dayLabel(e.d)}</h2>`} h+=evRow(e)}); if(list.length>300) h+=`<p class="note">De eerste 300 van ${list.length} getoond. Kies een datum of filter om verder te kijken.</p>`}
   else list.slice(0,300).forEach(e=>h+=evRow(e,{showDate:true}));
@@ -188,7 +190,7 @@ function viewGrid(){
 }
 function viewFav(){
   let h="";
-  const newList=EV.filter(e=>NEW.has(e.id)&&e.type===S.type);
+  const newList=EV.filter(e=>NEW.has(e.id)&&inTab(e));
   const newHits=newList.filter(e=>isFav(e)||alarmHit(e));
   if(NEW.size){ h+=`<div class="banner"><strong>${NEW.size} nieuwe shows sinds je laatste bezoek</strong>${newHits.length?`${newHits.length} daarvan passen bij je favorieten of alarmen.`:"Geen daarvan past bij je favorieten of alarmen."}<div style="margin-top:8px"><button class="btn ghost" id="markSeen" style="display:inline-flex;flex:0">Markeer als gezien</button></div></div>`;
     h+=newHits.map(e=>evRow(e,{showDate:true,reason:isFav(e)?"Nieuw van een artiest die je volgt":"Nieuw voor alarm: "+alarmHit(e)})).join(""); }
@@ -196,19 +198,19 @@ function viewFav(){
   h+=`<h2 class="dh" style="margin-top:18px">Seintjes</h2><p class="s" style="margin:0">Volg artiesten met de ster, of zet een alarm op een naam, podium of stad. Nieuwe shows krijgen hier een melding zodra de agenda is bijgewerkt.</p>
   <div class="alarmrow"><input id="alarmIn" placeholder="Bijv. Froukje, Mezz of Nijmegen" aria-label="Nieuw alarm"><button class="btn" id="alarmAdd">Toevoegen</button></div>
   <div class="favhead">${S.alarms.map((a,i)=>`<span class="favchip">🔔 ${esc(a)}<button data-alarm="${i}" aria-label="Verwijder alarm ${esc(a)}">✕</button></span>`).join("")}</div>`;
-  const hits=S.alarms.length?EV.filter(e=>e.type===S.type&&alarmHit(e)).sort((a,b)=>a.d-b.d):[];
+  const hits=S.alarms.length?EV.filter(e=>inTab(e)&&alarmHit(e)).sort((a,b)=>a.d-b.d):[];
   if(hits.length) h+=`<h2 class="dh">Gevonden voor je alarmen <small>${hits.length}</small></h2>`+hits.slice(0,15).map(e=>evRow(e,{showDate:true,reason:"Alarm: "+alarmHit(e)})).join("");
   // favorieten
   const favs=[...S.fav];
   h+=`<h2 class="dh">Artiesten die je volgt</h2>`;
   if(!favs.length) return h+`<div class="empty"><strong>Nog niemand gevolgd</strong>Tik op de ster bij een ${S.type==="pop"?"artiest":LBL[S.type][0]}. Daarna zie je hier hun shows en tips.</div>`;
   h+=`<div class="favhead">${favs.map(ak=>`<span class="favchip">${esc(favName(ak))}<button data-fav="${ak}" data-name="${esc(favName(ak))}" aria-label="Ontvolg">✕</button></span>`).join("")}</div>`;
-  const own=EV.filter(e=>e.type===S.type&&isFav(e)).sort((a,b)=>a.d-b.d||(a.time??0)-(b.time??0));
+  const own=EV.filter(e=>inTab(e)&&isFav(e)).sort((a,b)=>a.d-b.d||(a.time??0)-(b.time??0));
   h+=`<h2 class="dh">Waar ze spelen <small>${own.length}</small></h2>`+(own.length?own.map(e=>evRow(e,{showDate:true})).join(""):`<p class="s">Geen shows in de huidige agenda.</p>`);
   // genre-tips
   const favGenres={}; EV.filter(isFav).forEach(e=>{if(!["Overig","Feest"].includes(e.genre)) favGenres[e.genre]=e.artist});
   const seenA=new Set(favs);
-  const recs=EV.filter(e=>e.type===S.type&&favGenres[e.genre]&&!seenA.has(e.ak)&&(seenA.add(e.ak),true)).sort((a,b)=>(travel(a.v).car??999)-(travel(b.v).car??999)||a.d-b.d).slice(0,6);
+  const recs=EV.filter(e=>inTab(e)&&favGenres[e.genre]&&!seenA.has(e.ak)&&(seenA.add(e.ak),true)).sort((a,b)=>(travel(a.v).car??999)-(travel(b.v).car??999)||a.d-b.d).slice(0,6);
   h+=`<h2 class="dh">Zelfde genre, dichtbij</h2>`+(recs.length?recs.map(e=>evRow(e,{showDate:true,reason:e.genre+", net als "+favGenres[e.genre]})).join(""):`<p class="s">Volg nog iemand om tips te krijgen.</p>`);
   h+=`<div class="ai" id="aiBox"><strong>Persoonlijk advies van Claude</strong><p>Claude kent de artiesten en kijkt naar wie je volgt. Daarna kiest het uit de hele agenda wat echt bij je past, met uitleg.</p><button class="btn" id="askAI">Vraag advies</button><div id="aiOut"></div></div>`;
   return h;
@@ -238,24 +240,26 @@ $("#geoBtn").onclick=()=>{
 
 /* ---------- FILTER SHEET ---------- */
 function buildFilters(){
-  const regios=[...new Set(EV.filter(e=>e.type===S.type).map(e=>V[e.v].prov))].sort();
-  const genres=[...new Set(EV.filter(e=>e.type===S.type).map(e=>e.genre))].sort((a,b)=>a.localeCompare(b,"nl"));
+  const regios=[...new Set(EV.filter(e=>inTab(e)).map(e=>V[e.v].prov))].sort();
+  const genres=[...new Set(EV.filter(e=>inTab(e)).map(e=>e.genre))].sort((a,b)=>a.localeCompare(b,"nl"));
   const chip=(on,val,lab)=>`<button class="chip" data-val="${esc(val)}" aria-pressed="${on}">${esc(lab)}</button>`;
   $("#fSort").innerHTML=[["date","Datum"],["az","Artiest A–Z"],["venue","Podium A–Z"],["near","Dichtstbij"]].map(([k,l])=>chip(S.sort===k,k,l)).join("");
   $("#fTravel").innerHTML=[[0,"Alles"],[30,"30 min"],[45,"45 min"],[60,"1 uur"],[90,"1,5 uur"]].map(([k,l])=>chip(S.maxTravel===k,k,l)).join("");
   $("#fRegio").innerHTML=regios.map(r=>chip(S.regio.has(r),r,r)).join("");
   $("#fGenre").innerHTML=genres.map(g=>chip(S.genre.has(g),g,g)).join("");
   $("#fTime").innerHTML=[["","Alles"],["mid","Middag"],["eve","Avond"],["late","Nacht (na 22:00)"]].map(([k,l])=>chip(S.time===k,k,l)).join("");
-  const vs=[...new Set(EV.filter(e=>e.type===S.type).map(e=>e.v))].map(id=>V[id]).filter(v=>!S.regio.size||S.regio.has(v.prov)).sort((a,b)=>a.name.localeCompare(b.name,"nl"));
+  const vs=[...new Set(EV.filter(e=>inTab(e)).map(e=>e.v))].map(id=>V[id]).filter(v=>!S.regio.size||S.regio.has(v.prov)).sort((a,b)=>a.name.localeCompare(b.name,"nl"));
   $("#fVenue").innerHTML=`<option value="">Alle podia</option>`+vs.map(v=>`<option value="${v.id}"${S.venue===v.id?" selected":""}>${esc(v.name)} (${esc(v.city)})</option>`).join("");
   $("#fOnlyFav").checked=S.onlyFav;
+  $("#fShowFilm").checked=S.showFilm;
+  $("#fFilmRow").hidden=S.type==="film"||!EV.some(e=>e.type===S.type&&e.genre==="Film");
 }
 function openSheet(id){$("#scrim").classList.add("open");$(id).classList.add("open")}
 function closeSheets(){$("#scrim").classList.remove("open");document.querySelectorAll(".sheet").forEach(s=>s.classList.remove("open"))}
 $("#openFilters").onclick=()=>{buildFilters();openSheet("#filterSheet")};
 $("#scrim").onclick=closeSheets;
 $("#applyF").onclick=()=>{closeSheets();render()};
-function resetFilters(){S.regio.clear();S.genre.clear();S.venue="";S.time="";S.onlyFav=false;S.sort="date";S.maxTravel=0}
+function resetFilters(){S.regio.clear();S.genre.clear();S.venue="";S.time="";S.onlyFav=false;S.showFilm=false;S.sort="date";S.maxTravel=0}
 $("#resetF").onclick=()=>{resetFilters();buildFilters()};
 $("#filterSheet").addEventListener("click",e=>{
   const c=e.target.closest(".chip"); if(!c) return; const val=c.dataset.val, box=c.parentElement.id;
@@ -268,6 +272,7 @@ $("#filterSheet").addEventListener("click",e=>{
 });
 $("#fVenue").onchange=e=>S.venue=e.target.value;
 $("#fOnlyFav").onchange=e=>S.onlyFav=e.target.checked;
+$("#fShowFilm").onchange=e=>{S.showFilm=e.target.checked; if(!S.showFilm) S.genre.delete("Film"); buildFilters()};
 
 /* ---------- DETAIL ---------- */
 function openDetail(id){
@@ -329,7 +334,7 @@ function setupFav(){
   $("#askAI").onclick=async()=>{
     const out=$("#aiOut"), btn=$("#askAI"); btn.disabled=true; out.innerHTML="<p>Bezig met nadenken…</p>";
     const favs=[...S.fav].map(favName);
-    const pool=EV.filter(e=>e.type===S.type&&!isFav(e)).slice(0,250).map(e=>({id:e.id,t:e.title,g:e.genre,p:V[e.v].name,dag:short(e),auto_min:travel(e.v).car}));
+    const pool=EV.filter(e=>inTab(e)&&!isFav(e)).slice(0,250).map(e=>({id:e.id,t:e.title,g:e.genre,p:V[e.v].name,dag:short(e),auto_min:travel(e.v).car}));
     try{
       const res=await sample.json(`Je bent een Nederlandse muziek- en theaterkenner en geeft persoonlijk uitgaansadvies.
 De gebruiker volgt: ${JSON.stringify(favs)}. Alarmen: ${JSON.stringify(S.alarms)}.
@@ -350,6 +355,7 @@ document.addEventListener("click",e=>{
   const ev=e.target.closest("[data-ev]"); if(ev){openDetail(ev.dataset.ev);return}
   const d=e.target.closest(".day"); if(d){S.day=+d.dataset.d;render();return}
   const t=e.target.closest("nav.tabs button"); if(t){S.view=t.dataset.view;render();try{window.scrollTo(0,0)}catch{};return}
+  if(e.target.id==="showFilm"){S.showFilm=true;render();return}
   if(e.target.id==="clearAll"||e.target.id==="clearAll2"){resetFilters();S.q="";$("#q").value="";if(S.view!=="grid")S.day=-1;render()}
 });
 /* Slepen met de muis om blokkenschema en datumrij opzij te schuiven (touch scrolt al vanzelf) */

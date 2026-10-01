@@ -63,6 +63,7 @@ header{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:va
 .search input{border:0;background:none;outline:none;padding:10px 6px;width:100%;font-size:16px}
 .fbtn{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:0 14px;font-weight:600;font-size:14px;position:relative}
 .fbtn b{position:absolute;top:-6px;right:-6px;background:var(--acc);color:#fff;font-size:11px;border-radius:999px;min-width:18px;height:18px;display:grid;place-items:center;padding:0 5px}
+.fbtn b[hidden]{display:none}
 .dates{display:flex;gap:6px;overflow-x:auto;padding:10px 0 4px;scrollbar-width:none}
 .dates::-webkit-scrollbar{display:none}
 .day{flex:0 0 auto;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:5px 0;width:50px;text-align:center;line-height:1.1}
@@ -138,6 +139,7 @@ select.sel{width:100%;padding:10px;border-radius:10px;border:1px solid var(--lin
 .btn{flex:1;border:0;border-radius:12px;padding:12px 14px;font-weight:700;background:var(--acc);color:#fff;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line)}
 .toggle{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.toggle[hidden]{display:none}
 .toggle input{width:20px;height:20px;accent-color:var(--acc)}
 
 /* detail */
@@ -183,7 +185,7 @@ select.sel{width:100%;padding:10px;border-radius:10px;border:1px solid var(--lin
   <div class="top">
     <div class="brand">Podiumradar<span></span></div>
     <div class="seg" role="group" aria-label="Soort">
-      <button data-type="pop" aria-pressed="true">Muziek</button>
+      <button data-type="pop" aria-pressed="true">Concerten</button>
       <button data-type="thea" aria-pressed="false">Theater</button>
       <button data-type="film" aria-pressed="false">Film</button>
       <button data-type="expo" aria-pressed="false">Musea</button>
@@ -214,7 +216,8 @@ select.sel{width:100%;padding:10px;border-radius:10px;border:1px solid var(--lin
   <h3>Podium</h3><select class="sel" id="fVenue"></select>
   <h3>Genre</h3><div class="chips" id="fGenre"></div>
   <h3>Tijd</h3><div class="chips" id="fTime"></div>
-  <div style="margin-top:14px"><label class="toggle">Alleen favoriete artiesten <input type="checkbox" id="fOnlyFav"></label></div>
+  <div style="margin-top:14px"><label class="toggle">Alleen favoriete artiesten <input type="checkbox" id="fOnlyFav"></label>
+    <label class="toggle" id="fFilmRow">Toon films <input type="checkbox" id="fShowFilm"></label></div>
   <div class="row2"><button class="btn" id="applyF">Toon resultaten</button></div>
 </section>
 <section class="sheet" id="detailSheet" aria-label="Details" role="dialog"></section>

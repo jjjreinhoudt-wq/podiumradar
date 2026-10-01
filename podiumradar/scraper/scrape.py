@@ -4,7 +4,7 @@ Gebruik:
   python scraper/scrape.py                                           # volledige run
   python scraper/scrape.py --only noord-brabant --max-pages 2 --dry-run --dump /tmp/pr   # snelle test
 """
-import argparse, datetime as dt, hashlib, json, pathlib, re, sys, time
+import argparse, datetime as dt, hashlib, json, pathlib, re, sys, time, unicodedata
 from html import unescape
 from urllib import robotparser
 import requests
@@ -24,6 +24,7 @@ ap.add_argument("--no-details", action="store_true")
 ap.add_argument("--only", help="alleen deze provincie-slug (test)")
 ap.add_argument("--source", help="alleen bronnen waarvan de naam dit bevat (test)")
 ap.add_argument("--podiuminfo", action="store_true", help="podiuminfo.nl ook meenemen (werkt niet vanaf GitHub)")
+ap.add_argument("--reclassify", action="store_true", help="alleen de genres in site/data.json opnieuw bepalen (zonder ophalen)")
 ARGS = ap.parse_args()
 
 S = requests.Session()
@@ -186,11 +187,67 @@ GENRE_WORDS = [  # (genre, trefwoorden in titel) - eerste treffer wint
     ("Dance", ["techno", "house", " dj", "rave", "hardstyle", "drum & bass", "dnb"]),
     ("Metal", ["metal", "doom", "sludge", "grindcore"]), ("Punk", ["punk", "hardcore"]),
     ("Nederlandstalig", ["hollandse", "toppers", "nederlandstalig", "smartlap"]),
-    ("Film", ["film", "cinema", "screening"]), ("Lezing", ["lezing", "talk", "podcast", "debat", "college"]),
+    ("Lezing", ["lezing", "talk", "podcast", "debat", "college"]),
     ("Toneel", ["toneel", "voorstelling", "theater"]),
 ]
 DEFAULT_GENRE = {"pop": "Overig", "concert": "Klassiek", "arena": "Overig", "cafe": "Overig",
                  "thea": "Theater", "museum": "Tentoonstelling", "festival": "Festival", "film": "Film"}
+
+
+# Films, documentaires en filmvertoningen bij podia en theaters krijgen het genre "Film" (in de app standaard verborgen).
+FILM_RE = re.compile(r"\b(films?|filmhuis\w*|filmclub|filmkring|film ?avond|filmmiddag|filmochtend|filmmatinee|film ?vertoning|"
+                     r"filmvoorstelling|filmprogramma|filmreeks|film ?festival|film ?tour|\w+film|documentaires?|documentary|"
+                     r"docu|albumovie|screening|vertoning|voorpremi[eè]re|movies that matter|kom movies|viewing party|bioscoop)\b",
+                     re.I)
+FILM_URL_RE = re.compile(r"/(films?|cinema|bioscoop|filmhuis|filmtheater)(/|$)", re.I)
+FILM_YEAR_RE = re.compile(r"\((19[3-9]\d|20\d\d)\)")  # "Naked (1993)": zo zet o.a. de Melkweg films in de agenda
+# Wel muziek: filmconcerten met live orkest/band, en stomme films met live begeleiding
+LIVE_MUSIC_RE = re.compile(r"in concert|live[- ]to[- ]film|film ?concert|film ?muziek|film ?music|filmorkest|film orchestra|"
+                           r"live[- ](soundtrack|score|muziek|begeleid\w*|gespeeld|orkest|op (het )?orgel)|met live|orkest|"
+                           r"orchestra|symfon|symphon|sing[- ]?along|meezing|cinemusic|stomme film|stille film|silent film|"
+                           r"\((18\d\d|19[0-2]\d)\)|eigen film", re.I)
+
+
+def is_film(title, url="", vtype="", screening=False):
+    """Film, documentaire of filmvertoning (en geen filmconcert met live muziek)?"""
+    if vtype == "film":
+        return True
+    if vtype == "museum":  # tentoonstellingen over film zijn geen film; alleen echte vertoningen
+        return bool(screening or re.search(r"film ?vertoning|screening|film ?avond|filmmiddag", title, re.I))
+    slug = re.sub(r"[-_]+", " ", url.split("?")[0].rstrip("/").rsplit("/", 1)[-1])
+    title = re.sub(r"\s\|\s[^|—]*$", "", title)  # "... | Lodewijk Films" is de maker, niet het soort voorstelling
+    if LIVE_MUSIC_RE.search(title) or LIVE_MUSIC_RE.search(slug):
+        return False
+    return bool(screening or FILM_RE.search(title) or FILM_RE.search(slug) or FILM_URL_RE.search(url.split("?")[0])
+                or FILM_YEAR_RE.search(title))
+
+
+def film_key(title):
+    """'FILMHUIS HOOFDDORP: Pressure' / 'Filmkring: Sense and Sensibility (2025)' -> 'pressure' / 'senseandsensibility'."""
+    t = re.sub(r"^(film\w*|beschouwfilm|film ?&[^:]*)(\s+[^:]{0,25})?:\s*", "", unescape(title), flags=re.I)
+    t = re.split(r"\s+[—|]\s+|\s+-\s+", t)[0]
+    t = re.sub(r"\((19|20)\d\d\)|\((voor)?premi[eè]re\)", "", t, flags=re.I)
+    t = unicodedata.normalize("NFD", t.lower())
+    return re.sub(r"[^a-z0-9]", "", t)
+
+
+def mark_known_films(items):
+    """items: [(event, podiumnaam, soort)]. Podia met een filmhuis (Cacaofabriek, ECI, Groene Engel...) zetten films
+    zonder herkenbare titel tussen de concerten. Staat dezelfde titel bij een bioscoop of elders al als film,
+    dan is het daar ook een film. Alleen bij podia die aantoonbaar films draaien, zodat een band met een filmnaam blijft staan."""
+    films, film_venues = set(), set()
+    for e, venue, vtype in items:
+        if e["genre"] == "Film":
+            film_venues.add(venue)
+            k = film_key(e["title"])
+            if len(k) >= 4:
+                films.add(k)
+    n = 0
+    for e, venue, vtype in items:
+        if e["genre"] != "Film" and venue in film_venues and vtype not in ("museum", "festival") \
+                and film_key(e["title"]) in films and not LIVE_MUSIC_RE.search(e["title"]):
+            e["genre"], n = "Film", n + 1
+    return n
 
 
 def guess_genre(title, vtype):
@@ -253,7 +310,9 @@ def own_events():
             seen.add(key)
             e = dict(ev, venue=src["name"], city=src.get("city", ""), prov=src.get("prov", ""),
                      vtype=src.get("type", "pop"), kind=src.get("type", "pop"))
-            e["genre"] = src.get("genre") or guess_genre(e["title"], e["vtype"])
+            screening = e.pop("screening", False)
+            e["genre"] = "Film" if is_film(e["title"], e["url"], e["vtype"], screening) \
+                else src.get("genre") or guess_genre(e["title"], e["vtype"])
             # Films draaien meerdere keren per dag: tijd hoort dan bij de id
             idkey = f"{src['name']}|{e['date']}|{e['title']}" + (f"|{e['time']}" if e["vtype"] == "film" else "")
             e["id"] = "s" + hashlib.sha1(idkey.encode()).hexdigest()[:10]
@@ -261,12 +320,39 @@ def own_events():
     return events
 
 
+def reclassify():
+    """Genres in de bestaande data.json opnieuw bepalen, zonder de bronnen opnieuw op te halen."""
+    data = json.loads(OUT.read_text(encoding="utf-8"))
+    changed = 0
+    for e in data["events"]:
+        vtype = data["venues"].get(e["v"], {}).get("type", "pop")
+        g = "Film" if is_film(e["title"], e["url"], vtype) else \
+            (guess_genre(e["title"], vtype) if e["genre"] == "Film" else e["genre"])
+        if g != e["genre"]:
+            print(f"  {e['genre']:>12} -> {g:<12} {e['title'][:70]}")
+            e["genre"], changed = g, changed + 1
+    V = data["venues"]
+    before = {id(e): e["genre"] for e in data["events"]}
+    mark_known_films([(e, V.get(e["v"], {}).get("name"), V.get(e["v"], {}).get("type", "pop")) for e in data["events"]])
+    for e in data["events"]:
+        if e["genre"] != before[id(e)]:
+            print(f"  {before[id(e)]:>12} -> {'Film':<12} {e['title'][:70]} (titel uit filmagenda)")
+            changed += 1
+    print(f"{changed} genres aangepast")
+    if not ARGS.dry_run:
+        OUT.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+
+
 def main():
+    if ARGS.reclassify:
+        return reclassify()
     prev = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() else {"events": []}
     first_seen = {e["id"]: e.get("first_seen", TODAY.isoformat()) for e in prev.get("events", [])}
 
     events = own_events()
     print(f"Eigen bronnen: {len(events)} items")
+    n = mark_known_films([(e, e["venue"], e["vtype"]) for e in events.values()])
+    print(f"Films herkend aan een titel uit de filmagenda: {n}")
     if CFG.get("use_podiuminfo") or ARGS.podiuminfo:
         # Podiuminfo vult alleen aan: wat we al van de eigen site hebben, slaan we over.
         have = {(slug(e["venue"] + "-" + e["city"]), e["date"], norm(e["title"])) for e in events.values()}
@@ -287,7 +373,9 @@ def main():
     venues, budget = {}, CFG["geocode_max_per_run"]
     for e in events.values():
         city = e["city"] or ""
-        vid = slug(e["venue"] + "-" + city)
+        # Eigen id voor de filmzaal van een podium dat ook als poppodium/theater in de lijst staat (bv. De Cacaofabriek),
+        # anders belanden de concerten in het tabblad Film of de films bij Muziek
+        vid = slug(e["venue"] + "-" + city) + ("-film" if e["vtype"] == "film" else "")
         if vid not in venues:
             key = f"{e['venue']}|{city}"
             if key not in cache and budget > 0:
