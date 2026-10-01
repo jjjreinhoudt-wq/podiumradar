@@ -10,6 +10,9 @@ Dit project is van Jasper. Hij wil **zo min mogelijk techniek uitgelegd krijgen*
   - Bron werkt niet (0 items)? Meestal laadt de site zijn agenda met JavaScript. Voeg dan in `bronnen.json` een `link_pattern`, `extra_urls` of een eigen aanpak toe. Test één bron met `python scraper/scrape.py --source "<naam>" --dry-run`.
   - Soorten in `bronnen.json`: pop, concert, arena, cafe → tab Concerten; thea → Theater; film → Film; museum → Musea; festival → Festivals. `"local": true` = binnen 15 km van Tilburg.
   - Film: `scraper/film.py` heeft per kaartverkoopsysteem een uitlezer (`"platform"` in bronnen.json: pathe, cinecitta, tribe, ticketlab, cinelink, wpgraphql, fraterhuis). Filmhuizen zonder platform gaan via de algemene uitlezer (JSON-LD ScreeningEvent). Draaitijden alleen voor de komende `film_days_ahead` dagen.
+  - Musea: `scraper/museum.py` leest tentoonstellingen als periode (`date` + `end`), plus eigen uitlezers per museum-platform. Losse podia/theaters met een eigen API of ingebedde JSON: `scraper/venues.py` (Ziggo Dome, Melkweg, Tolhuistuin, Musis, Carré, cre8ion, Itix, Umbraco). Kies met `"platform"` in bronnen.json.
+  - Extra velden in bronnen.json: `link_pattern`, `extra_urls`, `link_attrs`, `must_contain`/`must_not_contain`, `max_pages`, `max_details`, `month` (festival: gebruikelijke maand, controle op valse datums), `enabled: false` + `note`.
+  - Na elke run staat in `scraper/rapport.json` per bron het aantal items en de antwoordcodes van de site (403 = geblokkeerd). Kijk daar eerst als iets ontbreekt.
   - Beleefdheid: pauze per server (IP), niet per site, want veel filmhuizen/theaters delen een server. Crawl-delay uit robots.txt wordt gevolgd (max 10 s). Sites die bots blokkeren (Chassé, De Leest, De Bussel, Cinerama, MIMIK, FC Hyena) staan er bewust niet in: niet omzeilen.
 - `.github/workflows/update.yml` draait de scraper elke nacht en zet de site opnieuw online.
 

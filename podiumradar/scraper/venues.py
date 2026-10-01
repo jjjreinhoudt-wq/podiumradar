@@ -110,7 +110,134 @@ def musis(src, F, cfg, log):
     return out
 
 
-PLATFORMS = {"ziggodome": ziggodome, "melkweg": melkweg, "tolhuistuin": tolhuistuin, "musis": musis}
+def _dt(s):
+    """'2026-10-02T20:15:00+02:00' of '2026-10-02T20:15:00' -> (datum, tijd), kloktijd zoals de site hem geeft."""
+    m = re.match(r"(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})", s or "")
+    return (m.group(1), m.group(2) if m.group(2) != "00:00" else None) if m else (None, None)
+
+
+def _site(src):
+    m = re.match(r"https?://[^/]+", src["agenda_url"])
+    return m.group(0)
+
+
+def cre8ion(src, F, cfg, log):
+    """cre8ion IDPS (Het Zuidelijk Toneel, De Cammeleur, 't Voorhuys): POST {api_base}/nl/api/events.
+    location_filter: alleen voorstellingen in deze plaats (HZT reist het land rond)."""
+    out, page, site = [], 1, _site(src)
+    while page <= 20:
+        js = F.post_json(src["api_base"].rstrip("/") + "/nl/api/events",
+                         {"filters": {"startAt": f"{TODAY}T00:00:00.000Z", "searchTerm": ""},
+                          "pagination": {"page": page, "pageSize": 100}, "sortings": []}) or {}
+        for e in js.get("events") or []:
+            for p in e.get("programs") or []:
+                if p.get("isCanceled"):
+                    continue
+                loc = (p.get("location") or {}).get("name") or ""
+                if src.get("location_filter") and src["location_filter"].lower() not in loc.lower():
+                    continue
+                d, t = _dt(p.get("startAt"))
+                if d:
+                    out.append({"date": d, "time": t, "title": e.get("title", ""), "url": site + (e.get("url") or "")})
+        if page >= int((js.get("pagination") or {}).get("pages") or 1):
+            break
+        page += 1
+    return out
+
+
+def render_api(src, F, cfg, log):
+    """Carré / De Rijswijkse Schouwburg: /api/render/production-page-list-nl (alles in één antwoord)."""
+    site = _site(src)
+    js = F.get_json(src.get("api_url") or site + "/api/render/production-page-list-nl") or {}
+    prods = js.get("productions") or {}
+    out = []
+    for node in (js.get("nodes") or {}).values():
+        if node.get("kind") != "production-page":
+            continue
+        data = node.get("data") or {}
+        for e in (prods.get(str(node.get("production_id"))) or {}).get("events") or []:
+            d, t = _dt(e.get("start_date"))
+            if not d:
+                continue
+            ev = {"date": d, "time": t, "title": data.get("title", ""), "url": site + (data.get("url") or "")}
+            if "sold" in str(e.get("sales_status", "")).lower():
+                ev["status"] = "sold"
+            out.append(ev)
+    return out
+
+
+def umbraco_agenda(src, F, cfg, log):
+    """Umbraco 'AgendaItems' (De Vest, De Purmaryn): POST met Limit/Offset; api_url en api_body in bronnen.json."""
+    site, out, offset = _site(src), [], 0
+    while offset < 3000:
+        body = dict(src.get("api_body") or {}, Limit=200, Offset=offset)
+        js = F.post_json(src["api_url"], body) or {}
+        items = js.get("items") or []
+        for e in items:
+            if e.get("isExhibit"):
+                continue
+            d, t = _dt(e.get("start") or e.get("startDate"))
+            title = (e.get("title") or "").strip()
+            if e.get("performer") and e["performer"].strip().lower() not in title.lower():
+                title = f"{e['performer'].strip()} - {title}"
+            url = e.get("detailUrl") or e.get("agendaItemUrl") or ""
+            if d and title:
+                out.append({"date": d, "time": t, "title": title, "url": url if url.startswith("http") else site + url})
+        offset += 200
+        if not items or offset >= int(js.get("totalCount") or js.get("queryCount") or 0):
+            break
+    return out
+
+
+def umbraco_getshows(src, F, cfg, log):
+    """Umbraco + Yesplan 'Search/GetShows' (Zaantheater)."""
+    site = _site(src)
+    js = F.get_json(site + "/umbraco/api/Search/GetShows", {"lang": "nl", "productiontypes": "theatre", "limit": 500}) or {}
+    out = []
+    for e in js.get("Data") or []:
+        p = e.get("Production") or {}
+        d, t = _dt(e.get("Start"))
+        if d and p.get("Title"):
+            out.append({"date": d, "time": t, "title": p["Title"].strip(), "url": site + (p.get("Url") or "")})
+    return out
+
+
+def itix(src, F, cfg, log):
+    """Itix CMS (Ogterop, Hof 88, Zeelandtheaters, Maaspoort): /shows.php?page=N geeft JSON met html.
+    Datum en tijd staan ook in de link: /programma/<slug>/01-10-2026-20-15."""
+    site, out, page = _site(src), [], 1
+    while page <= 40:
+        js = F.get_json(site + "/shows.php", {"page": page, "genres": "", "dates": "", "type": src.get("itix_type", "theatre")}) or {}
+        soup = BeautifulSoup(js.get("html") or "", "html.parser")
+        for art in soup.select("article.program-block"):
+            ttl = art.select_one(".program-block__title")
+            sub = art.select_one(".program-block__subtitle")
+            link = art.select_one("a.icon-info[href]") or art.select_one("a[href*='/programma/']")
+            href = link["href"] if link else ""
+            if not href:
+                m = re.search(r"location\s*=\s*'([^']+)'", str(art))
+                href = m.group(1) if m else ""
+            m = re.search(r"/(\d{2})-(\d{2})-(\d{4})-(\d{2})-(\d{2})/?$", href)
+            if not (ttl and m):
+                continue
+            title = ttl.get_text(" ", strip=True)
+            if sub and sub.get_text(strip=True):
+                title = f"{title} - {sub.get_text(' ', strip=True)}"
+            ev = {"date": f"{m.group(3)}-{m.group(2)}-{m.group(1)}", "time": f"{m.group(4)}:{m.group(5)}",
+                  "title": title, "url": href if href.startswith("http") else site + href}
+            lab = art.select_one(".program-block__label")
+            if lab and "uitverkocht" in lab.get_text().lower():
+                ev["status"] = "sold"
+            out.append(ev)
+        if page >= int(js.get("pages") or 1):
+            break
+        page += 1
+    return out
+
+
+PLATFORMS = {"ziggodome": ziggodome, "melkweg": melkweg, "tolhuistuin": tolhuistuin, "musis": musis,
+             "cre8ion": cre8ion, "render_api": render_api, "umbraco_agenda": umbraco_agenda,
+             "umbraco_getshows": umbraco_getshows, "itix": itix}
 
 
 def scrape(src, F, cfg, log):

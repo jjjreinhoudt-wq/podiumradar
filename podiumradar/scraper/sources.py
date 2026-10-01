@@ -78,7 +78,11 @@ class Fetcher:
             rp = robotparser.RobotFileParser()
             try:
                 r = self.S.get(host + "/robots.txt", timeout=20)
-                rp.parse(r.text.splitlines() if r.status_code == 200 else [])
+                # Een BOM aan het begin maakt de eerste regel ("User-agent: *") onleesbaar voor robotparser,
+                # die dan alles toestaat. Weghalen, zodat een verbod ook echt een verbod is.
+                rp.parse(r.content.decode("utf-8-sig", errors="replace").splitlines() if r.status_code == 200 else [])
+                if r.status_code >= 500:
+                    rp.disallow_all = True  # server-fout: voor de zekerheid niets ophalen
             except requests.RequestException:
                 rp.parse([])
             self.robots[host] = rp
@@ -168,10 +172,16 @@ def jsonld_events(soup):
 
 def _iso(s):
     """'2026-10-01T20:15:00+00:00' -> (date, '20:15'). We nemen de kloktijd zoals de site hem noemt:
-    veel sites plakken er ten onrechte +00:00 achter terwijl het Nederlandse tijd is."""
+    veel sites plakken er ten onrechte +00:00 achter terwijl het Nederlandse tijd is.
+    Alleen een expliciete 'Z' (bv. '2026-10-01T18:00:00Z') is echt UTC en rekenen we om naar Nederlandse tijd."""
     if not isinstance(s, str):
         return None, None
-    m = re.match(r"(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?", s.strip())
+    s = s.strip()
+    mz = re.match(r"(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2})?(?:\.\d+)?Z$", s)
+    if mz:
+        x = dt.datetime.fromisoformat(f"{mz.group(1)}T{mz.group(2)}+00:00").astimezone(museum.NL)
+        return x.date(), (x.strftime("%H:%M") if x.strftime("%H:%M") != "00:00" else None)
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?", s)
     if not m:
         return None, None
     try:
@@ -309,6 +319,13 @@ def from_text(soup, url):
     txt = main.get_text("\n", strip=True)[:6000]
     title = pick_title(soup, url)
     d = _txt_date(txt)
+    if d and d < TODAY - dt.timedelta(days=365):
+        d = None  # datum van jaren terug ("opgericht in 2009", oude recensie): geen speeldatum
+    if not d and main is not soup.body and soup.body:
+        # Datum staat soms buiten <main>/<article> (lege article, datum in de paginakop)
+        d = _txt_date(soup.body.get_text("\n", strip=True)[:6000])
+        if d and d < TODAY - dt.timedelta(days=365):
+            d = None
     end = None
     # Periode, bv. "12 sep 2026 t/m 10 jan 2027" of "nog t/m 10 januari 2027" (tentoonstellingen, festivals)
     m = re.search(r"(?:t/m|tot en met|tot|until|[–—-])\s*(\d{1,2}\s+[a-z]{3,}\.?(?:\s+\d{4})?|\d{1,2}[-/.]\d{1,2}[-/.]20\d{2})",
@@ -373,7 +390,7 @@ def next_pages(soup, page_url, html):
     for a in soup.find_all("a", href=True):
         u = urljoin(page_url, a["href"]).split("#")[0]
         p = urlparse(u)
-        if p.netloc == urlparse(page_url).netloc and re.search(r"[?&]page=\d+$|/page/\d+/?$", u) \
+        if p.netloc == urlparse(page_url).netloc and re.search(r"[?&](page|pagina|p)=\d+$|/page/\d+/?$", u) \
                 and re.sub(r"/page/\d+/?$", "", p.path).rstrip("/") == path and u not in out:
             out.append(u)
     return out
