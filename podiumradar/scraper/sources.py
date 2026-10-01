@@ -21,7 +21,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 BRONNEN = ROOT / "scraper/bronnen.json"
 CACHE = ROOT / "scraper/detail_cache.json"
 TODAY = dt.date.today()
-CACHE_V = 2  # ophogen als het uitlezen verandert, zodat gecachte pagina's opnieuw worden gelezen
+CACHE_V = 3  # ophogen als het uitlezen verandert, zodat gecachte pagina's opnieuw worden gelezen
 
 DETAIL_RE = re.compile(r"/(agenda|programma|programme|event|events|evenement|evenementen|concert|concerten|film|films|movies?|"
                        r"voorstelling|voorstellingen|show|shows|tentoonstelling|tentoonstellingen|exhibition|"
@@ -196,7 +196,13 @@ def from_jsonld(o, page_url):
 
 
 def _txt_date(txt):
-    """Eerste datum in de tekst; jaar weggelaten = eerstvolgende keer dat die datum valt."""
+    """Eerste datum in de tekst; jaar weggelaten = eerstvolgende keer dat die datum valt.
+    Een datum direct achter het woord 'Datum' gaat voor (anders pakken we soms een datum uit de tekst)."""
+    m = re.search(r"\bdatum\s*:?\s*", txt, re.I)
+    if m and not txt.startswith("\x00"):
+        d = _txt_date("\x00" + txt[m.end():m.end() + 40])
+        if d:
+            return d
     best = None
     for m in NUM_DATE_RE.finditer(txt):
         try:
@@ -218,6 +224,15 @@ def _txt_date(txt):
             d = d.replace(year=y + 1)
         best = (m.start(), d)
         break
+    if not best:
+        # "Datum 16-10" zonder jaartal (alleen direct na het woord datum, anders te veel valse treffers)
+        m = re.search(r"(?:\bdatum\s*:?\s*|^\x00)(?:[a-z]{2,9}\.?\s+)?(\d{1,2})[-/.](\d{1,2})(?![-/.]?\d)", txt, re.I)
+        if m:
+            try:
+                d = dt.date(TODAY.year, int(m.group(2)), int(m.group(1)))
+                best = (m.start(), d.replace(year=d.year + 1) if d < TODAY - dt.timedelta(days=60) else d)
+            except ValueError:
+                pass
     return best[1] if best else None
 
 
@@ -322,6 +337,14 @@ def next_pages(soup, page_url, html):
     ln = soup.find("link", rel="next") or soup.find("a", rel="next")
     if ln and ln.get("href"):
         out.append(urljoin(page_url, ln["href"]))
+    # Genummerde vervolgpagina's van dezelfde agenda: "?page=2", "/page/2/"
+    path = urlparse(page_url).path.rstrip("/")
+    for a in soup.find_all("a", href=True):
+        u = urljoin(page_url, a["href"]).split("#")[0]
+        p = urlparse(u)
+        if p.netloc == urlparse(page_url).netloc and re.search(r"[?&]page=\d+$|/page/\d+/?$", u) \
+                and re.sub(r"/page/\d+/?$", "", p.path).rstrip("/") == path and u not in out:
+            out.append(u)
     return out
 
 
@@ -430,7 +453,7 @@ def scrape_source(src, F, cache, cfg, log):
         # Opnieuw ophalen als de cache oud is, of als de voorstelling binnen twee weken is (tijden/uitverkocht).
         soon = c and c.get("ev") and c["ev"]["date"] <= (TODAY + dt.timedelta(days=14)).isoformat()
         if c and c.get("v") == CACHE_V and c.get("at", "") >= fresh and not (soon and c.get("at") != TODAY.isoformat()):
-            evs = [c["ev"]] if c.get("ev") else []
+            evs = c.get("evs") or ([c["ev"]] if c.get("ev") else [])
         else:
             html = F.get(u)
             fetched += 1
@@ -445,20 +468,23 @@ def scrape_source(src, F, cache, cfg, log):
                 if not evs:
                     e = from_text(soup, u)
                     evs = [e] if e else []
+                # Alleen een deel van het gebouw (bv. Willem Twee: "Locatie Poppodium", niet de Kunstruimte)
+                page_txt = soup.get_text(" ", strip=True)
+                if src.get("must_contain") and not re.search(src["must_contain"], page_txt, re.I):
+                    evs = []
+                if src.get("must_not_contain") and re.search(src["must_not_contain"], page_txt, re.I):
+                    evs = []
             cache[u] = {"at": TODAY.isoformat(), "v": CACHE_V, "ev": evs[0] if len(evs) == 1 else None}
             if len(evs) > 1:
                 cache[u]["evs"] = evs
-            elif not evs:
-                cache[u]["ev"] = None
-        if c and c.get("evs"):
-            evs = c["evs"]
         for ev in evs:
             events.setdefault(k(ev), ev)
     skip = re.compile("|".join(map(re.escape, cfg.get("skip_title_words", []))) or "(?!)", re.I)
     out = []
     for e in events.values():
         # "Meeuw — Het Nationale Theater | regie Nina Spijkers" -> "Meeuw"
-        head = re.split(r"\s+[—|]\s+", e["title"])[0].strip()
+        # "Wodan Boys // zaterdag 10 oktober, Willem Twee Den Bosch" -> "Wodan Boys"
+        head = re.split(r"\s+[—|]\s+|\s*//\s*", e["title"])[0].strip()
         if len(head) >= 3:
             e["title"] = head
         if src.get("type") == "film":

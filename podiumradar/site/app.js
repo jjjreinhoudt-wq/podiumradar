@@ -112,12 +112,19 @@ function filtered(ignoreDay,films=S.showFilm){
     return true;
   });
   const tm=e=>e.time==null?20*60:e.time;
-  const cmp={date:(a,b)=>(b.started-a.started)||a.d-b.d||tm(a)-tm(b),
-    az:(a,b)=>a.artist.localeCompare(b.artist,"nl")||a.d-b.d,
-    venue:(a,b)=>V[a.v].name.localeCompare(V[b.v].name,"nl")||a.d-b.d,
+  // Eigen stad altijd bovenaan (per dag bij sorteren op datum)
+  const own=(a,b)=>inCity(b.v)-inCity(a.v);
+  const cmp={date:(a,b)=>(b.started-a.started)||a.d-b.d||own(a,b)||tm(a)-tm(b),
+    az:(a,b)=>own(a,b)||a.artist.localeCompare(b.artist,"nl")||a.d-b.d,
+    venue:(a,b)=>own(a,b)||V[a.v].name.localeCompare(V[b.v].name,"nl")||a.d-b.d,
     near:(a,b)=>(travel(a.v).car??999)-(travel(b.v).car??999)||a.d-b.d}[S.sort];
   return list.sort(cmp);
 }
+// Ligt deze locatie in de gekozen stad? Op naam van de plaats; bij "Mijn locatie" binnen 5 km.
+const CITY_ALIAS={"den bosch":"s hertogenbosch","s hertogenbosch":"s hertogenbosch","den haag":"s gravenhage","s gravenhage":"s gravenhage"};
+const cityKey=c=>{const k=String(c||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z]+/g," ").trim();return CITY_ALIAS[k]||k};
+const inCity=vid=>{const v=V[vid]; if(!v) return false; if(S.home==="__geo"){const k=travel(vid).k; return k!=null&&k<5}
+  return cityKey(v.city)===cityKey(S.home)};
 function similar(e,n=4){
   if(["Overig","Feest"].includes(e.genre)) return [];
   const seenA=new Set([e.ak]);
@@ -170,7 +177,7 @@ function viewGrid(){
     const from=Math.floor(Math.min(...list.map(e=>e.time-(e.type==="thea"?30:0)))/60)*60;
     const to=Math.ceil(Math.max(...list.map(endOf))/60)*60, hours=Math.max(3,(to-from)/60), px=96/60;
     const byV={}; list.forEach(e=>(byV[e.v]=byV[e.v]||[]).push(e));
-    const vids=Object.keys(byV).sort((a,b)=>S.sort==="near"?(travel(a).car??999)-(travel(b).car??999):Math.min(...byV[a].map(e=>e.time))-Math.min(...byV[b].map(e=>e.time))||V[a].name.localeCompare(V[b].name));
+    const vids=Object.keys(byV).sort((a,b)=>S.sort==="near"?(travel(a).car??999)-(travel(b).car??999):inCity(b)-inCity(a)||Math.min(...byV[a].map(e=>e.time))-Math.min(...byV[b].map(e=>e.time))||V[a].name.localeCompare(V[b].name));
     let ruler=""; for(let i=0;i<=hours;i++) ruler+=`<span style="left:${i*96}px">${hm(from+i*60)}</span>`;
     h+=`<div class="grid-wrap"><div class="grid" style="--hours:${hours}"><div class="ruler"><div class="vname"></div><div class="hrs">${ruler}</div></div>`;
     vids.forEach(vid=>{const v=V[vid]; const rows=byV[vid];
@@ -249,6 +256,7 @@ function buildFilters(){
   $("#fGenre").innerHTML=genres.map(g=>chip(S.genre.has(g),g,g)).join("");
   $("#fTime").innerHTML=[["","Alles"],["mid","Middag"],["eve","Avond"],["late","Nacht (na 22:00)"]].map(([k,l])=>chip(S.time===k,k,l)).join("");
   const vs=[...new Set(EV.filter(e=>inTab(e)).map(e=>e.v))].map(id=>V[id]).filter(v=>!S.regio.size||S.regio.has(v.prov)).sort((a,b)=>a.name.localeCompare(b.name,"nl"));
+  vs.sort((a,b)=>inCity(b.id)-inCity(a.id)); // eigen stad eerst, daarna A-Z (sort is stabiel)
   $("#fVenue").innerHTML=`<option value="">Alle podia</option>`+vs.map(v=>`<option value="${v.id}"${S.venue===v.id?" selected":""}>${esc(v.name)} (${esc(v.city)})</option>`).join("");
   $("#fOnlyFav").checked=S.onlyFav;
   $("#fShowFilm").checked=S.showFilm;

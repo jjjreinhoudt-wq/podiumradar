@@ -77,7 +77,7 @@
  {"name": "Chassé Theater", "city": "Breda", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.chasse.nl/programma"},
  {"name": "Mezz", "city": "Breda", "prov": "Noord-Brabant", "type": "pop", "agenda_url": "https://www.mezz.nl/programma"},
  {"name": "Theater aan de Parade", "city": "'s-Hertogenbosch", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.theateraandeparade.nl/nl/programma"},
- {"name": "Willem Twee Poppodium (W2)", "city": "'s-Hertogenbosch", "prov": "Noord-Brabant", "type": "pop", "agenda_url": "https://www.willem-twee.nl/agenda/poppodium"},
+ {"name": "Willem Twee Poppodium (W2)", "city": "'s-Hertogenbosch", "prov": "Noord-Brabant", "type": "pop", "agenda_url": "https://www.willem-twee.nl/agenda/poppodium", "link_pattern": "/alle-activiteiten/", "must_contain": "Locatie\\s+Poppodium", "must_not_contain": "Zaal\\s+Kunstruimte"},
  {"name": "Brabanthallen", "city": "'s-Hertogenbosch", "prov": "Noord-Brabant", "type": "arena", "agenda_url": "https://www.brabanthallen.nl/agenda/"},
  {"name": "Theater Het Speelhuis", "city": "Helmond", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://theaterspeelhuis.nl/programma"},
  {"name": "De Cacaofabriek", "city": "Helmond", "prov": "Noord-Brabant", "type": "pop", "agenda_url": "https://cacaofabriek.nl/agenda"},
