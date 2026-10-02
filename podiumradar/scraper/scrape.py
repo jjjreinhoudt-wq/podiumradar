@@ -310,6 +310,9 @@ def own_events():
             seen.add(key)
             e = dict(ev, venue=src["name"], city=src.get("city", ""), prov=src.get("prov", ""),
                      vtype=src.get("type", "pop"), kind=src.get("type", "pop"))
+            if night_show(e):
+                e.pop("end")
+            e["title"] = unescape(e["title"])  # dubbel gecodeerd bij sommige sites: "Cato &#038; Anton"
             screening = e.pop("screening", False)
             e["genre"] = "Film" if is_film(e["title"], e["url"], e["vtype"], screening) \
                 else src.get("genre") or guess_genre(e["title"], e["vtype"])
@@ -322,14 +325,27 @@ def own_events():
     return events
 
 
+def night_show(e):
+    """Avondconcert dat 'tot de volgende dag' loopt (eindtijd middernacht, bv. SPOT Groningen) is geen tweedaags evenement."""
+    if not e.get("end") or e["vtype"] in ("festival", "museum") or (e.get("time") or "") < "17:00":
+        return False
+    return (dt.date.fromisoformat(e["end"]) - dt.date.fromisoformat(e["date"])).days == 1
+
+
 def reclassify():
     """Genres in de bestaande data.json opnieuw bepalen, zonder de bronnen opnieuw op te halen."""
     data = json.loads(OUT.read_text(encoding="utf-8"))
     changed = 0
     for e in data["events"]:
         vtype = data["venues"].get(e["v"], {}).get("type", "pop")
+        if night_show(dict(e, vtype=vtype)):
+            e.pop("end")
+            changed += 1
+        # Alleen films erbij zoeken: of de site zelf 'filmvertoning' zei, weten we hier niet meer
         g = "Film" if is_film(e["title"], e["url"], vtype) else \
-            (guess_genre(e["title"], vtype) if e["genre"] == "Film" else e["genre"])
+            (guess_genre(e["title"], vtype) if e["genre"] == "Film" and LIVE_MUSIC_RE.search(e["title"]) else e["genre"])
+        if "&#" in e["title"] or "&amp;" in e["title"]:
+            e["title"], changed = unescape(unescape(e["title"])), changed + 1
         if g != e["genre"]:
             print(f"  {e['genre']:>12} -> {g:<12} {e['title'][:70]}")
             e["genre"], changed = g, changed + 1
