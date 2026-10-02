@@ -15,6 +15,10 @@ Dit project is van Jasper. Hij wil **zo min mogelijk techniek uitgelegd krijgen*
   - Na elke run staat in `scraper/rapport.json` per bron het aantal items en de antwoordcodes van de site (403 = geblokkeerd). Kijk daar eerst als iets ontbreekt.
   - Beleefdheid: pauze per server (IP), niet per site, want veel filmhuizen/theaters delen een server. Crawl-delay uit robots.txt wordt gevolgd (max 10 s). Sites die bots blokkeren (Chassé, De Leest, De Bussel, Cinerama, MIMIK, FC Hyena) staan er bewust niet in: niet omzeilen.
 - `.github/workflows/update.yml` draait de scraper elke nacht en zet de site opnieuw online.
+- De site is een installeerbare app (PWA) voor iPhone en Android: `site/manifest.json`, `site/sw.js` (service worker) en `site/pwa.js` (registratie, automatisch bijwerken, installatiebanner; los van app.js gehouden).
+  - `index.html`, `app.js`, `pwa.js` en `data.json` gaan via **network-first**: online altijd vers, de cache is alleen voor offline. Iconen/manifest: stale-while-revalidate; Google Fonts: cache-first.
+  - **Pas je `sw.js` aan (of de lijst `SHELL` met bestanden), verhoog dan `VERSION`** (v1 → v2 …). Dan wordt de nieuwe service worker actief, ruimt hij oude caches op en herlaadt een open app één keer met de melding "Nieuwe versie geladen". Voor gewone wijzigingen aan app.js/data.json hoeft dat niet.
+  - Nieuw bestand dat offline moet werken? Zet het in `SHELL` en verhoog `VERSION`. Iconen opnieuw maken: PNG's zijn gerenderd uit `icon.svg` met Playwright/Chromium (maskable versie: volle achtergrond, figuur op 86%).
 
 ## Als Jasper zegt "zet dit online" (eerste keer)
 1. Controleer of `gh` geïnstalleerd en ingelogd is (`gh auth status`). Zo niet: installeer het en laat Jasper inloggen met `gh auth login` (kies GitHub.com, HTTPS, browser). Begeleid hem stap voor stap.
