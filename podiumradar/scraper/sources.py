@@ -309,6 +309,10 @@ def pick_title(soup, url):
     return _slug_title(url)
 
 
+OTHER_EVENTS_RE = re.compile(r"more-events|other-events|related|recommend|aanrader|ook-leuk|also-|news-box|nieuws|"
+                             r"upcoming|carousel|swiper|slider", re.I)
+
+
 def from_text(soup, url):
     """Terugval als er geen bruikbare JSON-LD is: titel uit og:title/h1, datum en tijd uit de tekst."""
     main = soup.find("main") or soup.find("article") or soup.body or soup
@@ -317,6 +321,11 @@ def from_text(soup, url):
         if bad.name == "header" and main.name in ("main", "article"):
             continue
         bad.decompose()
+    # Blokken met ándere voorstellingen ("meer concerten", nieuws, aanraders) geven anders de verkeerde datum
+    # of 'uitverkocht' (PaRaDoX: rij 'more-events' met de eerstvolgende concerten)
+    for bad in main.find_all(class_=OTHER_EVENTS_RE):
+        if not bad.find("h1"):
+            bad.decompose()
     txt = main.get_text("\n", strip=True)[:6000]
     title = pick_title(soup, url)
     d = _txt_date(txt)
