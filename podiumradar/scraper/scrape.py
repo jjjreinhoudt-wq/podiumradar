@@ -310,9 +310,6 @@ def own_events():
             seen.add(key)
             e = dict(ev, venue=src["name"], city=src.get("city", ""), prov=src.get("prov", ""),
                      vtype=src.get("type", "pop"), kind=src.get("type", "pop"))
-            if night_show(e):
-                e.pop("end")
-            e["title"] = unescape(e["title"])  # dubbel gecodeerd bij sommige sites: "Cato &#038; Anton"
             screening = e.pop("screening", False)
             e["genre"] = "Film" if is_film(e["title"], e["url"], e["vtype"], screening) \
                 else src.get("genre") or guess_genre(e["title"], e["vtype"])
@@ -321,8 +318,76 @@ def own_events():
             when = f"t/m {e['end']}" if e.pop("ongoing", False) and e.get("end") else e["date"]
             idkey = f"{src['name']}|{when}|{e['title']}" + (f"|{e['time']}" if e["vtype"] == "film" else "")
             e["id"] = "s" + hashlib.sha1(idkey.encode()).hexdigest()[:10]
-            events[e["id"]] = e
-    return events
+            if tidy(e):  # na de id, zodat bestaande items hun id (favoriet, 'nieuw') houden
+                events[e["id"]] = e
+    fix_series_ends(events.values())
+    return dedupe(events)
+
+
+# ---------------------------------------------------------------- opschonen (zie ook --reclassify)
+
+CATEGORY_WORDS = {"agenda", "programma", "program", "overzicht", "totaal overzicht", "randprogramma", "professioneel programma",
+                  "laatste kaarten", "cabaret", "comedy", "stand-up comedy", "cabaret & comedy", "film", "films", "muziek",
+                  "theater", "dans", "jeugd", "concerten", "voorstellingen", "home", "isala film"}
+SERVICE_RE = re.compile(r"hulp bij digitale|digitale vragen|boekstart|steunpunt|is closed|is gesloten|gesloten van", re.I)
+
+
+def tidy(e):
+    """Titel (ook dubbel gecodeerd: "Cato &#038; Anton"), tijd en periode opschonen. Geeft False als het geen echte voorstelling is (kopje, bestelpagina, dienst)."""
+    t = re.sub(r"<[^>]+>", " — ", unescape(unescape(e["title"])))                       # "Geert Mak <br>met ..." 
+    t = re.sub(r"\s+tickets? kopen\?.*$", "", t, flags=re.I)       # Gebouw-T: "... tickets kopen? Bekijk snel de site"
+    if re.search(r"\*\s*uitverkocht\s*\*", t, re.I):
+        e["status"] = "sold"
+        t = re.sub(r"\s*\*\s*uitverkocht\s*\*", "", t, flags=re.I)
+    t = re.sub(r"\s+", " ", t).strip(" —-")
+    # "FamilieFest: Dwarsliggers FamilieFest: Dwarsl iggers": titel twee keer achter elkaar (afgekapt)
+    for i in range(12, len(t) - 11):
+        if t[i] == " " and t[i + 1:i + 13] == t[:12] and 0.35 < i / len(t) < 0.65:
+            t = t[:i].strip()
+            break
+    e["title"] = t
+    slug_ = e["url"].split("?")[0].rstrip("/").rsplit("/", 1)[-1].lower()
+    low = t.lower()
+    if low in CATEGORY_WORDS and (slug(low) == slug_ or e["vtype"] == "film" or low in ("home", "agenda", "programma", "program",
+                                                                                         "totaal overzicht", "randprogramma")):
+        return False                                                    # categorie- of overzichtspagina
+    if re.match(r"agenda van \w+$|professioneel programma$|laatste kaarten$", low) or SERVICE_RE.search(t):
+        return False
+    # Tijden als 06:20 of 03:10 komen uit rommel op de pagina, niet van de voorstelling
+    if e.get("time") and e["vtype"] != "film" and e["time"] < "09:00" and \
+            (int(e["time"][3:]) % 15 or e["vtype"] == "museum" or "03:00" <= e["time"] < "06:00"):
+        e["time"] = None
+    if night_show(e):
+        e.pop("end")
+    # Bij een podium is een 'periode' van meer dan een maand een reeks of het seizoen, geen doorlopend evenement
+    if e.get("end") and e["vtype"] in ("pop", "concert", "arena", "cafe", "thea") and \
+            (dt.date.fromisoformat(e["end"]) - dt.date.fromisoformat(e["date"])).days > 31 and \
+            not re.search(r"expo|tentoonstelling|winter efteling", t, re.I):
+        e.pop("end")
+    return True
+
+
+def fix_series_ends(events):
+    """Dezelfde einddatum bij 3+ verschillende items van één podium is een datum van de pagina (seizoen, week), geen eind."""
+    groups = {}
+    for e in events:
+        if e.get("end") and e.get("vtype", "pop") not in ("festival", "museum"):
+            groups.setdefault((e.get("venue") or e.get("v"), e["end"]), []).append(e)
+    for evs in groups.values():
+        if len({e["date"] for e in evs}) >= 3:
+            for e in evs:
+                e.pop("end")
+
+
+def dedupe(events):
+    """Zelfde podium, dag, tijd en titel (via twee links): één keer tonen."""
+    out, seen = {}, set()
+    for k, e in events.items():
+        key = (e.get("venue") or e.get("v"), e["date"], e.get("time"), re.sub(r"\W", "", e["title"].lower()))
+        if e.get("vtype") == "film" or key not in seen:
+            seen.add(key)
+            out[k] = e
+    return out
 
 
 def night_show(e):
@@ -336,16 +401,34 @@ def reclassify():
     """Genres in de bestaande data.json opnieuw bepalen, zonder de bronnen opnieuw op te halen."""
     data = json.loads(OUT.read_text(encoding="utf-8"))
     changed = 0
+    keep = []
     for e in data["events"]:
         vtype = data["venues"].get(e["v"], {}).get("type", "pop")
-        if night_show(dict(e, vtype=vtype)):
-            e.pop("end")
+        before = json.dumps(e, sort_keys=True)
+        e["vtype"] = vtype
+        ok = tidy(e)
+        e.pop("vtype")
+        if not ok:
+            print(f"  {'weg':>12}    {e['title'][:70]}")
             changed += 1
+            continue
+        if json.dumps(e, sort_keys=True) != before:
+            changed += 1
+        keep.append(e)
+    for e in keep:
+        e["vtype"] = data["venues"].get(e["v"], {}).get("type", "pop")
+    fix_series_ends(keep)
+    n0 = len(keep)
+    keep = list(dedupe({e["id"]: e for e in keep}).values())
+    for e in keep:
+        e.pop("vtype")
+    changed += n0 - len(keep)
+    data["events"] = keep
+    for e in data["events"]:
+        vtype = data["venues"].get(e["v"], {}).get("type", "pop")
         # Alleen films erbij zoeken: of de site zelf 'filmvertoning' zei, weten we hier niet meer
         g = "Film" if is_film(e["title"], e["url"], vtype) else \
             (guess_genre(e["title"], vtype) if e["genre"] == "Film" and LIVE_MUSIC_RE.search(e["title"]) else e["genre"])
-        if "&#" in e["title"] or "&amp;" in e["title"]:
-            e["title"], changed = unescape(unescape(e["title"])), changed + 1
         if g != e["genre"]:
             print(f"  {e['genre']:>12} -> {g:<12} {e['title'][:70]}")
             e["genre"], changed = g, changed + 1
