@@ -4,7 +4,7 @@ Gebruik:
   python scraper/scrape.py                                           # volledige run
   python scraper/scrape.py --only noord-brabant --max-pages 2 --dry-run --dump /tmp/pr   # snelle test
 """
-import argparse, datetime as dt, hashlib, json, pathlib, re, sys, time, unicodedata
+import argparse, datetime as dt, hashlib, json, os, pathlib, re, sys, time, unicodedata
 from html import unescape
 from urllib import robotparser
 import requests
@@ -298,10 +298,18 @@ def podiuminfo_events():
     return events
 
 
-def own_events():
+def own_events(prev_events=()):
     """Events van de eigen sites van podia, theaters, musea en festivals (scraper/bronnen.json)."""
     events, seen = {}, set()
     for src, evs in sources.collect(CFG, only=ARGS.source):
+        if evs is None:  # niet op tijd klaar: items van de vorige keer aanhouden
+            vid = slug(src["name"] + "-" + src.get("city", "")) + ("-film" if src.get("type") == "film" else "")
+            for e in prev_events:
+                if e.get("v") == vid:
+                    e = {k: v for k, v in e.items() if k not in ("v", "first_seen")}
+                    events[e["id"]] = dict(e, venue=src["name"], city=src.get("city", ""), prov=src.get("prov", ""),
+                                           vtype=src.get("type", "pop"), kind=src.get("type", "pop"))
+            continue
         for ev in evs:
             # Zelfde voorstelling via twee bronnen (bv. dubbel in de lijst): één keer tonen
             key = (ev["url"].split("?")[0].rstrip("/"), ev["date"], ev.get("time"))
@@ -450,7 +458,7 @@ def main():
     prev = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() else {"events": []}
     first_seen = {e["id"]: e.get("first_seen", TODAY.isoformat()) for e in prev.get("events", [])}
 
-    events = own_events()
+    events = own_events(prev.get("events", []))
     print(f"Eigen bronnen: {len(events)} items")
     n = mark_known_films([(e, e["venue"], e["vtype"]) for e in events.values()])
     print(f"Films herkend aan een titel uit de filmagenda: {n}")
@@ -512,4 +520,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    code = 0
+    try:
+        main()
+    except SystemExit as e:
+        code = e.code if isinstance(e.code, int) else (0 if e.code is None else 1)
+    sys.stdout.flush()
+    # Niet wachten op bronnen die na de tijdslimiet nog bezig zijn
+    os._exit(code)

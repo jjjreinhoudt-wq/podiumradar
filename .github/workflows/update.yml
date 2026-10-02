@@ -31,7 +31,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r scraper/requirements.txt
-      - run: python scraper/scrape.py
+      - run: python -u scraper/scrape.py
       - name: Wijzigingen opslaan
         run: |
           git config user.name "podiumradar-bot"
