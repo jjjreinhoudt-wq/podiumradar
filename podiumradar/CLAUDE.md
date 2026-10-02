@@ -14,6 +14,7 @@ Dit project is van Jasper. Hij wil **zo min mogelijk techniek uitgelegd krijgen*
   - Extra velden in bronnen.json: `link_pattern`, `extra_urls`, `link_attrs`, `must_contain`/`must_not_contain`, `max_pages`, `max_details`, `month` (festival: gebruikelijke maand, controle op valse datums), `enabled: false` + `note`.
   - Na elke run staat in `scraper/rapport.json` per bron het aantal items en de antwoordcodes van de site (403 = geblokkeerd). Kijk daar eerst als iets ontbreekt.
   - Beleefdheid: pauze per server (IP), niet per site, want veel filmhuizen/theaters delen een server. Crawl-delay uit robots.txt wordt gevolgd (max 10 s). Sites die bots blokkeren (Chassé, De Leest, De Bussel, Cinerama, MIMIK, FC Hyena) staan er bewust niet in: niet omzeilen.
+- Tijdslimiet: na `max_minutes` (config.json, 200) stopt de scraper netjes; bronnen die dan nog bezig zijn houden hun items van de vorige keer (meestal trage bioscoopsites). De workflow zelf stopt na 240 min, dus `max_minutes` ruim daaronder houden.
 - `.github/workflows/update.yml` draait de scraper elke nacht en zet de site opnieuw online.
 - De site is een installeerbare app (PWA) voor iPhone en Android: `site/manifest.json`, `site/sw.js` (service worker) en `site/pwa.js` (registratie, automatisch bijwerken, installatiebanner; los van app.js gehouden).
   - `index.html`, `app.js`, `pwa.js` en `data.json` gaan via **network-first**: online altijd vers, de cache is alleen voor offline. Iconen/manifest: stale-while-revalidate; Google Fonts: cache-first.

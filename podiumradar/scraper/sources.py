@@ -9,7 +9,7 @@ Werkwijze per bron (scraper/bronnen.json):
 Elke site krijgt hoogstens één verzoek per `delay_seconds`; verschillende sites lopen parallel.
 """
 import datetime as dt, json, pathlib, re, socket, threading, time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 from html import unescape
 from urllib import robotparser
 from urllib.parse import urljoin, urlparse
@@ -647,8 +647,22 @@ def collect(cfg, only=None, log=print):
             cache.update({k: v for k, v in local.items() if k not in cache or v is not cache.get(k)})
         return src, evs
 
-    with ThreadPoolExecutor(max_workers=cfg.get("source_workers", 12)) as pool:
-        results = list(pool.map(one, srcs))
+    # Tijdslimiet: wat na max_minutes nog niet klaar is (vaak een trage bioscoopsite) laten we schieten;
+    # scrape.py houdt voor die bronnen de items van de vorige keer aan. Zo gaat niet de hele nacht verloren.
+    t0 = time.time()
+    pool = ThreadPoolExecutor(max_workers=cfg.get("source_workers", 12))
+    futs = [(src, pool.submit(one, src)) for src in srcs]
+    wait([f for _, f in futs], timeout=max(60, cfg.get("max_minutes", 200) * 60 - (time.time() - t0)))
+    results = []
+    for src, f in futs:
+        if f.done():
+            results.append(f.result())
+        else:
+            log(f"  {src['name']}: niet op tijd klaar, vorige gegevens blijven staan")
+            results.append((src, None))
+    pool.shutdown(wait=False, cancel_futures=True)
+    with lock:
+        cache = dict(cache)
     horizon = (TODAY - dt.timedelta(days=cfg.get("cache_keep_days", 30))).isoformat()
     cache = {k: v for k, v in cache.items() if v.get("at", "") >= horizon}
     CACHE.write_text(json.dumps(cache, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
@@ -657,7 +671,8 @@ def collect(cfg, only=None, log=print):
         rep = []
         for src, evs in results:
             site = urlparse(src["agenda_url"]).netloc.removeprefix("www.")
-            rep.append({"name": src["name"], "type": src.get("type"), "items": len(evs),
+            rep.append({"name": src["name"], "type": src.get("type"), "items": len(evs or []),
+                        "niet_op_tijd": evs is None,
                         "site": site, "antwoorden": F.stats.get(site, {})})
         rep.sort(key=lambda r: (r["items"] > 0, r["type"] or "", r["name"]))
         REPORT.write_text(json.dumps({"datum": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
