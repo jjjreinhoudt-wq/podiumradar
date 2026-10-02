@@ -1,0 +1,40 @@
+name: Bron testen
+
+# Handmatig: één bron (of één pagina) ophalen en laten zien wat de scraper ervan maakt.
+# Handig als een podium verkeerde datums of titels geeft; de pagina's zelf staan dan in het logboek.
+on:
+  workflow_dispatch:
+    inputs:
+      bron:
+        description: "Naam (of deel van de naam) van de bron in bronnen.json"
+        required: false
+      url:
+        description: "Losse pagina om te bekijken (tekst, datums en JSON-LD worden getoond)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: podiumradar
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r scraper/requirements.txt
+      - name: Pagina bekijken
+        if: inputs.url != ''
+        env:
+          URL: ${{ inputs.url }}
+        run: python -u scraper/inspect_page.py "$URL"
+      - name: Bron proberen
+        if: inputs.bron != ''
+        env:
+          BRON: ${{ inputs.bron }}
+        run: python -u scraper/scrape.py --source "$BRON" --dry-run
