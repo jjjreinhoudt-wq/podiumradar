@@ -66,6 +66,9 @@
   "detail_refresh_days": 7,
   "cache_keep_days": 30,
   "skip_title_words": [
+    "stoelen kiezen",
+    "kies stoelen",
+    "kies je stoel",
     "spreekuur",
     "juridisch loket",
     "digicafé",

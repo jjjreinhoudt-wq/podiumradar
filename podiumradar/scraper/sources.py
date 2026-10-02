@@ -29,7 +29,8 @@ CACHE_V = 3  # ophogen als het uitlezen verandert, zodat gecachte pagina's opnie
 DETAIL_RE = re.compile(r"/(agenda|programma|programme|event|events|evenement|evenementen|concert|concerten|film|films|movies?|"
                        r"voorstelling|voorstellingen|show|shows|tentoonstelling|tentoonstellingen|exhibition|"
                        r"exhibitions|activiteit|activiteiten|nu-te-zien|productie|producties)/[^?#]{3,}", re.I)
-SKIP_RE = re.compile(r"\.(jpe?g|png|gif|svg|pdf|ics|zip|mp[34])$|/(tag|categor(y|ie)|genre|page|zoeken|search|"
+SKIP_RE = re.compile(r"\.(jpe?g|png|gif|svg|pdf|ics|zip|mp[34])$|/(order|bestellen|checkout|winkelmand|basket)/|"
+                     r"/(tag|categor(y|ie)|genre|page|zoeken|search|"
                      r"filter|nieuws|news|login|account|winkelwagen|cart)/|[?&](page|filter|genre)=", re.I)
 
 MONTHS = {"jan": 1, "feb": 2, "mrt": 3, "maa": 3, "mar": 3, "apr": 4, "mei": 5, "may": 5, "jun": 6, "jul": 7,
@@ -419,6 +420,11 @@ def festival_event(src, F, log):
     soup = BeautifulSoup(html, "html.parser")
     evs = [e for e in (from_jsonld(o, src["agenda_url"]) for o in jsonld_events(soup)) if e]
     evs = sorted((e for e in evs if (e.get("end") or e["date"]) >= TODAY.isoformat()), key=lambda e: e["date"])
+    # Festivalsites tonen vaak ook hun losse clubavonden (Awakenings tijdens ADE in oktober): als we weten in welke
+    # maand het festival is (bronnen.json "month"), dan geen losse datums ver daarvandaan. Een periode is betrouwbaar.
+    usual = MONTHS.get(str(src.get("month", "")).lower()[:3])
+    if usual:
+        evs = [e for e in evs if e.get("end") or min((int(e["date"][5:7]) - usual) % 12, (usual - int(e["date"][5:7])) % 12) <= 1]
     if evs:
         d0, d1 = evs[0]["date"], max(e.get("end") or e["date"] for e in evs)
     else:
