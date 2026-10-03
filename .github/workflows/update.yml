@@ -2,7 +2,7 @@ name: Agenda bijwerken
 
 on:
   schedule:
-    - cron: "30 2 * * *"
+    - cron: "7 1 * * *"  # 03:07 NL-zomertijd; niet op een heel of half uur, dan is GitHub druk en start hij uren later
   workflow_dispatch:
   push:
     branches: [main]
