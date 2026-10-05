@@ -145,6 +145,17 @@ select.sel{width:100%;padding:10px;border-radius:10px;border:1px solid var(--lin
 .btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line)}
 .toggle{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
 .toggle[hidden]{display:none}
+.locbar{display:flex;gap:8px;align-items:center}.locbar .sel{flex:1}.locbar .btn{flex:0 0 auto;padding:10px 12px}
+.loclist{max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;margin-top:8px;background:var(--card)}
+.loclist details{border-bottom:1px solid var(--line)}.loclist details:last-child{border-bottom:0}
+.loclist summary{display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;list-style:none}
+.loclist summary::-webkit-details-marker{display:none}
+.loclist summary::after{content:"›";margin-left:auto;color:var(--muted);transition:transform .15s}
+.loclist details[open] summary::after{transform:rotate(90deg)}
+.loclist .cnt{color:var(--muted);font-size:13px}
+.loclist label.v{display:flex;align-items:center;gap:10px;padding:6px 12px 6px 38px;font-size:14px}
+.loclist input{width:18px;height:18px;accent-color:var(--acc);flex:0 0 auto}
+.loclist .off{opacity:.45}
 .toggle input{width:20px;height:20px;accent-color:var(--acc)}
 
 /* detail */
@@ -226,6 +237,9 @@ select.sel{width:100%;padding:10px;border-radius:10px;border:1px solid var(--lin
   <h3>Reistijd vanaf je vertrekpunt</h3><div class="chips" id="fTravel"></div>
   <h3>Regio</h3><div class="chips" id="fRegio"></div>
   <h3>Podium</h3><select class="sel" id="fVenue"></select>
+  <h3>Steden en podia <small class="s" style="font-weight:400">vink uit wat je niet wilt zien</small></h3>
+  <div class="locbar"><input class="sel" id="fLocQ" type="search" placeholder="Zoek stad of podium" aria-label="Zoek stad of podium"><button class="btn ghost" id="fLocAll" type="button">Alles aan</button></div>
+  <div class="loclist" id="fLoc"></div>
   <h3>Genre</h3><div class="chips" id="fGenre"></div>
   <h3>Tijd</h3><div class="chips" id="fTime"></div>
   <div style="margin-top:14px"><label class="toggle">Alleen favoriete artiesten <input type="checkbox" id="fOnlyFav"></label>

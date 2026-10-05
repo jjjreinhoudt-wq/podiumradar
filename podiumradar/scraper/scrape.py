@@ -331,7 +331,36 @@ def own_events(prev_events=()):
             if tidy(e):  # na de id, zodat bestaande items hun id (favoriet, 'nieuw') houden
                 events[e["id"]] = e
     fix_series_ends(events.values())
-    return dedupe(events)
+    return dedupe(relocate(events))
+
+
+def relocate(events):
+    """Een podium zet ook shows van andere podia in zijn agenda (013: 'Locatie | Hall of Fame').
+    Staat die andere locatie als eigen bron in dezelfde stad, dan hoort de show daar: heeft dat podium hem zelf
+    ook, dan gaat de kopie weg; anders verhuist hij naar dat podium."""
+    key = lambda s: re.sub(r"[^a-z0-9]", "", unescape(s).lower())
+    by_city = {}
+    for s in json.loads(sources.BRONNEN.read_text(encoding="utf-8")):
+        if s.get("enabled", True) and s.get("type") != "film":
+            by_city.setdefault(key(s.get("city", "")), []).append(s)
+    own = {(e["venue"], e["date"], norm(e["title"])) for e in events.values()}
+    out = {}
+    for k, e in events.items():
+        loc = key(e.pop("loc", "") or "")
+        if len(loc) >= 4 and e.get("vtype") not in ("film", "festival"):
+            for s in by_city.get(key(e.get("city", "")), []):
+                name = re.sub(r"\(.*?\)", "", s["name"])  # "Willem Twee Poppodium (W2)" -> "Willem Twee Poppodium"
+                nk = key(name)
+                if s["name"] == e["venue"] or len(nk) < 4 or not (nk in loc or loc in nk):
+                    continue
+                if (s["name"], e["date"], norm(e["title"])) in own:
+                    e = None  # dat podium heeft de show zelf al
+                else:
+                    e.update(venue=s["name"], prov=s.get("prov", e["prov"]), vtype=s.get("type", e["vtype"]))
+                break
+        if e is not None:
+            out[k] = e
+    return out
 
 
 # ---------------------------------------------------------------- opschonen (zie ook --reclassify)

@@ -49,7 +49,11 @@ function travel(vid){const v=V[vid], h=S.homeXY; if(v.lat==null) return {car:nul
 /* ---------- STATE ---------- */
 const store={get(k,f){try{const v=localStorage.getItem(k);return v?JSON.parse(v):f}catch{return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 const S={type:"pop",view:"list",day:-1,q:"",sort:"date",regio:new Set(),venue:"",genre:new Set(),time:"",maxTravel:0,onlyFav:false,showFilm:false,
-  fav:new Set(store.get("pr_fav2",[])), alarms:store.get("pr_alarms",[]), home:store.get("pr_home","Tilburg"), homeXY:null};
+  fav:new Set(store.get("pr_fav2",[])), alarms:store.get("pr_alarms",[]), home:store.get("pr_home","Tilburg"), homeXY:null,
+  // Uitgevinkte steden en podia (blijven bewaard): niets van tonen
+  hideC:new Set(store.get("pr_hideC",[])), hideV:new Set(store.get("pr_hideV",[]))};
+const saveHidden=()=>{store.set("pr_hideC",[...S.hideC]);store.set("pr_hideV",[...S.hideV])};
+const hiddenLoc=vid=>{const v=V[vid];return S.hideV.has(vid)||(v&&S.hideC.has(cityKey(v.city)))};
 S.homeXY = S.home==="__geo" ? store.get("pr_geo",HOMES.Tilburg) : (HOMES[S.home]||HOMES.Tilburg);
 // nieuw-sinds-laatste-bezoek
 let seen=store.get("pr_seen",null);
@@ -106,6 +110,7 @@ function filtered(ignoreDay,films=S.showFilm){
     if(!ignoreDay&&S.day>=0&&!onDay(e,S.day)) return false;
     if(S.regio.size&&!S.regio.has(v.prov)) return false;
     if(S.venue&&e.v!==S.venue) return false;
+    if(e.v!==S.venue&&hiddenLoc(e.v)) return false;
     if(S.genre.size&&!S.genre.has(e.genre)) return false;
     if(S.time){ if(e.time==null) return false;
       if(S.time==="mid"&&!(e.time<18*60)) return false;
@@ -147,6 +152,9 @@ function renderDates(){
   $("#dates").innerHTML=h;
 }
 const fcount=()=>S.regio.size+S.genre.size+(S.venue?1:0)+(S.time?1:0)+(S.onlyFav?1:0)+(S.maxTravel?1:0)+(S.showFilm&&S.type!=="film"?1:0);
+const hidNote=()=>{const n=S.hideC.size+S.hideV.size; if(!n) return "";
+  const parts=[S.hideC.size?`${S.hideC.size} ${S.hideC.size===1?"stad":"steden"}`:"",S.hideV.size?`${S.hideV.size} ${S.hideV.size===1?"podium":"podia"}`:""].filter(Boolean);
+  return ` · <button id="showHidden">${parts.join(" en ")} verborgen, toon</button>`};
 
 function evRow(e,o={}){
   const v=V[e.v], tr=travel(e.v);
@@ -167,7 +175,7 @@ const srcNote=()=>`<p class="note">Rechtstreeks van de sites van ${Object.keys(V
 
 function viewList(){
   const list=filtered(false), hidFilm=S.showFilm||S.type==="film"?0:filtered(false,true).length-list.length;
-  let h=`<div class="meta"><span>${list.length} ${LBL[S.type][1]}${hidFilm?` · <button id="showFilm">${hidFilm} ${hidFilm===1?"film":"films"} verborgen, toon</button>`:""}</span>${fcount()||S.q?'<button id="clearAll">Alles wissen</button>':""}</div>`;
+  let h=`<div class="meta"><span>${list.length} ${LBL[S.type][1]}${hidFilm?` · <button id="showFilm">${hidFilm} ${hidFilm===1?"film":"films"} verborgen, toon</button>`:""}${hidNote()}</span>${fcount()||S.q?'<button id="clearAll">Alles wissen</button>':""}</div>`;
   if(!list.length) return h+emptyState()+srcNote();
   if(S.sort==="date"){let cur=null; list.slice(0,300).forEach(e=>{const k=e.started&&S.day<0?"nu":e.d; if(k!==cur){cur=k;h+=`<h2 class="dh">${k==="nu"?"Nu te zien":dayLabel(e.d)}</h2>`} h+=evRow(e)}); if(list.length>300) h+=`<p class="note">De eerste 300 van ${list.length} getoond. Kies een datum of filter om verder te kijken.</p>`}
   else list.slice(0,300).forEach(e=>h+=evRow(e,{showDate:true}));
@@ -176,7 +184,7 @@ function viewList(){
 }
 function viewGrid(){
   const all=filtered(false), list=all.filter(e=>e.time!=null), unk=all.filter(e=>e.time==null);
-  let h=`<div class="meta"><span>${dayLabel(S.day)}: ${all.length} ${LBL[S.type][1]}</span></div>`;
+  let h=`<div class="meta"><span>${dayLabel(S.day)}: ${all.length} ${LBL[S.type][1]}${hidNote()}</span></div>`;
   if(!all.length) return h+emptyState();
   if(list.length){
     const from=Math.floor(Math.min(...list.map(e=>e.time-(e.type==="thea"?30:0)))/60)*60;
@@ -264,6 +272,7 @@ function buildFilters(){
   vs.sort((a,b)=>inCity(b.id)-inCity(a.id)); // eigen stad eerst, daarna A-Z (sort is stabiel)
   $("#fVenue").innerHTML=`<option value="">Alle podia</option>`+vs.map(v=>`<option value="${v.id}"${S.venue===v.id?" selected":""}>${esc(v.name)} (${esc(v.city)})</option>`).join("");
   $("#fOnlyFav").checked=S.onlyFav;
+  buildLocList();
   $("#fShowFilm").checked=S.showFilm;
   $("#fFilmRow").hidden=S.type==="film"||!EV.some(e=>e.type===S.type&&e.genre==="Film");
 }
@@ -285,6 +294,31 @@ $("#filterSheet").addEventListener("click",e=>{
 });
 $("#fVenue").onchange=e=>S.venue=e.target.value;
 $("#fOnlyFav").onchange=e=>S.onlyFav=e.target.checked;
+
+/* Steden en podia aan/uit: per stad een vinkje, uitklapbaar naar de losse podia */
+function buildLocList(){
+  const q=($("#fLocQ").value||"").trim().toLowerCase(), open=new Set([...document.querySelectorAll("#fLoc details[open]")].map(d=>d.dataset.city));
+  const cnt={}; EV.forEach(e=>{if(inTab(e)) cnt[e.v]=(cnt[e.v]||0)+1});
+  const cities={}; Object.keys(cnt).forEach(id=>{const v=V[id], k=cityKey(v.city); (cities[k]=cities[k]||{name:v.city||"?",vs:[]}).vs.push(v)});
+  const home=cityKey(S.home);
+  const keys=Object.keys(cities).sort((a,b)=>(b===home)-(a===home)||cities[a].name.localeCompare(cities[b].name,"nl"));
+  let h="";
+  keys.forEach(k=>{const c=cities[k], vs=c.vs.sort((a,b)=>a.name.localeCompare(b.name,"nl"));
+    const hit=!q||c.name.toLowerCase().includes(q)||vs.some(v=>v.name.toLowerCase().includes(q)); if(!hit) return;
+    const n=vs.reduce((s,v)=>s+cnt[v.id],0), cityOff=S.hideC.has(k);
+    h+=`<details data-city="${esc(k)}"${open.has(k)||(q&&!c.name.toLowerCase().includes(q))?" open":""}><summary><input type="checkbox" data-hidec="${esc(k)}"${cityOff?"":" checked"} aria-label="Toon ${esc(c.name)}"><span${cityOff?' class="off"':""}>${esc(c.name)}</span><span class="cnt">${n}</span></summary>`+
+      vs.filter(v=>!q||c.name.toLowerCase().includes(q)||v.name.toLowerCase().includes(q)).map(v=>`<label class="v${cityOff?" off":""}"><input type="checkbox" data-hidev="${v.id}"${S.hideV.has(v.id)?"":" checked"}${cityOff?" disabled":""}>${esc(v.name)} <span class="cnt">${cnt[v.id]}</span></label>`).join("")+`</details>`});
+  $("#fLoc").innerHTML=h||`<p class="s" style="padding:10px 12px;margin:0">Niets gevonden.</p>`;
+}
+$("#fLocQ").oninput=buildLocList;
+$("#fLocAll").onclick=()=>{S.hideC.clear();S.hideV.clear();saveHidden();buildLocList()};
+$("#fLoc").addEventListener("click",e=>{if(e.target.matches("summary input")) e.stopPropagation()},true);  // vinkje klikken klapt niet open/dicht
+$("#fLoc").addEventListener("change",e=>{
+  const t=e.target;
+  if(t.dataset.hidec){t.checked?S.hideC.delete(t.dataset.hidec):S.hideC.add(t.dataset.hidec)}
+  if(t.dataset.hidev){t.checked?S.hideV.delete(t.dataset.hidev):S.hideV.add(t.dataset.hidev)}
+  saveHidden(); buildLocList();
+});
 $("#fShowFilm").onchange=e=>{S.showFilm=e.target.checked; if(!S.showFilm) S.genre.delete("Film"); buildFilters()};
 
 /* ---------- DETAIL ---------- */
@@ -369,6 +403,7 @@ document.addEventListener("click",e=>{
   const d=e.target.closest(".day"); if(d){S.day=+d.dataset.d;render();return}
   const t=e.target.closest("nav.tabs button"); if(t){S.view=t.dataset.view;render();try{window.scrollTo(0,0)}catch{};return}
   if(e.target.id==="showFilm"){S.showFilm=true;render();return}
+  if(e.target.id==="showHidden"){S.hideC.clear();S.hideV.clear();saveHidden();render();return}
   if(e.target.id==="clearAll"||e.target.id==="clearAll2"){resetFilters();S.q="";$("#q").value="";if(S.view!=="grid")S.day=-1;render()}
 });
 /* Slepen met de muis om blokkenschema en datumrij opzij te schuiven (touch scrolt al vanzelf) */

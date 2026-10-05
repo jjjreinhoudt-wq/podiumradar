@@ -24,7 +24,7 @@ BRONNEN = ROOT / "scraper/bronnen.json"
 CACHE = ROOT / "scraper/detail_cache.json"
 REPORT = ROOT / "scraper/rapport.json"
 TODAY = dt.date.today()
-CACHE_V = 3  # ophogen als het uitlezen verandert, zodat gecachte pagina's opnieuw worden gelezen
+CACHE_V = 4  # ophogen als het uitlezen verandert, zodat gecachte pagina's opnieuw worden gelezen
 
 DETAIL_RE = re.compile(r"/(agenda|programma|programme|event|events|evenement|evenementen|concert|concerten|film|films|movies?|"
                        r"voorstelling|voorstellingen|show|shows|tentoonstelling|tentoonstellingen|exhibition|"
@@ -224,6 +224,9 @@ def from_jsonld(o, page_url):
         ev["end"] = end.isoformat()
     if "ScreeningEvent" in str(o.get("@type")):
         ev["screening"] = True  # de site zegt zelf dat het een filmvertoning is
+    loc = _name(o.get("location"))
+    if loc:
+        ev["loc"] = loc  # waar het is; scrape.py zet een show bij het juiste podium als dat een ander podium is
     perf = [p for p in re.split(r"\s*,\s*", _name(o.get("performer"))) if p and p.lower() != title.lower()]
     if len(perf) > 1 and "Screening" not in str(o.get("@type")):  # bij films zijn dit acteurs
         ev["support"] = perf[1:4]
@@ -367,6 +370,10 @@ def from_text(soup, url):
     ev = {"date": d.isoformat(), "time": t, "title": title, "url": url}
     if end and (end - d).days >= 1:
         ev["end"] = end.isoformat()
+    # "Locatie | Hall of Fame" op de pagina van 013: de show is bij een ander podium
+    m = re.search(r"\bLocatie\s*[:\n]?\s*\n?([^\n]{2,60})", txt)
+    if m and not re.match(r"(en|&|\d|:)", m.group(1).strip()):
+        ev["loc"] = m.group(1).strip()
     if doors:
         ev["doors"] = doors
     if start:
