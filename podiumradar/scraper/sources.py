@@ -564,7 +564,9 @@ def scrape_source(src, F, cache, cfg, log):
         if not html:
             continue
         soup = BeautifulSoup(html, "html.parser")
-        for o in jsonld_events(soup):
+        # "listing_jsonld": false = de JSON-LD van het overzicht klopt niet (Paard: wintertijd een uur mis),
+        # dan alleen de voorstellingspagina's zelf lezen
+        for o in (jsonld_events(soup) if src.get("listing_jsonld", True) else []):
             ev = from_jsonld(o, url)
             # Nummer als naam (sommige filmsites): die voorstelling halen we van de filmpagina zelf
             if ev and not re.fullmatch(r"[\d\s#-]+", ev["title"]):

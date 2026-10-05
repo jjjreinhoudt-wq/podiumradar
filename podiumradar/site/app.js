@@ -1,7 +1,8 @@
 (async()=>{
 /* ---------- DATA ---------- */
 let DATA;
-try{ DATA=await fetch("data.json",{cache:"no-store"}).then(r=>r.json()); }
+// "no-cache": altijd bij de server navragen, maar onveranderde data komt uit de browsercache (304), dus geen 700 KB per bezoek
+try{ DATA=await fetch("data.json",{cache:"no-cache"}).then(r=>r.json()); }
 catch(e){ document.querySelector("#main").innerHTML='<div class="empty"><strong>De agenda kon niet laden</strong>Controleer je verbinding en ververs de pagina.</div>'; return; }
 const V={}, EV=[];
 const THEATER_GENRES=new Set(["Cabaret","Comedy","Musical","Toneel","Dans","Opera","Theater","Jeugd"]);
@@ -172,7 +173,7 @@ function evRow(e,o={}){
   </div>`;
 }
 function emptyState(){return `<div class="empty"><strong>Niets gevonden</strong>Geen ${LBL[S.type][0]} dat bij deze filters past. Kies een andere datum of haal een filter weg.<br><button class="btn ghost" id="clearAll2" style="display:inline-flex;flex:0">Filters wissen</button></div>`}
-const srcNote=()=>`<p class="note">Rechtstreeks van de sites van ${Object.keys(V).length} podia, theaters, musea en festivals, bijgewerkt op ${SNAPSHOT}. ${EV.length} items in totaal. Elke nacht komt er nieuwe data bij. Tijden met ~ zijn geschat.</p>`;
+const srcNote=()=>`<p class="note">Rechtstreeks van de sites van ${Object.keys(V).length} podia, theaters, musea en festivals, bijgewerkt op ${SNAPSHOT}. ${EV.length} items in totaal. Elke nacht komt er nieuwe data bij. Tijden met ~ zijn geschat. De site van het podium is altijd leidend. <a href="over.html">Over Podiumradar, privacy en contact</a></p>`;
 
 function viewList(){
   const list=filtered(false), hidFilm=S.showFilm||S.type==="film"?0:filtered(false,true).length-list.length;

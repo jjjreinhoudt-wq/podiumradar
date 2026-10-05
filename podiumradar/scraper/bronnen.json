@@ -38,7 +38,7 @@
  {"name": "Annabel", "city": "Rotterdam", "prov": "Zuid-Holland", "type": "pop", "agenda_url": "https://annabel.nu/agenda/", "link_pattern": "^/(?!(agenda|info|vacatures|verhuur|feed|wp-json|xmlrpc|annas-terras)/)[a-z0-9-]+/?$"},
  {"name": "Rotown", "city": "Rotterdam", "prov": "Zuid-Holland", "type": "pop", "agenda_url": "https://www.rotown.nl/", "max_details": 0},
  {"name": "Baroeg", "city": "Rotterdam", "prov": "Zuid-Holland", "type": "pop", "agenda_url": "https://baroeg.nl/agenda/"},
- {"name": "Paard", "city": "Den Haag", "prov": "Zuid-Holland", "type": "pop", "agenda_url": "https://www.paard.nl/event/"},
+ {"name": "Paard", "city": "Den Haag", "prov": "Zuid-Holland", "type": "pop", "agenda_url": "https://www.paard.nl/event/", "listing_jsonld": false, "link_pattern": "^/event/[^/]+/?$", "max_details": 300},
  {"name": "Amare", "city": "Den Haag", "prov": "Zuid-Holland", "type": "concert", "agenda_url": "https://www.amare.nl/nl/agenda"},
  {"name": "Het Nationale Theater (Koninklijke Schouwburg)", "city": "Den Haag", "prov": "Zuid-Holland", "type": "thea", "agenda_url": "https://www.hnt.nl/nl/voorstellingen"},
  {"name": "AFAS Circustheater Scheveningen", "city": "Den Haag", "prov": "Zuid-Holland", "type": "thea", "agenda_url": "https://www.stage-entertainment.nl/theaters/afas-circustheater-scheveningen"},
