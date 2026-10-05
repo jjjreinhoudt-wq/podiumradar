@@ -94,7 +94,7 @@ class Fetcher:
             st = self.stats.setdefault(urlparse(host).netloc.removeprefix("www."), {})
             st[what] = st.get(what, 0) + 1
 
-    def _fetch(self, url, params=None, json_body=None):
+    def _fetch(self, url, params=None, json_body=None, headers=None):
         host = self._host(url)
         with self.locks[host]:
             if not self.allowed(url):
@@ -108,7 +108,7 @@ class Fetcher:
                 time.sleep(wait)
             self.last[ip] = time.time()
             try:
-                r = self.S.post(url, json=json_body, timeout=30) if json_body is not None \
+                r = self.S.post(url, json=json_body, headers=headers, timeout=30) if json_body is not None \
                     else self.S.get(url, params=params, timeout=30)
             except requests.RequestException as e:
                 self._note(host, "timeout" if isinstance(e, requests.Timeout) else "verbindingsfout")
@@ -130,9 +130,14 @@ class Fetcher:
         except ValueError:
             return None
 
-    def post_json(self, url, body):
+    def get_text(self, url):
+        """Ruwe tekst (bv. een JavaScript-bestand), zonder de html-controle van get()."""
+        r = self._fetch(url)
+        return r.text if r is not None else None
+
+    def post_json(self, url, body, headers=None):
         """POST met JSON (sommige sites halen hun agenda zo op); zelfde pauze en robots-regels als get."""
-        r = self._fetch(url, json_body=body)
+        r = self._fetch(url, json_body=body, headers=headers)
         try:
             return r.json() if r is not None else None
         except ValueError:

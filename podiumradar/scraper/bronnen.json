@@ -1,5 +1,5 @@
 [
- {"name": "Paradiso", "city": "Amsterdam", "prov": "Noord-Holland", "type": "pop", "agenda_url": "https://www.paradiso.nl/"},
+ {"name": "Paradiso", "city": "Amsterdam", "prov": "Noord-Holland", "type": "pop", "agenda_url": "https://www.paradiso.nl/", "platform": "paradiso", "location": "Paradiso"},
  {"name": "Melkweg", "city": "Amsterdam", "prov": "Noord-Holland", "type": "pop", "agenda_url": "https://www.melkweg.nl/nl/agenda/", "platform": "melkweg"},
  {"name": "AFAS Live", "city": "Amsterdam", "prov": "Noord-Holland", "type": "pop", "agenda_url": "https://www.afaslive.nl/agenda"},
  {"name": "Ziggo Dome", "city": "Amsterdam", "prov": "Noord-Holland", "type": "arena", "agenda_url": "https://www.ziggodome.nl/agenda/", "platform": "ziggodome"},

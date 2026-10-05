@@ -235,7 +235,60 @@ def itix(src, F, cfg, log):
     return out
 
 
-PLATFORMS = {"ziggodome": ziggodome, "melkweg": melkweg, "tolhuistuin": tolhuistuin, "musis": musis,
+PARADISO_Q = ("query($site:String,$size:Int,$gteStartDateTime:String,$searchAfter:[String]){program(site:$site,size:$size,"
+              "gteStartDateTime:$gteStartDateTime,searchAfter:$searchAfter){events{id uri title subtitle startDateTime "
+              "sort eventStatus supportAct soldOut location{title}}}}")
+
+
+def paradiso(src, F, cfg, log):
+    """Paradiso: de site haalt zijn programma bij een GraphQL-dienst met een openbare sleutel die in de eigen
+    JavaScript van paradiso.nl staat. We lezen adres en sleutel elke run opnieuw uit die JavaScript (niets vast
+    in de code), en doen daarna dezelfde aanvraag als de site. Met toestemming van Jasper (okt 2026).
+    location: alleen voorstellingen op deze locatie (de dienst geeft ook Tolhuistuin, Bitterzoet, ...)."""
+    site = _site(src)
+    html = F.get(site + "/") or ""
+    endpoint = key = None
+    for chunk in sorted(set(re.findall(r'(/_next/static/chunks/[^"\']+\.js)', html)), key=lambda c: "execute" not in c):
+        js = F.get_text(site + chunk) or ""
+        if "execute-api" not in js:
+            continue
+        m = re.search(r'"(https://[a-z0-9]+\.execute-api\.[a-z0-9-]+\.amazonaws\.com)"\s*,\s*"(/graphql)"', js)
+        k = re.search(r'"Bearer "\.concat\("([A-Za-z0-9_\-]+)"\)|Bearer ([A-Za-z0-9_\-]{20,})', js)
+        if m and k:
+            endpoint, key = m.group(1) + m.group(2), k.group(1) or k.group(2)
+            break
+    if not endpoint:
+        log(f"  {src['name']}: adres van het programma niet gevonden in de site")
+        return []
+    want = src.get("location", "Paradiso").lower()
+    out, after, page = [], None, 0
+    while page < 20:
+        var = {"site": "paradisoNederlands", "size": 100, "gteStartDateTime": f"{TODAY}T00:00:00.000Z"}
+        if after:
+            var["searchAfter"] = after
+        js = F.post_json(endpoint, {"query": PARADISO_Q, "variables": var}, headers={"Authorization": f"Bearer {key}"}) or {}
+        evs = (((js.get("data") or {}).get("program") or {}).get("events")) or []
+        if not evs:
+            break
+        for e in evs:
+            locs = [(l or {}).get("title", "").lower() for l in (e.get("location") or [])]
+            if want not in locs or e.get("eventStatus") in ("canceled", "cancelled"):
+                continue
+            d, t = _dt(e.get("startDateTime"))
+            if not d:
+                continue
+            ev = {"date": d, "time": t, "title": (e.get("title") or "").strip(), "url": f"{site}/{e.get('uri', '')}"}
+            if e.get("supportAct"):
+                ev["support"] = [s.strip() for s in re.split(r",|&| en | \+ ", e["supportAct"]) if s.strip()][:3]
+            if str(e.get("soldOut", "no")).startswith("yes"):
+                ev["status"] = "sold"
+            out.append(ev)
+        after = evs[-1].get("sort")
+        page += 1
+    return out
+
+
+PLATFORMS = {"paradiso": paradiso, "ziggodome": ziggodome, "melkweg": melkweg, "tolhuistuin": tolhuistuin, "musis": musis,
              "cre8ion": cre8ion, "render_api": render_api, "umbraco_agenda": umbraco_agenda,
              "umbraco_getshows": umbraco_getshows, "itix": itix}
 
