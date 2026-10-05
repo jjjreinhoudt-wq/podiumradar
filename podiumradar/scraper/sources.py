@@ -41,7 +41,8 @@ MONTHS = {"jan": 1, "feb": 2, "mrt": 3, "maa": 3, "mar": 3, "apr": 4, "mei": 5, 
 TXT_DATE_RE = re.compile(
     r"\b(\d{1,2})\s+(jan(?:uari|uary)?|feb(?:ruari|ruary)?|mrt|maart|mar(?:ch)?|apr(?:il)?|mei|may|jun[ie]?|jul[iy]?|"
     r"aug(?:ustus|ust)?|sep(?:t(?:ember)?)?|okt(?:ober)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\b"
-    r"(?:\s+'?(\d{4}|\d{2})(?![:.]\d))?\b", re.I)  # "3 okt 12:40": 12 is geen jaartal
+    # jaartal: "3 okt 12:40" en "3 okt 19 uur" zijn geen jaartal; "12 november , 2026" wel
+    r"(?:\s*,?\s+'?(\d{4}|\d{2})(?![:.]\d)(?!\s*u(?:ur)?\b))?\b", re.I)
 NUM_DATE_RE = re.compile(r"\b(\d{1,2})[-/.](\d{1,2})[-/.](20\d{2})\b")
 TIME_RE = re.compile(r"\b([01]?\d|2[0-3])[:.]([0-5]\d)(?![.\-/]\d)\s*(?:uur|u\b)?", re.I)  # "03.10.2026" is geen 03:10
 
@@ -640,6 +641,12 @@ def scrape_source(src, F, cache, cfg, log):
             parts = parts[1:]
         if parts and len(parts[0]) >= 3:
             e["title"] = parts[0]
+        # "Donderdag 8 oktober v.v. EIGEN WIJS" / "9 t/m 11 oktober Biergarten": datum vooraan eraf
+        stripped = re.sub(r"^(?:(?:ma|di|wo|do|vr|za|zo)[a-z]*\.?\s+)?\d{1,2}(?:\s*(?:t/m|-|–)\s*\d{1,2})?\s+(?:jan|feb|mrt|maa|apr|mei|jun|jul|aug|sep|okt|nov|dec)[a-z]*\.?"
+                          r"(?:\s+20\d\d)?\s*(?:v\.v\.|:|-|–)?\s*", "", e["title"], flags=re.I)
+        stripped = re.sub(r"\s+\d{1,2}[:.]\d{2}(?:\s*(?:-|–|tot)\s*\d{1,2}[:.]\d{2})?\s*(?:uur)?\s*$", "", stripped)  # "... 13:00 - 23:00"
+        if stripped != e["title"] and len(stripped) >= 3:
+            e["title"] = stripped
         if src.get("type") == "film":
             # "The Incomer - Filmvoorstelling" / "Film: Pressure" -> filmtitel
             e["title"] = re.sub(r"\s+-\s+(filmvoorstelling|film|voorstelling)\b.*$|^film:\s*", "", e["title"], flags=re.I).strip()

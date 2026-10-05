@@ -481,5 +481,20 @@
  {"name": "Slieker Film", "city": "Leeuwarden", "prov": "Friesland", "type": "film", "agenda_url": "https://sliekerfilm.nl/programma/"},
  {"name": "Cinema Oostereiland", "city": "Hoorn", "prov": "Noord-Holland", "type": "film", "agenda_url": "https://cinemaoostereiland.nl/agenda/"},
  {"name": "Filmtheater Fraterhuis", "city": "Zwolle", "prov": "Overijssel", "type": "film", "agenda_url": "https://filmtheaterfraterhuis.nl/programma/", "platform": "fraterhuis"},
- {"name": "Filmhuis Cavia", "city": "Amsterdam", "prov": "Noord-Holland", "type": "film", "agenda_url": "https://www.filmhuiscavia.nl/programma/oktober-2026"}
+ {"name": "Filmhuis Cavia", "city": "Amsterdam", "prov": "Noord-Holland", "type": "film", "agenda_url": "https://www.filmhuiscavia.nl/programma/oktober-2026"},
+ {"name": "Poppodium Phoenix", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "pop", "agenda_url": "https://poppodiumphoenix.nl/events/"},
+ {"name": "Podium Bloos", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "thea", "agenda_url": "https://podiumbloos.nl/evenementen/", "link_pattern": "/evenement/[^/]+/?$"},
+ {"name": "Café Lievense", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "cafe", "agenda_url": "https://cafelievense.nl/event-agenda/", "link_pattern": "^/(?!live-muziek|besloten|event-agenda|contact|over-ons|programma|feest|cafe|bbq|bedrijfs|vergader|bruiloft|beer|mogelijkheden|privacy|cookie|wp-)[^/]+/?$"},
+ {"name": "Pier15", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "pop", "agenda_url": "https://pier15.nl/agenda/", "link_pattern": "^/event/[^/]+/?$"},
+ {"name": "Nieuwe Veste (Bibliotheek & Centrum voor de Kunsten)", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "concert", "agenda_url": "https://www.nieuweveste.nl/agenda?categorieen=concert", "extra_urls": ["https://www.nieuweveste.nl/agenda?categorieen=voorstelling", "https://www.nieuweveste.nl/agenda?categorieen=expositie"], "link_pattern": "^/agenda/[^/]+$"},
+ {"name": "Grote Kerk Breda", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "concert", "agenda_url": "https://www.grotekerkbreda.nl/agenda", "link_pattern": "^/agenda/[^/]+$"},
+ {"name": "Grote Kerk Breda (tentoonstellingen)", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "museum", "sub": "kunst", "agenda_url": "https://www.grotekerkbreda.nl/nu-te-zien", "extra_urls": ["https://www.grotekerkbreda.nl/nu-te-zien/verwacht"], "link_pattern": "^/nu-te-zien/(?!archief|activiteiten|mummiekat|tranen-van-breda|verwacht$)(verwacht/)?[^/]+$"},
+ {"name": "Het Gele Huis Princenhage", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "thea", "agenda_url": "https://hetgelehuisinprincenhage.com/agenda/", "link_pattern": "^/agenda/(exposities/[^/]+|activiteiten/(muziek|cabaret|cultuurpodium|muzieksalon-spronk|cafe-livre|filmclub|muziek-poezie))/[^/]+/?$"},
+ {"name": "Ulvenhart", "city": "Ulvenhout", "prov": "Noord-Brabant", "local": false, "type": "concert", "agenda_url": "https://www.ulvenhart.nl/agenda", "link_pattern": "^/agenda/(?!trouwbeurs)[^/]+$"},
+ {"name": "Maczek Memorial Breda", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "museum", "sub": "geschiedenis", "agenda_url": "https://www.maczekmemorialbreda.nl/7/event/aba489f07cece7dcb6ffc1fe8cdc73ca/Evenementen.html"},
+ {"name": "Havenfeesten Breda", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "festival", "sub": "pop", "month": "augustus", "agenda_url": "https://havenfeestenbreda.nl/"},
+ {"name": "Spanjaardsgat Orkestfestival", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "festival", "sub": "klassiek", "month": "mei", "agenda_url": "https://hetspanjaardsgat.nl/"},
+ {"name": "TURF", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "festival", "sub": "elektronisch", "month": "november", "agenda_url": "https://www.turf-event.nl/"},
+ {"name": "Breda in Concert", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "festival", "sub": "pop", "month": "juli", "agenda_url": "https://bredainconcert.com/"},
+ {"name": "Breda Live", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "festival", "sub": "pop", "month": "juli", "agenda_url": "https://www.bredalive.nl/"}
 ]
