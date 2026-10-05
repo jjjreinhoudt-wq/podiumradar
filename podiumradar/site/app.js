@@ -7,7 +7,12 @@ const V={}, EV=[];
 const THEATER_GENRES=new Set(["Cabaret","Comedy","Musical","Toneel","Dans","Opera","Theater","Jeugd"]);
 // Soort locatie (uit de bron) -> tabblad in de app
 const TYPE_OF={thea:"thea",film:"film",museum:"expo",festival:"fest"};
-const LBL={pop:["concert","concerten"],thea:["voorstelling","voorstellingen"],film:["filmvoorstelling","filmvoorstellingen"],expo:["tentoonstelling","tentoonstellingen"],fest:["festival","festivals"]};
+// Kids: alles wat voor kinderen/gezinnen is, over alle soorten heen (herkend aan titel en genre)
+const KIDS_WORDS=/kinder(?!loos|achtig)|\bkids?\b|familie(voorstelling|concert|film|dag|theater|middag|musical|tour|tentoonstelling|programma|zondag|weekend|activiteit|vertelling)|familietheater|voor (het hele )?gezin|gezinsvoorstelling|\bjeugd(theater|voorstelling|film|concert|orkest)|peuter|kleuter|\bjunior|voorlees|poppenkast|poppentheater|sprookje|sinterklaas|\bsint\b|nijntje|dikkie dik|kikker|buurman en buurman|pieter post|paw patrol|k3\b|samson|bumba|woezel|pip|minoes|pluk van de petteflet|jip en janneke|taartrovers|cinemini|kidsclub|kinderfeest|schoolvoorstelling|nederlandse versie|nl versie|\(nl\)|2d nl|nl gesproken|nederlands gesproken/i;
+const ageOf=t=>{const m=String(t).match(/\(?\b(\d{1,2})\s*\+\)?|\bvanaf\s+(\d{1,2})\s+jaar/i);return m?+(m[1]||m[2]):null};
+function isKids(title,genre){const a=ageOf(title); if(a!=null) return a<=12; if(/\b(16|18)\s*\+|\bvolwassen/i.test(title)) return false;
+  return KIDS_WORDS.test(title)}  // genre "Jeugd" alleen niet genoeg: dat komt soms van "familie" in een titel
+const LBL={kids:["activiteit voor kinderen","activiteiten voor kinderen"],pop:["concert","concerten"],thea:["voorstelling","voorstellingen"],film:["filmvoorstelling","filmvoorstellingen"],expo:["tentoonstelling","tentoonstellingen"],fest:["festival","festivals"]};
 const today=new Date(); today.setHours(0,0,0,0);
 const toMin=t=>t?(+t.slice(0,2))*60+(+t.slice(3,5)):null;
 const dayNr=s=>{const [y,m,dd]=s.split("-").map(Number);return Math.round((new Date(y,m-1,dd)-today)/864e5)};
@@ -27,7 +32,7 @@ DATA.events.forEach(r=>{
   EV.push({id:r.id,title:r.title,artist:acts[0],support,v:r.v,genre:r.genre,type,date,d,
     time:toMin(r.time)??toMin(r.start)??toMin(r.doors), doors:toMin(r.doors), start:toMin(r.start),
     url:r.url,isFest:r.id[0]==="f"||type==="fest",status:r.status||null,firstSeen:r.first_seen,
-    dur:r.dur||null,endD,endDate:r.end?new Date(...r.end.split("-").map((x,i)=>i===1?x-1:+x)):null,started});
+    dur:r.dur||null,kids:!!r.kids||isKids(r.title,r.genre),endD,endDate:r.end?new Date(...r.end.split("-").map((x,i)=>i===1?x-1:+x)):null,started});
 });
 const SNAPSHOT=(()=>{const [dpart,t]=DATA.updated.split(" ");const [y,m,d]=dpart.split("-").map(Number);return d+" "+["januari","februari","maart","april","mei","juni","juli","augustus","september","oktober","november","december"][m-1]+" om "+t})();
 const recent=e=>e.firstSeen&&(today-new Date(e.firstSeen))/864e5<=3;
@@ -72,7 +77,7 @@ function toggleFav(ak,name){ if(S.fav.has(ak)){S.fav.delete(ak);toast(name+" nie
   store.set("pr_fav2",[...S.fav]); store.set("pr_favnames",Object.assign(store.get("pr_favnames",{}),{[ak]:name})); render(); }
 const favName=ak=>store.get("pr_favnames",{})[ak]||(EV.find(e=>e.ak===ak)||{}).artist||ak;
 // Films tussen muziek/theater/festivals zijn standaard verborgen ("Toon films" in de filters); het tabblad Film toont ze altijd
-const inTab=(e,films=S.showFilm)=>e.type===S.type&&(films||e.type==="film"||e.genre!=="Film");
+const inTab=(e,films=S.showFilm)=>S.type==="kids"?e.kids:e.type===S.type&&(films||e.type==="film"||e.genre!=="Film");
 const alarmHit=e=>S.alarms.find(a=>(e.title+" "+V[e.v].name+" "+V[e.v].city).toLowerCase().includes(a.toLowerCase()));
 
 /* timetable: bron geeft één tijd; de rest is een schatting */
@@ -223,7 +228,7 @@ function viewFav(){
   return h;
 }
 function render(){
-  ["thea","film","expo","fest"].forEach(t=>document.body.classList.toggle(t,S.type===t));
+  ["thea","film","expo","fest","kids"].forEach(t=>document.body.classList.toggle(t,S.type===t));
   document.querySelectorAll(".seg [data-type]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.type===S.type));
   document.querySelectorAll("nav.tabs button").forEach(b=>b.dataset.view===S.view?b.setAttribute("aria-current","page"):b.removeAttribute("aria-current"));
   const n=fcount(); $("#fcount").hidden=!n; $("#fcount").textContent=n;
