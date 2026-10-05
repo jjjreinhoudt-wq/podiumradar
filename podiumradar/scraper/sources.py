@@ -23,6 +23,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 BRONNEN = ROOT / "scraper/bronnen.json"
 CACHE = ROOT / "scraper/detail_cache.json"
 REPORT = ROOT / "scraper/rapport.json"
+LOKAAL = ROOT / "scraper/lokaal.json"          # geschreven door scraper/lokaal.py op Jaspers computer
+LOCAL_CACHE = ROOT / "scraper/lokaal_cache.json"  # aparte cache, zodat die niet botst met de cache van GitHub
 TODAY = dt.date.today()
 CACHE_V = 4  # ophogen als het uitlezen verandert, zodat gecachte pagina's opnieuw worden gelezen
 
@@ -645,13 +647,36 @@ def scrape_source(src, F, cache, cfg, log):
     return out
 
 
-def collect(cfg, only=None, log=print):
-    """Geeft [(bron, [events])] terug voor alle bronnen in bronnen.json."""
+def local_key(src):
+    """Sleutel in lokaal.json: naam + soort (Gigant staat er als poppodium én als filmhuis in)."""
+    return f"{src['name']}|{src.get('type', '')}"
+
+
+def load_local(log=print):
+    """Resultaten van de bronnen die alleen vanaf Jaspers computer werken (scraper/lokaal.py -> lokaal.json)."""
+    if not LOKAAL.exists():
+        return {}
+    data = json.loads(LOKAAL.read_text(encoding="utf-8"))
+    age = (TODAY - dt.date.fromisoformat(data.get("datum", "2000-01-01")[:10])).days
+    if age > 21:
+        log(f"  lokaal.json is {age} dagen oud: niet meer gebruikt")
+        return {}
+    t0 = TODAY.isoformat()
+    return {name: [e for e in evs if (e.get("end") or e["date"]) >= t0] for name, evs in data.get("bronnen", {}).items()}
+
+
+def collect(cfg, only=None, log=print, local=False):
+    """Geeft [(bron, [events])] terug voor alle bronnen in bronnen.json.
+    Bronnen met "local_only" blokkeren datacenters (GitHub): die haalt scraper/lokaal.py (local=True) op
+    vanaf Jaspers eigen computer; de gewone run neemt dan de items uit lokaal.json over."""
     if not BRONNEN.exists():
         return []
-    srcs = [s for s in json.loads(BRONNEN.read_text(encoding="utf-8"))
-            if s.get("agenda_url") and s.get("enabled", True) and (not only or only.lower() in s["name"].lower())]
-    cache = json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
+    allsrc = [s for s in json.loads(BRONNEN.read_text(encoding="utf-8"))
+              if s.get("agenda_url") and s.get("enabled", True) and (not only or only.lower() in s["name"].lower())]
+    srcs = [s for s in allsrc if bool(s.get("local_only")) == local]
+    from_local = [] if local else [s for s in allsrc if s.get("local_only")]
+    cache_file = LOCAL_CACHE if local else CACHE
+    cache = json.loads(cache_file.read_text(encoding="utf-8")) if cache_file.exists() else {}
     F = Fetcher(cfg["user_agent"], cfg["delay_seconds"])
     lock = threading.Lock()
 
@@ -686,14 +711,23 @@ def collect(cfg, only=None, log=print):
         cache = dict(cache)
     horizon = (TODAY - dt.timedelta(days=cfg.get("cache_keep_days", 30))).isoformat()
     cache = {k: v for k, v in cache.items() if v.get("at", "") >= horizon}
-    CACHE.write_text(json.dumps(cache, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    cache_file.write_text(json.dumps(cache, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    if local:
+        return results
+    if from_local:
+        loc = load_local(log)
+        for src in from_local:
+            evs = loc.get(local_key(src))
+            log(f"  {src['name']}: {len(evs) if evs is not None else 'geen'} items van Jaspers computer (lokaal.json)")
+            results.append((src, evs))  # None = nog nooit lokaal opgehaald: vorige gegevens aanhouden
     if not only:
         # Rapport per bron: aantal items en de antwoorden van de site (403 = geblokkeerd, 404 = verkeerde link, ...)
         rep = []
         for src, evs in results:
             site = urlparse(src["agenda_url"]).netloc.removeprefix("www.")
             rep.append({"name": src["name"], "type": src.get("type"), "items": len(evs or []),
-                        "niet_op_tijd": evs is None,
+                        "niet_op_tijd": evs is None and not src.get("local_only"),
+                        "lokaal": bool(src.get("local_only")),
                         "site": site, "antwoorden": F.stats.get(site, {})})
         rep.sort(key=lambda r: (r["items"] > 0, r["type"] or "", r["name"]))
         REPORT.write_text(json.dumps({"datum": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
