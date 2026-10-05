@@ -75,7 +75,7 @@
  {"name": "Dynamo", "city": "Eindhoven", "prov": "Noord-Brabant", "type": "pop", "agenda_url": "https://www.dynamo-eindhoven.nl/evenementen"},
  {"name": "Klokgebouw", "city": "Eindhoven", "prov": "Noord-Brabant", "type": "arena", "agenda_url": "https://www.klokgebouw.nl/agenda"},
  {"name": "Chassé Theater", "city": "Breda", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.chasse.nl/programma", "local_only": true},
- {"name": "Mezz", "city": "Breda", "prov": "Noord-Brabant", "type": "pop", "agenda_url": "https://www.mezz.nl/programma"},
+ {"name": "Mezz", "city": "Breda", "prov": "Noord-Brabant", "type": "pop", "agenda_url": "https://www.mezz.nl/programma", "links_json": {"url": "https://www.mezz.nl/wp-json/wp/v2/event?per_page=100&page={page}", "path": "prod.link", "max_pages": 5}, "link_pattern": "/programma/[^/]+/?$"},
  {"name": "Theater aan de Parade", "city": "'s-Hertogenbosch", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.theateraandeparade.nl/nl/programma"},
  {"name": "Willem Twee Poppodium (W2)", "city": "'s-Hertogenbosch", "prov": "Noord-Brabant", "type": "pop", "agenda_url": "https://www.willem-twee.nl/agenda/poppodium", "link_pattern": "/alle-activiteiten/", "must_contain": "Locatie\\s+Poppodium", "must_not_contain": "Zaal\\s+Kunstruimte"},
  {"name": "Brabanthallen", "city": "'s-Hertogenbosch", "prov": "Noord-Brabant", "type": "arena", "agenda_url": "https://www.brabanthallen.nl/agenda/"},

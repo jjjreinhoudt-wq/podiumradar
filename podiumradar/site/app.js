@@ -31,7 +31,8 @@ DATA.events.forEach(r=>{
   const support=(r.support&&r.support.length)?r.support:acts.slice(1);
   EV.push({id:r.id,title:r.title,artist:acts[0],support,v:r.v,genre:r.genre,type,date,d,
     time:toMin(r.time)??toMin(r.start)??toMin(r.doors), doors:toMin(r.doors), start:toMin(r.start),
-    url:r.url,isFest:r.id[0]==="f"||type==="fest",status:r.status||null,firstSeen:r.first_seen,
+    // alleen echte webadressen als link (geen javascript:-links uit een bron)
+    url:/^https?:\/\//i.test(r.url||"")?r.url:"#",isFest:r.id[0]==="f"||type==="fest",status:r.status||null,firstSeen:r.first_seen,
     dur:r.dur||null,kids:!!r.kids||isKids(r.title,r.genre),endD,endDate:r.end?new Date(...r.end.split("-").map((x,i)=>i===1?x-1:+x)):null,started});
 });
 const SNAPSHOT=(()=>{const [dpart,t]=DATA.updated.split(" ");const [y,m,d]=dpart.split("-").map(Number);return d+" "+["januari","februari","maart","april","mei","juni","juli","augustus","september","oktober","november","december"][m-1]+" om "+t})();
@@ -335,9 +336,9 @@ function openDetail(id){
      <button class="star" data-fav="${e.ak}" data-name="${esc(e.artist)}" aria-pressed="${S.fav.has(e.ak)}" aria-label="Volg ${esc(e.artist)}" style="font-size:30px">★</button></div>
    <div class="facts"><div><small>Genre</small><b>${esc(e.genre)}</b></div>${tr.car!=null?`<div><small>Auto</small><b>± ${tr.car} min</b></div><div><small>OV</small><b>± ${tr.ov} min</b></div>`:""}${e.status==="sold"?`<div><small>Kaarten</small><b style="color:var(--warn)">Uitverkocht</b></div>`:""}</div>
    <div class="timeline">${tl}</div>
-   <div class="row2"><a class="btn" href="${esc(e.url)}" target="_blank" rel="noopener">Info en kaarten</a></div>
+   <div class="row2"><a class="btn" href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">Info en kaarten bij ${esc(V[e.v].name)}</a></div>
    <div class="row2" style="margin-top:10px">${e.time!=null?`<button class="btn ghost" id="icsBtn">Zet in agenda</button><a class="btn ghost" id="gcal" target="_blank" rel="noopener">Google Agenda</a>`:`<p class="s">Agenda-knop verschijnt zodra de tijd bekend is.</p>`}</div>
-   <p class="note">Kaartstatus en prijs staan op de pagina van de bron; die wisselen te snel voor een momentopname.</p>
+   <p class="note">Gegevens van ${SNAPSHOT}, overgenomen van de site van ${esc(V[e.v].name)}. Tijden, prijzen en beschikbaarheid kunnen veranderen: kijk altijd op die site voordat je gaat of kaarten koopt.</p>
    <h3>Vergelijkbaar en dichtbij</h3>
    <div class="simlist">${sims.length?sims.map(o=>`<div class="ev" role="button" tabindex="0" data-ev="${o.id}"><div><div class="a">${esc(o.artist)}</div><div class="v">${short(o)}, ${esc(V[o.v].name)} ${travel(o.v).car!=null?"(± "+travel(o.v).car+" min)":""}</div></div><button class="star" data-fav="${o.ak}" data-name="${esc(o.artist)}" aria-pressed="${S.fav.has(o.ak)}" aria-label="Volg ${esc(o.artist)}">★</button></div>`).join(""):'<p class="s">Geen genre-match in de huidige agenda.</p>'}</div>
    <div class="ai" id="simAI" hidden><strong>Wie lijkt hierop?</strong><p>Claude noemt vergelijkbare artiesten en checkt of die in de agenda staan.</p><button class="btn" id="askSim">Vraag Claude</button><div id="simOut"></div></div>`;

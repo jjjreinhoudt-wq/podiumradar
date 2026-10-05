@@ -2,10 +2,11 @@
    Verhoog VERSION bij elke wijziging aan dit bestand of aan de lijst SHELL.
    index.html, app.js, pwa.js en data.json gaan altijd eerst naar het netwerk
    (network-first), dus updates komen direct door; de cache is alleen voor offline. */
-const VERSION = "v1";
+const VERSION = "v2";
 const CACHE = "podiumradar-" + VERSION;
 const FONTS = "podiumradar-fonts"; // los van VERSION: fonts veranderen niet
-const SHELL = ["./", "index.html", "app.js", "pwa.js", "data.json", "manifest.json",
+const SHELL = ["./", "index.html", "app.js", "pwa.js", "data.json", "manifest.json", "fonts.css",
+  "fonts/archivo-latin.woff2", "fonts/archivo-latin-ext.woff2",
   "icon.svg", "icon-180.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"];
 const FRESH = /\/(?:index\.html|app\.js|pwa\.js|data\.json)$/;
 

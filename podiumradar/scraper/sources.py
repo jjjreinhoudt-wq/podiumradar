@@ -382,6 +382,9 @@ def from_text(soup, url):
         ev["start"] = start
     if re.search(r"\buitverkocht\b|\bsold ?out\b", txt, re.I):
         ev["status"] = "sold"
+    # Afgelast bovenaan de pagina (niet ergens in de tekst over een ander concert)
+    if re.search(r"\b(afgelast|geannuleerd|gaat niet door|cancelled|canceled)\b", txt[:800], re.I):
+        ev["status"] = "cancelled"
     return ev
 
 
@@ -571,6 +574,23 @@ def scrape_source(src, F, cache, cfg, log):
                 links.append(u)
         pages += [p for p in next_pages(soup, url, html) if p not in seen_pages]
 
+    # Links uit een JSON-lijst (WordPress REST e.d.), bv. Mezz: {"url": ".../wp-json/wp/v2/event?per_page=100&page={page}",
+    # "path": "prod.link"}. Daarna gewoon de voorstellingspagina's lezen.
+    lj = src.get("links_json")
+    if lj:
+        for page in range(1, lj.get("max_pages", 10) + 1):
+            data = F.get_json(lj["url"].replace("{page}", str(page)))
+            if not isinstance(data, list) or not data:
+                break
+            for item in data:
+                v = item
+                for part in lj.get("path", "link").split("."):
+                    v = v.get(part) if isinstance(v, dict) else None
+                if isinstance(v, str) and v.startswith("http") and v not in links:
+                    links.append(v)
+            if "{page}" not in lj["url"]:
+                break
+
     known = {e["url"] for e in events.values()}
     fresh = (TODAY - dt.timedelta(days=cfg.get("detail_refresh_days", 7))).isoformat()
     fetched = 0
@@ -686,6 +706,7 @@ def collect(cfg, only=None, log=print, local=False):
             local.update({k: v for k, v in cache.items()})
         try:
             evs = scrape_source(src, F, local, cfg, log)
+            evs = [e for e in evs if e.get("status") != "cancelled"]  # afgelast: niet tonen
         except Exception as e:  # een kapotte site mag de rest niet tegenhouden
             log(f"  {src['name']}: fout {e.__class__.__name__}: {e}")
             evs = []
