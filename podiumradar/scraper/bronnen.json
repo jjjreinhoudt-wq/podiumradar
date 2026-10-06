@@ -496,5 +496,20 @@
  {"name": "Spanjaardsgat Orkestfestival", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "festival", "sub": "klassiek", "month": "mei", "agenda_url": "https://hetspanjaardsgat.nl/"},
  {"name": "TURF", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "festival", "sub": "elektronisch", "month": "november", "agenda_url": "https://www.turf-event.nl/"},
  {"name": "Breda in Concert", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "festival", "sub": "pop", "month": "juli", "agenda_url": "https://bredainconcert.com/"},
- {"name": "Breda Live", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "festival", "sub": "pop", "month": "juli", "agenda_url": "https://www.bredalive.nl/"}
+ {"name": "Breda Live", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "festival", "sub": "pop", "month": "juli", "agenda_url": "https://www.bredalive.nl/"},
+ {"name": "Café Weemoed TSTX", "city": "Tilburg", "prov": "Noord-Brabant", "type": "cafe", "agenda_url": "https://www.cafeweemoed.nl/", "local": true, "link_pattern": "^/events/[^/]+/?$", "extra_urls": ["https://www.cafeweemoed.nl/events/"]},
+ {"name": "Café Joris TSTX", "city": "Tilburg", "prov": "Noord-Brabant", "type": "cafe", "agenda_url": "https://www.cafejoris.nl/agenda", "local": true},
+ {"name": "Willem Twee Toonzaal TSTX", "city": "'s-Hertogenbosch", "prov": "Noord-Brabant", "type": "concert", "agenda_url": "https://www.willem-twee.nl/agenda/toonzaal", "link_pattern": "/alle-activiteiten/", "must_contain": "Locatie\\s+Toonzaal"},
+ {"name": "Verkadefabriek (theater) TSTX", "city": "'s-Hertogenbosch", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.verkadefabriek.nl/agenda", "link_pattern": "^/agenda/[a-z0-9-]+-\\d+$", "max_pages": 4},
+ {"name": "Protestantse Gemeente Den Bosch concerten TSTX", "city": "'s-Hertogenbosch", "prov": "Noord-Brabant", "type": "concert", "agenda_url": "https://pgdenbosch.nl/agenda/concerten/", "link_pattern": "^/agenda-items/"},
+ {"name": "Huis73 TSTX", "city": "'s-Hertogenbosch", "prov": "Noord-Brabant", "type": "concert", "agenda_url": "https://www.huis73.nl/agenda?f%5B0%5D=agenda_cat%3A522", "link_pattern": "^/agenda/[^/?]+$", "max_pages": 2},
+ {"name": "Natlab (theater) TSTX", "city": "Eindhoven", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.natlab.nl/nl/programma?genres%5B0%5D=116", "link_pattern": "^/nl/programma/[a-z0-9-]+-[a-z0-9]{4}$"},
+ {"name": "Café Wilhelmina TSTX", "city": "Eindhoven", "prov": "Noord-Brabant", "type": "cafe", "agenda_url": "https://www.cafewilhelmina.nl/agenda", "link_pattern": "/event-details/"},
+ {"name": "Altstadt TSTX", "city": "Eindhoven", "prov": "Noord-Brabant", "type": "cafe", "agenda_url": "https://www.altstadt.nl/agenda/", "link_pattern": "^/event/[^/]+/?$"},
+ {"name": "Pand P TSTX", "city": "Eindhoven", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://pand-p.nl/agenda/", "link_pattern": "^/event/"},
+ {"name": "CKE TSTX", "city": "Eindhoven", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://cke.nl/agenda/", "link_pattern": "^/agenda/(?!page/)[^/]+/?$"},
+ {"name": "De Schalm TSTX", "city": "Veldhoven", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.deschalm.com/nl/programma", "link_pattern": "^/nl/programma/[a-z0-9-]+-[a-z0-9]{4}$"},
+ {"name": "De Voorste Venne TSTX", "city": "Drunen", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.devoorstevenne.nl/"},
+ {"name": "Podium Boxtel TSTX", "city": "Boxtel", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.podiumboxtel.nl/"},
+ {"name": "Lulboompop TSTX", "city": "Megen", "prov": "Noord-Brabant", "type": "festival", "sub": "pop", "month": "juni", "agenda_url": "https://www.lulboompop.nl/"}
 ]
