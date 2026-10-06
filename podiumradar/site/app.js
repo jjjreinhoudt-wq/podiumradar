@@ -18,6 +18,7 @@ const today=new Date(); today.setHours(0,0,0,0);
 const toMin=t=>t?(+t.slice(0,2))*60+(+t.slice(3,5)):null;
 const dayNr=s=>{const [y,m,dd]=s.split("-").map(Number);return Math.round((new Date(y,m-1,dd)-today)/864e5)};
 Object.entries(DATA.venues).forEach(([id,v])=>V[id]={id,...v});
+const filmSeen=new Set();
 DATA.events.forEach(r=>{
   const [y,m,dd]=r.date.split("-").map(Number);
   const endD=r.end?dayNr(r.end):null;
@@ -25,7 +26,10 @@ DATA.events.forEach(r=>{
   const v=V[r.v]; if(!v) return;
   // Loopt al (tentoonstelling, festival): toon hem vanaf vandaag
   const date=d<0?new Date(today):new Date(y,m-1,dd); const started=d<0; if(d<0) d=0;
-  const type=TYPE_OF[v.type]||(THEATER_GENRES.has(r.genre)?"thea":"pop");
+  // Films bij podia, theaters en musea (Cacaofabriek, Melkweg, Chassé, Eye...) horen bij Film; filmfestivals blijven festivals
+  const type=r.genre==="Film"&&v.type!=="festival"?"film":TYPE_OF[v.type]||(THEATER_GENRES.has(r.genre)?"thea":"pop");
+  // Zelfde voorstelling via de podiumagenda én de filmagenda van hetzelfde huis: één keer tonen
+  if(type==="film"){const k=[v.name.toLowerCase(),r.date,r.time,r.title.toLowerCase().replace(/[^a-z0-9]/g,"")].join("|"); if(filmSeen.has(k)) return; filmSeen.add(k)}
   let head=r.title.replace(/\s*\((festival|festival, dag \d)\)$/i,"").split(" - ")[0].trim();
   let acts=head.replace(/^Popronde:\s*/,"").split(/\s\+\s/).map(s=>s.trim());
   const im=r.title.match(/Instore:\s*(.+)$/); if(im) acts=[im[1]];
@@ -50,7 +54,7 @@ function travel(vid){const v=V[vid], h=S.homeXY; if(v.lat==null) return {car:nul
 
 /* ---------- STATE ---------- */
 const store={get(k,f){try{const v=localStorage.getItem(k);return v?JSON.parse(v):f}catch{return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
-const S={type:"pop",view:"list",day:-1,q:"",sort:"date",regio:new Set(),venue:"",genre:new Set(),time:"",maxTravel:0,onlyFav:false,showFilm:false,
+const S={type:"pop",view:"list",day:-1,q:"",sort:"date",regio:new Set(),venue:"",genre:new Set(),time:"",maxTravel:0,onlyFav:false,
   fav:new Set(store.get("pr_fav2",[])), alarms:store.get("pr_alarms",[]), home:store.get("pr_home","Tilburg"), homeXY:null,
   // Uitgevinkte steden en podia (blijven bewaard): niets van tonen
   hideC:new Set(store.get("pr_hideC",[])), hideV:new Set(store.get("pr_hideV",[]))};
@@ -83,7 +87,7 @@ function toggleFav(ak,name){ if(S.fav.has(ak)){S.fav.delete(ak);toast(name+" nie
   store.set("pr_fav2",[...S.fav]); store.set("pr_favnames",Object.assign(store.get("pr_favnames",{}),{[ak]:name})); render(); }
 const favName=ak=>store.get("pr_favnames",{})[ak]||(EV.find(e=>e.ak===ak)||{}).artist||ak;
 // Films tussen muziek/theater/festivals zijn standaard verborgen ("Toon films" in de filters); het tabblad Film toont ze altijd
-const inTab=(e,films=S.showFilm)=>S.type==="kids"?e.kids:e.type===S.type&&(films||e.type==="film"||e.genre!=="Film");
+const inTab=e=>S.type==="kids"?e.kids:e.type===S.type;
 const alarmHit=e=>S.alarms.find(a=>(e.title+" "+V[e.v].name+" "+V[e.v].city).toLowerCase().includes(a.toLowerCase()));
 
 /* timetable: bron geeft één tijd; de rest is een schatting */
@@ -104,10 +108,10 @@ function slots(e){
 }
 const endOf=e=>{const s=slots(e);return s.length?s[s.length-1].e:null};
 
-function filtered(ignoreDay,films=S.showFilm){
+function filtered(ignoreDay){
   const q=S.q.trim().toLowerCase();
   let list=EV.filter(e=>{
-    if(!inTab(e,films)) return false;
+    if(!inTab(e)) return false;
     const v=V[e.v];
     if(!ignoreDay&&S.day>=0&&!onDay(e,S.day)) return false;
     if(S.regio.size&&!S.regio.has(v.prov)) return false;
@@ -153,7 +157,7 @@ function renderDates(){
     h+=`<button class="day${we?" we":""}" data-d="${d}" aria-pressed="${S.day===d}" aria-label="${dayLabel(d)}"><small>${d===0?"vand.":WD[x.getDay()]}</small><strong>${x.getDate()}</strong><small>${MON[x.getMonth()]}</small></button>`});
   $("#dates").innerHTML=h;
 }
-const fcount=()=>S.regio.size+S.genre.size+(S.venue?1:0)+(S.time?1:0)+(S.onlyFav?1:0)+(S.maxTravel?1:0)+(S.showFilm&&S.type!=="film"?1:0);
+const fcount=()=>S.regio.size+S.genre.size+(S.venue?1:0)+(S.time?1:0)+(S.onlyFav?1:0)+(S.maxTravel?1:0);
 const hidNote=()=>{const n=S.hideC.size+S.hideV.size; if(!n) return "";
   const parts=[S.hideC.size?`${S.hideC.size} ${S.hideC.size===1?"stad":"steden"}`:"",S.hideV.size?`${S.hideV.size} ${S.hideV.size===1?"podium":"podia"}`:""].filter(Boolean);
   return ` · <button id="showHidden">${parts.join(" en ")} verborgen, toon</button>`};
@@ -176,8 +180,8 @@ function emptyState(){return `<div class="empty"><strong>Niets gevonden</strong>
 const srcNote=()=>`<p class="note">Rechtstreeks van de sites van ${Object.keys(V).length} podia, theaters, musea en festivals, bijgewerkt op ${SNAPSHOT}. ${EV.length} items in totaal. Elke nacht komt er nieuwe data bij. Tijden met ~ zijn geschat. De site van het podium is altijd leidend. <a href="over.html">Over Podiumradar, privacy en contact</a></p>`;
 
 function viewList(){
-  const list=filtered(false), hidFilm=S.showFilm||S.type==="film"?0:filtered(false,true).length-list.length;
-  let h=`<div class="meta"><span>${list.length} ${LBL[S.type][1]}${hidFilm?` · <button id="showFilm">${hidFilm} ${hidFilm===1?"film":"films"} verborgen, toon</button>`:""}${hidNote()}</span>${fcount()||S.q?'<button id="clearAll">Alles wissen</button>':""}</div>`;
+  const list=filtered(false);
+  let h=`<div class="meta"><span>${list.length} ${LBL[S.type][1]}${hidNote()}</span>${fcount()||S.q?'<button id="clearAll">Alles wissen</button>':""}</div>`;
   if(!list.length) return h+emptyState()+srcNote();
   if(S.sort==="date"){let cur=null; list.slice(0,300).forEach(e=>{const k=e.started&&S.day<0?"nu":e.d; if(k!==cur){cur=k;h+=`<h2 class="dh">${k==="nu"?"Nu te zien":dayLabel(e.d)}</h2>`} h+=evRow(e)}); if(list.length>300) h+=`<p class="note">De eerste 300 van ${list.length} getoond. Kies een datum of filter om verder te kijken.</p>`}
   else list.slice(0,300).forEach(e=>h+=evRow(e,{showDate:true}));
@@ -275,15 +279,13 @@ function buildFilters(){
   $("#fVenue").innerHTML=`<option value="">Alle podia</option>`+vs.map(v=>`<option value="${v.id}"${S.venue===v.id?" selected":""}>${esc(v.name)} (${esc(v.city)})</option>`).join("");
   $("#fOnlyFav").checked=S.onlyFav;
   buildLocList();
-  $("#fShowFilm").checked=S.showFilm;
-  $("#fFilmRow").hidden=S.type==="film"||!EV.some(e=>e.type===S.type&&e.genre==="Film");
 }
 function openSheet(id){$("#scrim").classList.add("open");$(id).classList.add("open")}
 function closeSheets(){$("#scrim").classList.remove("open");document.querySelectorAll(".sheet").forEach(s=>s.classList.remove("open"))}
 $("#openFilters").onclick=()=>{buildFilters();openSheet("#filterSheet")};
 $("#scrim").onclick=closeSheets;
 $("#applyF").onclick=()=>{closeSheets();render()};
-function resetFilters(){S.regio.clear();S.genre.clear();S.venue="";S.time="";S.onlyFav=false;S.showFilm=false;S.sort="date";S.maxTravel=0}
+function resetFilters(){S.regio.clear();S.genre.clear();S.venue="";S.time="";S.onlyFav=false;S.sort="date";S.maxTravel=0}
 $("#resetF").onclick=()=>{resetFilters();buildFilters()};
 $("#filterSheet").addEventListener("click",e=>{
   const c=e.target.closest(".chip"); if(!c) return; const val=c.dataset.val, box=c.parentElement.id;
@@ -321,7 +323,6 @@ $("#fLoc").addEventListener("change",e=>{
   if(t.dataset.hidev){t.checked?S.hideV.delete(t.dataset.hidev):S.hideV.add(t.dataset.hidev)}
   saveHidden(); buildLocList();
 });
-$("#fShowFilm").onchange=e=>{S.showFilm=e.target.checked; if(!S.showFilm) S.genre.delete("Film"); buildFilters()};
 
 /* ---------- DETAIL ---------- */
 function openDetail(id){
@@ -404,7 +405,6 @@ document.addEventListener("click",e=>{
   const ev=e.target.closest("[data-ev]"); if(ev){openDetail(ev.dataset.ev);return}
   const d=e.target.closest(".day"); if(d){S.day=+d.dataset.d;render();return}
   const t=e.target.closest("nav.tabs button"); if(t){S.view=t.dataset.view;render();try{window.scrollTo(0,0)}catch{};return}
-  if(e.target.id==="showFilm"){S.showFilm=true;render();return}
   if(e.target.id==="showHidden"){S.hideC.clear();S.hideV.clear();saveHidden();render();return}
   if(e.target.id==="clearAll"||e.target.id==="clearAll2"){resetFilters();S.q="";$("#q").value="";if(S.view!=="grid")S.day=-1;render()}
 });
