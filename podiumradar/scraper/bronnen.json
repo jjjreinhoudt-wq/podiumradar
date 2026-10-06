@@ -515,5 +515,6 @@
  {"name": "Verkadefabriek (theater) TSTY", "city": "'s-Hertogenbosch", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.verkadefabriek.nl/agenda?genre=theater", "extra_urls": ["https://www.verkadefabriek.nl/agenda?genre=muziek", "https://www.verkadefabriek.nl/agenda?genre=comedy"], "link_pattern": "^/agenda/[a-z0-9-]+-\\d+$", "max_pages": 12},
  {"name": "Lodewijkskerkje TSTY", "city": "Oisterwijk", "prov": "Noord-Brabant", "type": "concert", "agenda_url": "https://www.lodewijkskerkje.nl/agenda/", "local": true, "link_pattern": "^/agenda/[^/]+/?$"},
  {"name": "De Voorste Venne TSTY", "city": "Drunen", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.devoorstevenne.nl/wat-is-er-te-doen", "link_pattern": "^/wat-is-er-te-doen/[^/]+$"},
- {"name": "'t Plein Udenhout TSTY", "city": "Udenhout", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.tplein.com/agenda", "local": true}
+ {"name": "'t Plein Udenhout TSTY", "city": "Udenhout", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.tplein.com/agenda", "local": true},
+ {"name": "De Voorste Venne TSTZ", "city": "Drunen", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.devoorstevenne.nl/", "link_pattern": "^/wat-is-er-te-doen/[^/]+$"}
 ]
