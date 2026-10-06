@@ -555,7 +555,8 @@ def main():
         if ARGS.source:  # één bron testen: alles tonen, één regel per item
             for e in out["events"]:
                 print(f"  {e['date']} {e.get('end') or '':10} {e['time'] or '--:--'} {e.get('status') or '':9} {e['genre']:10} "
-                      f"{e['title'][:60]} | {e['url']}")
+                      f"{e['title'][:60]} | {e['url']}"
+                      + "".join(f" | {k}={e[k]}" for k in ("doors", "start", "support", "times") if e.get(k)))
         else:
             print(json.dumps(out["events"][:5], ensure_ascii=False, indent=1))
         return
