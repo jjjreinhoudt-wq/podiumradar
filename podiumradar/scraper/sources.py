@@ -17,6 +17,7 @@ import requests
 from bs4 import BeautifulSoup
 import film
 import museum
+import prijzen
 import venues
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -233,6 +234,9 @@ def from_jsonld(o, page_url):
     perf = [p for p in re.split(r"\s*,\s*", _name(o.get("performer"))) if p and p.lower() != title.lower()]
     if len(perf) > 1 and "Screening" not in str(o.get("@type")):  # bij films zijn dit acteurs
         ev["support"] = perf[1:4]
+    price = prijzen.from_offers(o)  # laagste prijs in euro's, 0 = gratis; weg als onbekend
+    if price is not None:
+        ev["price"] = price
     status = json.dumps([o.get("eventStatus"), o.get("offers")]).lower()
     if "soldout" in status or "uitverkocht" in status:
         ev["status"] = "sold"
@@ -381,6 +385,9 @@ def from_text(soup, url):
         ev["doors"] = doors
     if start:
         ev["start"] = start
+    price = prijzen.from_text(txt)  # laagste prijs in euro's, 0 = gratis; weg als onbekend
+    if price is not None:
+        ev["price"] = price
     if re.search(r"\buitverkocht\b|\bsold ?out\b", txt, re.I):
         ev["status"] = "sold"
     # Afgelast bovenaan de pagina (niet ergens in de tekst over een ander concert)
