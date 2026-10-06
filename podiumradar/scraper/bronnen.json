@@ -511,5 +511,9 @@
  {"name": "De Schalm TSTX", "city": "Veldhoven", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.deschalm.com/nl/programma", "link_pattern": "^/nl/programma/[a-z0-9-]+-[a-z0-9]{4}$"},
  {"name": "De Voorste Venne TSTX", "city": "Drunen", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.devoorstevenne.nl/"},
  {"name": "Podium Boxtel TSTX", "city": "Boxtel", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.podiumboxtel.nl/"},
- {"name": "Lulboompop TSTX", "city": "Megen", "prov": "Noord-Brabant", "type": "festival", "sub": "pop", "month": "juni", "agenda_url": "https://www.lulboompop.nl/"}
+ {"name": "Lulboompop TSTX", "city": "Megen", "prov": "Noord-Brabant", "type": "festival", "sub": "pop", "month": "juni", "agenda_url": "https://www.lulboompop.nl/"},
+ {"name": "Verkadefabriek (theater) TSTY", "city": "'s-Hertogenbosch", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.verkadefabriek.nl/agenda?genre=theater", "extra_urls": ["https://www.verkadefabriek.nl/agenda?genre=muziek", "https://www.verkadefabriek.nl/agenda?genre=comedy"], "link_pattern": "^/agenda/[a-z0-9-]+-\\d+$", "max_pages": 12},
+ {"name": "Lodewijkskerkje TSTY", "city": "Oisterwijk", "prov": "Noord-Brabant", "type": "concert", "agenda_url": "https://www.lodewijkskerkje.nl/agenda/", "local": true, "link_pattern": "^/agenda/[^/]+/?$"},
+ {"name": "De Voorste Venne TSTY", "city": "Drunen", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.devoorstevenne.nl/wat-is-er-te-doen", "link_pattern": "^/wat-is-er-te-doen/[^/]+$"},
+ {"name": "'t Plein Udenhout TSTY", "city": "Udenhout", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.tplein.com/agenda", "local": true}
 ]
