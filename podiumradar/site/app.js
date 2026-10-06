@@ -328,6 +328,7 @@ function viewFav(){
   const seenA=new Set(favs);
   const recs=EV.filter(e=>inTab(e)&&favGenres[e.genre]&&!seenA.has(e.ak)&&(seenA.add(e.ak),true)).sort((a,b)=>(travel(a.v).car??999)-(travel(b.v).car??999)||a.d-b.d).slice(0,6);
   h+=`<h2 class="dh">Zelfde genre, dichtbij</h2>`+(recs.length?recs.map(e=>evRow(e,{showDate:true,reason:e.genre+", net als "+favGenres[e.genre]})).join(""):`<p class="s">Volg nog iemand om tips te krijgen.</p>`);
+  h+=meldBox();
   h+=`<div class="ai" id="aiBox"><strong>Persoonlijk advies van Claude</strong><p>Claude kent de artiesten en kijkt naar wie je volgt. Daarna kiest het uit de hele agenda wat echt bij je past, met uitleg.</p><button class="btn" id="askAI">Vraag advies</button><div id="aiOut"></div></div>`;
   return h;
 }
@@ -624,6 +625,16 @@ async function askSimilar(e){
     out.innerHTML=(r.lijkt_op||[]).map(x=>`<p><strong>${esc(x.naam)}</strong>: ${esc(x.waarom)}</p>`).join("")+(inAg.length?`<p><strong>Staat in de agenda:</strong></p>`+inAg.map(x=>evRow(x,{showDate:true})).join(""):"");
   }catch(err){ if(err&&err.code==="not_granted"){ $("#simAI").hidden=true; sample=null } else out.innerHTML=`<p>${errCopy(err&&err.code)}</p>` }
   finally{ btn.disabled=false }
+}
+/* Pushmeldingen via ntfy: de volglijst staat op dit toestel; met deze knop gaat hij als GitHub-melding naar de
+   repository, waar workflow volglijst.yml hem overneemt (alleen van de eigenaar). Zie scraper/meldingen.py. */
+function meldBox(){
+  const lijst={artiesten:[...S.fav].map(favName),podia:[...S.favV],alarmen:S.alarms};
+  const n=lijst.artiesten.length+lijst.podia.length+lijst.alarmen.length;
+  const body="Volglijst vanuit de app (niet aanpassen, alleen op 'Submit new issue' tikken).\n\n```json\n"+JSON.stringify(lijst,null,1)+"\n```\n";
+  const url="https://github.com/jjjreinhoudt-wq/podiumradar/issues/new?title="+encodeURIComponent("Volglijst Podiumradar")+"&body="+encodeURIComponent(body);
+  return `<div class="ai meld"><strong>Meldingen op je telefoon</strong><p>Krijg een melding in de app <b>ntfy</b> zodra er een nieuwe show is van een artiest of podium dat je volgt, of die past bij een alarm. Na het volgen of ontvolgen: stuur je lijst opnieuw.</p>
+    ${n?`<a class="btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Stuur mijn volglijst (${n})</a>`:`<p class="s">Volg eerst een artiest of podium, of zet een alarm.</p>`}</div>`;
 }
 function setupFav(){
   const add=()=>{const v=$("#alarmIn").value.trim(); if(!v) return; if(!S.alarms.includes(v)) S.alarms.push(v); store.set("pr_alarms",S.alarms); toast("Alarm gezet voor "+v); render();};
