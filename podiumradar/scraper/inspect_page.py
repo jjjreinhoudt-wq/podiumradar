@@ -8,6 +8,10 @@ import sources
 
 CFG = json.loads((sources.ROOT / "scraper/config.json").read_text(encoding="utf-8"))
 url = sys.argv[1]
+if " " in url.strip():
+    import runpy
+    runpy.run_path(str(sources.ROOT / "scraper/probe.py"), run_name="__main__")
+    sys.exit(0)
 F = sources.Fetcher(CFG["user_agent"], 0)
 html = F.get(url)
 if not html:
