@@ -40,11 +40,11 @@ Dit project is van Jasper. Hij wil **zo min mogelijk techniek uitgelegd krijgen*
 6. Geef Jasper daarna **alleen** de link (`https://<gebruiker>.github.io/podiumradar/`) en de tip om hem op zijn telefoon aan het beginscherm toe te voegen (Safari: Deel > Zet op beginscherm).
 
 ## Onderhoud
+- **Pushmeldingen (ntfy)**: na de nachtrun stuurt `scraper/meldingen.py` een melding naar het geheime ntfy-kanaal (GitHub-secret `NTFY_TOPIC`; zonder secret gebeurt niets) bij nieuwe shows (first_seen = vandaag) van artiesten/podia/alarmen in `scraper/volgen.json`. Meer dan 8 treffers = één samenvatting. Verstuurd: `meldingen_verstuurd.json`. De volglijst komt uit de app: knop in 'Voor jou' opent een GitHub-melding "Volglijst Podiumradar" met een JSON-blok; workflow `volglijst.yml` (alleen voor de eigenaar) zet die in volgen.json en sluit de melding. Testen: `python scraper/meldingen.py --droog`.
 - Versies staan vast: Python-pakketten in `scraper/requirements.txt` (==) en de GitHub-hulpprogramma's in de workflows op een vaste commit (met het versienummer erachter). Bijwerken: nieuwe versie opzoeken, ophogen, testen (lokaal en met 'Bron testen'), pushen.
 - Faalt de nachtelijke run met code 2 of 3, dan is de bronsite waarschijnlijk veranderd. De oude data blijft dan staan. Zoek uit wat er veranderd is in de HTML en pas de parser aan.
 - Een podium staat verkeerd als pop/theater: voeg het toe aan `venue_type_overrides` in `scraper/config.json`.
 - Nieuwe wensen van Jasper: bouw ze in `site/app.js`, test lokaal met `python -m http.server -d site`, en push.
 
 ## Ideeën die nog openstaan (alleen oppakken als Jasper erom vraagt)
-- Echte pushmeldingen bij nieuwe shows van gevolgde artiesten (vergt een kleine server of een dienst als ntfy.sh).
 - Voorprogramma's en tijden direct van de sites van de grote podia halen (013, Paradiso, Melkweg, TivoliVredenburg…) voor meer precisie.
