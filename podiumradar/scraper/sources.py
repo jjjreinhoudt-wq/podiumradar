@@ -554,7 +554,9 @@ def scrape_source(src, F, cache, cfg, log):
     if src.get("platform") in museum.PLATFORMS:
         return museum.scrape(src, F, cfg, log)
     if src.get("platform") in venues.PLATFORMS:
-        return venues.scrape(src, F, cfg, log)
+        evs = venues.scrape(src, F, cfg, log)
+        if evs is not None:  # None: platform herkende de site niet, dan de gewone uitlezer
+            return evs
     # Tentoonstellingen: periode ("t/m ...") in plaats van één datum
     text_reader = museum.from_text_museum if src.get("type") == "museum" else from_text
     # Films draaien vaak meerdere keren per dag: dan hoort de tijd bij de sleutel
@@ -626,6 +628,10 @@ def scrape_source(src, F, cache, cfg, log):
                 if not evs:
                     e = text_reader(soup, u)
                     evs = [e] if e else []
+                if src.get("timetable") and len(evs) == 1 and not evs[0].get("end"):  # settijden (013, Tivoli); niet bij meerdaags
+                    evs[0].update(venues.detail_times(soup, evs[0]["title"]))
+                    if any("<" in x for x in evs[0].get("support") or []):  # HTML-rommel uit de JSON-LD (Tivoli)
+                        evs[0].pop("support")
                 # Alleen een deel van het gebouw (bv. Willem Twee: "Locatie Poppodium", niet de Kunstruimte)
                 page_txt = soup.get_text(" ", strip=True)
                 if src.get("must_contain") and not re.search(src["must_contain"], page_txt, re.I):
