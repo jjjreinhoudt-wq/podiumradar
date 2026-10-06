@@ -365,7 +365,7 @@ def relocate(events):
 
 # ---------------------------------------------------------------- opschonen (zie ook --reclassify)
 
-CATEGORY_WORDS = {"agenda", "programma", "program", "overzicht", "totaal overzicht", "randprogramma", "professioneel programma",
+CATEGORY_WORDS = {"musical", "tribute", "te gast", "jeugd en familie", "familie", "agenda", "programma", "program", "overzicht", "totaal overzicht", "randprogramma", "professioneel programma",
                   "laatste kaarten", "cabaret", "comedy", "stand-up comedy", "cabaret & comedy", "film", "films", "muziek",
                   "theater", "dans", "jeugd", "concerten", "voorstellingen", "home", "isala film"}
 SERVICE_RE = re.compile(r"hulp bij digitale|digitale vragen|boekstart|steunpunt|is closed|is gesloten|gesloten van", re.I)
@@ -391,9 +391,19 @@ def tidy(e):
         e["genre"] = "Tentoonstelling"
     slug_ = e["url"].split("?")[0].rstrip("/").rsplit("/", 1)[-1].lower()
     low = t.lower()
-    if low in CATEGORY_WORDS and (slug(low) == slug_ or e["vtype"] == "film" or low in ("home", "agenda", "programma", "program",
-                                                                                         "totaal overzicht", "randprogramma")):
-        return False                                                    # categorie- of overzichtspagina
+    flat = lambda x: re.sub(r"[^a-z0-9]", "", x.lower())
+    if (low in CATEGORY_WORDS or re.fullmatch(r"\d{1,2} ?plus|\d{1,2}\+", low)) and \
+            (flat(low) == flat(slug_) or e["vtype"] == "film" or low in ("home", "agenda", "programma", "program",
+                                                                          "totaal overzicht", "randprogramma")):
+        return False                                                    # categorie- of overzichtspagina (Orpheus: /cabaret_comedy, /4plus)
+    # Titel is de naam van het podium (Ledeltheater, Jazz Podium Goirle): de echte titel staat dan in de link
+    venue = e.get("venue") or ""
+    if venue and e.get("vtype") not in ("festival", "museum") and flat(t) == flat(venue):
+        rest = re.sub("^" + re.escape(slug(venue)) + "-?", "", re.sub(r"-\d+$", "", slug_.strip("/")))
+        if len(rest) < 3:
+            return False
+        e["title"] = t = rest.replace("-", " ").capitalize()
+        low = t.lower()
     if re.match(r"agenda van \w+$|professioneel programma$|laatste kaarten$", low) or SERVICE_RE.search(t):
         return False
     # Tijden als 06:20 of 03:10 komen uit rommel op de pagina, niet van de voorstelling
@@ -448,9 +458,9 @@ def reclassify():
     for e in data["events"]:
         vtype = data["venues"].get(e["v"], {}).get("type", "pop")
         before = json.dumps(e, sort_keys=True)
-        e["vtype"] = vtype
+        e["vtype"], e["venue"] = vtype, data["venues"].get(e["v"], {}).get("name", "")
         ok = tidy(e)
-        e.pop("vtype")
+        e.pop("vtype"), e.pop("venue")
         if not ok:
             print(f"  {'weg':>12}    {e['title'][:70]}")
             changed += 1
