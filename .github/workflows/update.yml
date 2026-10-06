@@ -32,6 +32,11 @@ jobs:
           python-version: "3.12"
       - run: pip install -r scraper/requirements.txt
       - run: python -u scraper/scrape.py
+      - name: Meldingen versturen
+        # Pushmeldingen via ntfy bij nieuwe shows van gevolgde artiesten/podia; zonder secret NTFY_TOPIC doet dit niets
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python -u scraper/meldingen.py || echo "Meldingen mislukt (agenda is wel bijgewerkt)"
       - name: Wijzigingen opslaan
         run: |
           git config user.name "podiumradar-bot"
