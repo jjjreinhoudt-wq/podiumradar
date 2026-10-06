@@ -128,6 +128,11 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--card
 nav.tabs button{flex:1;border:0;background:none;padding:10px 0 12px;font-size:13px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px}
 nav.tabs button svg{width:22px;height:22px}
 nav.tabs button[aria-current="page"]{color:var(--acc)}
+body.venues .seg{display:none}
+.vkinds{margin-top:10px}
+.vhead{padding:6px 0 4px}.vhead h1{font-size:24px;margin:0 0 4px;line-height:1.15}
+.ev.venue .t{font-variant-numeric:tabular-nums}
+.linkbtn{border:0;background:none;padding:0;color:var(--acc);font:inherit;font-weight:600;text-decoration:underline;cursor:pointer}
 
 /* sheets */
 .scrim{position:fixed;inset:0;background:rgba(10,12,24,.45);z-index:40;display:none}
@@ -228,6 +233,7 @@ select.sel{width:100%;padding:10px;border-radius:10px;border:1px solid var(--lin
 <nav class="tabs" aria-label="Weergave">
   <button data-view="list" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Agenda</button>
   <button data-view="grid"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg>Blokkenschema</button>
+  <button data-view="venues"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Podia</button>
   <button data-view="fav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>Voor jou<b id="newDot" hidden style="position:absolute;margin-left:28px;margin-top:-2px;width:8px;height:8px;border-radius:50%;background:var(--star)"></b></button>
 </nav>
 <div class="scrim" id="scrim"></div>

@@ -385,6 +385,10 @@ def tidy(e):
             t = t[:i].strip()
             break
     e["title"] = t
+    # Exposities bij theaters en podia (Chassé, Tolhuistuin, De Doelen...): genre Tentoonstelling, de app zet ze bij Musea
+    if e.get("vtype") in ("pop", "concert", "arena", "cafe", "thea") and e.get("genre") != "Film" and \
+            re.search(r"\bexpo\b|expositie|exposities|exposeert|tentoonstelling|exhibition", t, re.I):
+        e["genre"] = "Tentoonstelling"
     slug_ = e["url"].split("?")[0].rstrip("/").rsplit("/", 1)[-1].lower()
     low = t.lower()
     if low in CATEGORY_WORDS and (slug(low) == slug_ or e["vtype"] == "film" or low in ("home", "agenda", "programma", "program",
