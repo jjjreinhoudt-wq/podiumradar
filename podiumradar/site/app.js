@@ -27,7 +27,8 @@ DATA.events.forEach(r=>{
   // Loopt al (tentoonstelling, festival): toon hem vanaf vandaag
   const date=d<0?new Date(today):new Date(y,m-1,dd); const started=d<0; if(d<0) d=0;
   // Films bij podia, theaters en musea (Cacaofabriek, Melkweg, Chassé, Eye...) horen bij Film; filmfestivals blijven festivals
-  const type=r.genre==="Film"&&v.type!=="festival"?"film":TYPE_OF[v.type]||(THEATER_GENRES.has(r.genre)?"thea":"pop");
+  // Exposities bij theaters en podia (Chassé, Tolhuistuin, De Doelen...) horen bij Musea
+  const type=r.genre==="Film"&&v.type!=="festival"?"film":r.genre==="Tentoonstelling"&&v.type!=="festival"?"expo":TYPE_OF[v.type]||(THEATER_GENRES.has(r.genre)?"thea":"pop");
   // Zelfde voorstelling via de podiumagenda én de filmagenda van hetzelfde huis: één keer tonen
   if(type==="film"){const k=[v.name.toLowerCase(),r.date,r.time,r.title.toLowerCase().replace(/[^a-z0-9]/g,"")].join("|"); if(filmSeen.has(k)) return; filmSeen.add(k)}
   let head=r.title.replace(/\s*\((festival|festival, dag \d)\)$/i,"").split(" - ")[0].trim();
@@ -241,15 +242,48 @@ function viewFav(){
   h+=`<div class="ai" id="aiBox"><strong>Persoonlijk advies van Claude</strong><p>Claude kent de artiesten en kijkt naar wie je volgt. Daarna kiest het uit de hele agenda wat echt bij je past, met uitleg.</p><button class="btn" id="askAI">Vraag advies</button><div id="aiOut"></div></div>`;
   return h;
 }
+/* ---------- PODIA ---------- */
+// Eén regel per podium; zelfde naam en stad (bv. podium + eigen filmzaal) samen
+const VKIND={pop:"Poppodium",concert:"Concertzaal",arena:"Arena",cafe:"Café",thea:"Theater",film:"Bioscoop / filmhuis",museum:"Museum",festival:"Festival"};
+const VGROUPS=[{k:"",l:"Alles"},{k:"muz",l:"Muziek",t:["pop","concert","arena","cafe"]},{k:"thea",l:"Theater",t:["thea"]},{k:"film",l:"Film",t:["film"]},{k:"museum",l:"Musea",t:["museum"]},{k:"festival",l:"Festivals",t:["festival"]}];
+const VG=(()=>{const m={}; EV.forEach(e=>{const v=V[e.v]; const k=(v.name+"|"+v.city).toLowerCase();
+  const g=m[k]||(m[k]={key:k,name:v.name,city:v.city,type:v.type,ids:new Set(),n:0,next:null}); g.ids.add(e.v); g.n++;
+  if(!g.next||e.d<g.next.d) g.next=e}); return Object.values(m)})();
+const vgOf=vid=>{const v=V[vid]; return (v.name+"|"+v.city).toLowerCase()};
+function viewVenues(){
+  if(S.venuePage){
+    const g=VG.find(x=>x.key===S.venuePage); if(!g){S.venuePage=null;return viewVenues()}
+    const tr=travel([...g.ids][0]);
+    const list=EV.filter(e=>g.ids.has(e.v)).sort((a,b)=>(b.started-a.started)||a.d-b.d||(a.time??1440)-(b.time??1440));
+    let h=`<div class="meta"><button data-vback>‹ Alle podia</button></div>
+      <div class="vhead"><h1>${esc(g.name)}</h1><div class="s">${esc(g.city)} · ${esc(VKIND[g.type]||"")}${tr.car!=null?` · ± ${tr.car} min met de auto`:""}</div>
+      <div class="s">${list.length} op de agenda</div></div>`;
+    let cur=null; list.slice(0,400).forEach(e=>{const k=e.started?"nu":e.d; if(k!==cur){cur=k;h+=`<h2 class="dh">${k==="nu"?"Nu te zien":dayLabel(e.d)}</h2>`} h+=evRow(e)});
+    return h;
+  }
+  const q=S.q.trim().toLowerCase(), grp=VGROUPS.find(x=>x.k===S.vkind)||VGROUPS[0];
+  const list=VG.filter(g=>(!grp.t||grp.t.includes(g.type))&&(!q||(g.name+" "+g.city).toLowerCase().includes(q)))
+    .sort((a,b)=>(travel([...a.ids][0]).car??9999)-(travel([...b.ids][0]).car??9999)||a.name.localeCompare(b.name,"nl"));
+  let h=`<div class="chips vkinds">${VGROUPS.map(x=>`<button class="chip" data-vkind="${x.k}" aria-pressed="${x.k===(S.vkind||"")}">${x.l}</button>`).join("")}</div>
+    <div class="meta"><span>${list.length} ${list.length===1?"podium":"podia"}, dichtstbij eerst</span></div>`;
+  if(!list.length) return h+`<div class="empty"><strong>Geen podium gevonden</strong>Zoek op een andere naam of stad.</div>`;
+  list.slice(0,300).forEach(g=>{const tr=travel([...g.ids][0]);
+    h+=`<div class="ev venue" role="button" tabindex="0" data-venue="${esc(g.key)}"><div class="t" style="font-size:15px">${g.n}<small>op agenda</small></div>
+      <div><div class="a">${esc(g.name)}</div><div class="v">${esc(g.city)} · ${esc(VKIND[g.type]||"")}</div>
+      <div class="tt">${tr.car==null?"reistijd onbekend":"± "+tr.car+" min met de auto"}${g.next?` · eerstvolgend ${g.next.started?"nu":short(g.next)}: ${esc(g.next.artist)}`:""}</div></div></div>`});
+  return h;
+}
+
 function render(){
   ["thea","film","expo","fest","kids"].forEach(t=>document.body.classList.toggle(t,S.type===t));
   document.querySelectorAll(".seg [data-type]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.type===S.type));
   document.querySelectorAll("nav.tabs button").forEach(b=>b.dataset.view===S.view?b.setAttribute("aria-current","page"):b.removeAttribute("aria-current"));
   const n=fcount(); $("#fcount").hidden=!n; $("#fcount").textContent=n;
   $("#newDot").hidden=!EV.some(e=>NEW.has(e.id)&&(isFav(e)||alarmHit(e)));
-  $("#dates").style.display=S.view==="fav"?"none":"flex";
+  document.body.classList.toggle("venues",S.view==="venues");
+  $("#dates").style.display=S.view==="fav"||S.view==="venues"?"none":"flex";
   renderDates();
-  $("#main").innerHTML=S.view==="list"?viewList():S.view==="grid"?viewGrid():viewFav();
+  $("#main").innerHTML=S.view==="list"?viewList():S.view==="grid"?viewGrid():S.view==="venues"?viewVenues():viewFav();
   if(S.view==="fav") setupFav();
 }
 
@@ -334,7 +368,7 @@ function openDetail(id){
   $("#detailSheet").innerHTML=`<div class="grab"></div>
    <div class="dhead"><div><div class="dsub">${range(e)?(e.started?"Nu te zien, ":"")+range(e):dayLabel(e.d)}</div><div class="dtitle">${esc(e.artist)}</div>
      ${e.title!==e.artist?`<div class="dsub">${esc(e.title)}</div>`:""}
-     <div class="dsub">${esc(v.name)}, ${esc(v.city)}</div></div>
+     <div class="dsub">${esc(v.name)}, ${esc(v.city)} · <button class="linkbtn" data-openvenue="${esc(vgOf(e.v))}">Alles bij dit podium</button></div></div>
      <button class="star" data-fav="${e.ak}" data-name="${esc(e.artist)}" aria-pressed="${S.fav.has(e.ak)}" aria-label="Volg ${esc(e.artist)}" style="font-size:30px">★</button></div>
    <div class="facts"><div><small>Genre</small><b>${esc(e.genre)}</b></div>${tr.car!=null?`<div><small>Auto</small><b>± ${tr.car} min</b></div><div><small>OV</small><b>± ${tr.ov} min</b></div>`:""}${e.status==="sold"?`<div><small>Kaarten</small><b style="color:var(--warn)">Uitverkocht</b></div>`:""}</div>
    <div class="timeline">${tl}</div>
@@ -404,7 +438,11 @@ document.addEventListener("click",e=>{
   const al=e.target.closest("[data-alarm]"); if(al){S.alarms.splice(+al.dataset.alarm,1);store.set("pr_alarms",S.alarms);render();return}
   const ev=e.target.closest("[data-ev]"); if(ev){openDetail(ev.dataset.ev);return}
   const d=e.target.closest(".day"); if(d){S.day=+d.dataset.d;render();return}
-  const t=e.target.closest("nav.tabs button"); if(t){S.view=t.dataset.view;render();try{window.scrollTo(0,0)}catch{};return}
+  const vk=e.target.closest("[data-vkind]"); if(vk){S.vkind=vk.dataset.vkind;render();return}
+  const vb=e.target.closest("[data-vback]"); if(vb){S.venuePage=null;render();try{window.scrollTo(0,0)}catch{};return}
+  const ov=e.target.closest("[data-openvenue]"); if(ov){closeSheets();S.view="venues";S.venuePage=ov.dataset.openvenue;S.q="";$("#q").value="";render();try{window.scrollTo(0,0)}catch{};return}
+  const vn=e.target.closest("[data-venue]"); if(vn){S.venuePage=vn.dataset.venue;render();try{window.scrollTo(0,0)}catch{};return}
+  const t=e.target.closest("nav.tabs button"); if(t){S.view=t.dataset.view;if(t.dataset.view==="venues")S.venuePage=null;render();try{window.scrollTo(0,0)}catch{};return}
   if(e.target.id==="showHidden"){S.hideC.clear();S.hideV.clear();saveHidden();render();return}
   if(e.target.id==="clearAll"||e.target.id==="clearAll2"){resetFilters();S.q="";$("#q").value="";if(S.view!=="grid")S.day=-1;render()}
 });
@@ -437,7 +475,7 @@ document.addEventListener("wheel",e=>{
   const el=e.target.closest(".dates"); if(!el||el.scrollWidth<=el.clientWidth||e.shiftKey||Math.abs(e.deltaX)>Math.abs(e.deltaY)) return;
   el.scrollLeft+=e.deltaY; e.preventDefault();
 },{passive:false});
-document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheets();if(e.key==="Enter"&&e.target.matches(".ev[data-ev]"))openDetail(e.target.dataset.ev)});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheets();if(e.key==="Enter"&&e.target.matches(".ev[data-ev]"))openDetail(e.target.dataset.ev);if(e.key==="Enter"&&e.target.matches("[data-venue]"))e.target.click()});
 document.querySelectorAll(".seg [data-type]").forEach(b=>b.onclick=()=>{S.type=b.dataset.type;S.genre.clear();S.venue="";if(S.view!=="grid")S.day=-1;render()});
 let qt;$("#q").oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{S.q=e.target.value;render()},150)};
 
