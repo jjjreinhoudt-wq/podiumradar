@@ -40,6 +40,7 @@ Dit project is van Jasper. Hij wil **zo min mogelijk techniek uitgelegd krijgen*
 6. Geef Jasper daarna **alleen** de link (`https://<gebruiker>.github.io/podiumradar/`) en de tip om hem op zijn telefoon aan het beginscherm toe te voegen (Safari: Deel > Zet op beginscherm).
 
 ## Onderhoud
+- Versies staan vast: Python-pakketten in `scraper/requirements.txt` (==) en de GitHub-hulpprogramma's in de workflows op een vaste commit (met het versienummer erachter). Bijwerken: nieuwe versie opzoeken, ophogen, testen (lokaal en met 'Bron testen'), pushen.
 - Faalt de nachtelijke run met code 2 of 3, dan is de bronsite waarschijnlijk veranderd. De oude data blijft dan staan. Zoek uit wat er veranderd is in de HTML en pas de parser aan.
 - Een podium staat verkeerd als pop/theater: voeg het toe aan `venue_type_overrides` in `scraper/config.json`.
 - Nieuwe wensen van Jasper: bouw ze in `site/app.js`, test lokaal met `python -m http.server -d site`, en push.

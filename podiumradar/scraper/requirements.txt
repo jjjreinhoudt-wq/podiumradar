@@ -1,3 +1,12 @@
-requests>=2.31
-beautifulsoup4>=4.12
-tzdata>=2024.1
+# Vaste versies (dezelfde als in de ophaalronde van oktober 2026), zodat een gekaapte of kapotte
+# nieuwe versie niet ongemerkt meedraait. Bijwerken: versie hier ophogen, lokaal testen, pushen.
+requests==2.34.2
+beautifulsoup4==4.15.0
+tzdata==2026.4
+# afhankelijkheden van de pakketten hierboven
+charset-normalizer==3.5.2
+idna==3.20
+urllib3==2.8.0
+certifi==2026.7.22
+soupsieve==2.10
+typing-extensions==4.16.0
