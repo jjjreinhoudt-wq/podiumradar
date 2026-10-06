@@ -24,6 +24,13 @@ Dit project is van Jasper. Hij wil **zo min mogelijk techniek uitgelegd krijgen*
   - **Pas je `sw.js` aan (of de lijst `SHELL` met bestanden), verhoog dan `VERSION`** (v1 → v2 …). Dan wordt de nieuwe service worker actief, ruimt hij oude caches op en herlaadt een open app één keer met de melding "Nieuwe versie geladen". Voor gewone wijzigingen aan app.js/data.json hoeft dat niet.
   - Nieuw bestand dat offline moet werken? Zet het in `SHELL` en verhoog `VERSION`. Iconen opnieuw maken: PNG's zijn gerenderd uit `icon.svg` met Playwright/Chromium (maskable versie: volle achtergrond, figuur op 86%).
 
+- Onderdelen in `app.js` (okt 2026):
+  - **Vanavond in de buurt** (`viewTonight`, `S.view="tonight"`, knop bovenaan de Agenda): alles van vandaag dat nog moet beginnen of bezig is (of dit weekend), binnen 15/30/45 min rijden, alle soorten samen met kleurlabel per soort. Verborgen steden/podia blijven verborgen.
+  - **Podia volgen**: ster bij een podium (lijst en podiumpagina), opgeslagen in localStorage `pr_favv` (VG-sleutel `naam|stad`). 'Voor jou' toont per gevolgd podium wat nieuw is en wat eraan komt; filter 'Alleen favorieten' neemt gevolgde podia mee.
+  - **Kaart** in Podia (Lijst/Kaart, `drawMap`): eigen SVG uit `site/nl.json` (provincies + buurlanden, vooraf geprojecteerd: x=(lon-lon0)·cos52°·k, y=(lat0-lat)·k). Bron: Natural Earth (publiek domein) via de npm-pakketten `datamaps` (MIT, NLD-provincies) en `world-atlas` (ISC), vereenvoudigd tot ±40 KB. Geen kaarttegels van buiten (privacy, CSP).
+  - Detailsheet: **Delen** (deelmenu of kopiëren; link `#<id>` opent het item bij laden) en **Klopt niet?** (vooringevuld GitHub-issue met label `melding`).
+  - Optionele velden in data.json die de app al toont: `price` (laagste prijs in euro, 0 = gratis; filter 'Alleen gratis') en `times` (`[{"a":"Naam","s":"20:30"}]`: echte settijden, vervangen de schatting in `slots()`). Ontbreken ze, dan verandert er niets.
+
 ## Als Jasper zegt "zet dit online" (eerste keer)
 1. Controleer of `gh` geïnstalleerd en ingelogd is (`gh auth status`). Zo niet: installeer het en laat Jasper inloggen met `gh auth login` (kies GitHub.com, HTTPS, browser). Begeleid hem stap voor stap.
 2. **Test eerst de scraper lokaal** voordat je iets online zet:
