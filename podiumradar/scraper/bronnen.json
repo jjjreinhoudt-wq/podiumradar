@@ -32,7 +32,7 @@
  {"name": "Rotterdam Ahoy", "city": "Rotterdam", "prov": "Zuid-Holland", "type": "arena", "agenda_url": "https://www.ahoy.nl/agenda"},
  {"name": "De Doelen", "city": "Rotterdam", "prov": "Zuid-Holland", "type": "concert", "agenda_url": "https://www.dedoelen.nl/agenda", "platform": "peppered"},
  {"name": "Luxor Theater (Nieuwe & Oude Luxor)", "city": "Rotterdam", "prov": "Zuid-Holland", "type": "thea", "agenda_url": "https://www.luxortheater.nl/agenda"},
- {"name": "Theater Rotterdam (Schouwburg)", "city": "Rotterdam", "prov": "Zuid-Holland", "type": "thea", "agenda_url": "https://www.theaterrotterdam.nl/agenda"},
+ {"name": "Theater Rotterdam (Schouwburg)", "city": "Rotterdam", "prov": "Zuid-Holland", "type": "thea", "agenda_url": "https://www.theaterrotterdam.nl/agenda", "platform": "peppered"},
  {"name": "Theater Zuidplein", "city": "Rotterdam", "prov": "Zuid-Holland", "type": "thea", "agenda_url": "https://www.theaterzuidplein.nl/agenda", "platform": "peppered"},
  {"name": "Maassilo", "city": "Rotterdam", "prov": "Zuid-Holland", "type": "pop", "agenda_url": "https://maassilo.com/agenda/"},
  {"name": "Annabel", "city": "Rotterdam", "prov": "Zuid-Holland", "type": "pop", "agenda_url": "https://annabel.nu/agenda/", "link_pattern": "^/(?!(agenda|info|vacatures|verhuur|feed|wp-json|xmlrpc|annas-terras)/)[a-z0-9-]+/?$"},

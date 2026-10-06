@@ -328,6 +328,10 @@ def own_events(prev_events=()):
             when = f"t/m {e['end']}" if e.pop("ongoing", False) and e.get("end") else e["date"]
             idkey = f"{src['name']}|{when}|{e['title']}" + (f"|{e['time']}" if e["vtype"] == "film" else "")
             e["id"] = "s" + hashlib.sha1(idkey.encode()).hexdigest()[:10]
+            if e["id"] in events and e.get("time") and events[e["id"]].get("time") != e["time"]:
+                # Zelfde voorstelling twee keer op één dag (middag en avond): de tweede krijgt de tijd in de id.
+                # De eerste houdt de oude id, zodat favorieten en 'nieuw' blijven kloppen.
+                e["id"] = "s" + hashlib.sha1(f"{idkey}|{e['time']}".encode()).hexdigest()[:10]
             if tidy(e):  # na de id, zodat bestaande items hun id (favoriet, 'nieuw') houden
                 events[e["id"]] = e
     fix_series_ends(events.values())
