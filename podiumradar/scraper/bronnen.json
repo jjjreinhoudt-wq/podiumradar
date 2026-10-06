@@ -496,5 +496,17 @@
  {"name": "Spanjaardsgat Orkestfestival", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "festival", "sub": "klassiek", "month": "mei", "agenda_url": "https://hetspanjaardsgat.nl/"},
  {"name": "TURF", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "festival", "sub": "elektronisch", "month": "november", "agenda_url": "https://www.turf-event.nl/"},
  {"name": "Breda in Concert", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "festival", "sub": "pop", "month": "juli", "agenda_url": "https://bredainconcert.com/"},
- {"name": "Breda Live", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "festival", "sub": "pop", "month": "juli", "agenda_url": "https://www.bredalive.nl/"}
+ {"name": "Breda Live", "city": "Breda", "prov": "Noord-Brabant", "local": false, "type": "festival", "sub": "pop", "month": "juli", "agenda_url": "https://www.bredalive.nl/"},
+ {"name": "Café Weemoed", "city": "Tilburg", "prov": "Noord-Brabant", "type": "cafe", "agenda_url": "https://www.cafeweemoed.nl/", "local": true, "link_pattern": "^/events/[^/]+/?$"},
+ {"name": "Lodewijkskerkje", "city": "Oisterwijk", "prov": "Noord-Brabant", "type": "concert", "agenda_url": "https://www.lodewijkskerkje.nl/agenda/", "local": true, "link_pattern": "^/agenda/[^/]+/?$"},
+ {"name": "Willem Twee Toonzaal (W2)", "city": "'s-Hertogenbosch", "prov": "Noord-Brabant", "type": "concert", "agenda_url": "https://www.willem-twee.nl/agenda/toonzaal", "link_pattern": "/alle-activiteiten/", "must_contain": "Locatie\\s+Toonzaal"},
+ {"name": "Verkadefabriek (theater en muziek)", "city": "'s-Hertogenbosch", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.verkadefabriek.nl/agenda?genre=theater", "extra_urls": ["https://www.verkadefabriek.nl/agenda?genre=muziek", "https://www.verkadefabriek.nl/agenda?genre=comedy"], "link_pattern": "^/agenda/[a-z0-9-]+-\\d+$", "max_pages": 12},
+ {"name": "Grote Kerk Den Bosch (Protestantse Gemeente, concerten)", "city": "'s-Hertogenbosch", "prov": "Noord-Brabant", "type": "concert", "agenda_url": "https://pgdenbosch.nl/agenda/concerten/", "link_pattern": "^/agenda-items/"},
+ {"name": "Natlab (theater)", "city": "Eindhoven", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.natlab.nl/nl/programma?genres%5B0%5D=116", "link_pattern": "^/nl/programma/[a-z0-9-]+-[a-z0-9]{4}$"},
+ {"name": "Pand P", "city": "Eindhoven", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://pand-p.nl/agenda/", "link_pattern": "^/event/"},
+ {"name": "Café Wilhelmina", "city": "Eindhoven", "prov": "Noord-Brabant", "type": "cafe", "agenda_url": "https://www.cafewilhelmina.nl/agenda", "link_pattern": "/event-details/"},
+ {"name": "Altstadt", "city": "Eindhoven", "prov": "Noord-Brabant", "type": "cafe", "agenda_url": "https://www.altstadt.nl/agenda/", "link_pattern": "^/event/[^/]+/?$"},
+ {"name": "Theater De Schalm", "city": "Veldhoven", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.deschalm.com/nl/programma", "link_pattern": "^/nl/programma/[a-z0-9-]+-[a-z0-9]{4}$"},
+ {"name": "De Voorste Venne", "city": "Drunen", "prov": "Noord-Brabant", "type": "thea", "agenda_url": "https://www.devoorstevenne.nl/", "link_pattern": "^/wat-is-er-te-doen/[^/]+$", "note": "agendapagina laadt met JavaScript; de voorpagina toont een deel van het programma"},
+ {"name": "Lulboompop", "city": "Megen", "prov": "Noord-Brabant", "type": "festival", "sub": "pop", "month": "juni", "agenda_url": "https://www.lulboompop.nl/"}
 ]
