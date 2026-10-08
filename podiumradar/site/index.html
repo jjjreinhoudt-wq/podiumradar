@@ -117,6 +117,38 @@ h2.mh::after{content:"";flex:1;height:2px;border-radius:1px;background:var(--lin
 .months .chip[aria-pressed="true"] small{color:inherit;opacity:.75}
 .btn.more{width:100%;margin:8px 0 4px;padding:13px 14px}
 .scope{margin-top:12px}
+/* snelle acties */
+.qrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.qpill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px 8px 12px;font-weight:600;font-size:14px;box-shadow:var(--shadow);transition:transform .1s}
+.qpill:active{transform:scale(.96)}
+.qpill small{font-size:12px;font-weight:600;color:var(--muted)}
+.qpill svg{color:var(--acc)}
+@media (max-width:420px){.qrow{gap:6px}.qpill{padding:8px 12px;font-size:13.5px}.qpill svg{display:none}}
+/* ik ga */
+.tag.going{background:var(--expo-soft);color:var(--expo)}
+.btn.go[aria-pressed="true"]{background:var(--expo);border-color:var(--expo);color:var(--paper)}
+.ev.gone{border-style:dashed;cursor:default;box-shadow:none}
+.ev.gone .t{background:var(--line);color:var(--muted)}
+.ev.gone .t small{color:inherit}
+.surp{background:var(--acc-soft);color:var(--acc);font-weight:700;font-size:13px;border-radius:10px;padding:8px 12px;margin:2px 0 12px}
+/* kalender */
+.calnav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
+.calnav h2{margin:0;font-size:22px;font-weight:800;font-variation-settings:"wdth" 80}
+.calnav button{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-size:22px;line-height:1;box-shadow:var(--shadow)}
+.calnav button:disabled{opacity:.35}
+.calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-top:14px}
+.calwd{font-size:11px;font-weight:700;color:var(--muted);text-align:center;text-transform:uppercase;letter-spacing:.04em}
+.calday{aspect-ratio:1/1.1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:0;font-weight:700;font-size:16px;font-variant-numeric:tabular-nums;transition:transform .1s}
+.calday small{font-size:10.5px;font-weight:600;color:var(--muted);min-height:12px}
+.calpad{min-width:0}
+.calday:disabled{opacity:.4}
+.calday:not(:disabled):active{transform:scale(.94)}
+.calday.today{outline:2px solid var(--ink);outline-offset:-2px}
+.calday.h1{background:color-mix(in srgb,var(--acc) 12%,var(--card))}
+.calday.h2{background:color-mix(in srgb,var(--acc) 26%,var(--card))}
+.calday.h3{background:color-mix(in srgb,var(--acc) 42%,var(--card))}
+.calday.h4{background:color-mix(in srgb,var(--acc) 60%,var(--card));border-color:var(--acc)}
+.calday.h3 small,.calday.h4 small{color:var(--ink)}
 .btn.ghost svg{flex:0 0 auto}
 .btn.more small{font-weight:500;color:var(--muted)}
 .ev{box-sizing:border-box;display:grid;grid-template-columns:66px 1fr auto;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px 6px 10px 10px;margin-bottom:10px;text-align:left;width:100%;box-shadow:var(--shadow);cursor:pointer;transition:transform .12s ease,box-shadow .2s ease,border-color .2s ease}

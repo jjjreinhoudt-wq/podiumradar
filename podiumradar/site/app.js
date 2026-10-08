@@ -59,7 +59,9 @@ const recent=e=>e.firstSeen&&(today-new Date(e.firstSeen))/864e5<=3;
 const norm=s=>String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 const artistKey=n=>n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
 EV.forEach(e=>{e.ak=artistKey(e.artist); if(e.time==null&&e.times) e.time=e.times[0].s;
-  const v=V[e.v]; e.hay=norm([e.title,v.name,v.city,e.genre,e.support.join(" ")].join(" "))});
+  const v=V[e.v]; e.hay=norm([e.title,v.name,v.city,e.genre,e.support.join(" ")].join(" "));
+  e.age=e.firstSeen?-dayNr(e.firstSeen):999});   // dagen sinds het item voor het eerst op de agenda kwam
+const BYID=new Map(EV.map(e=>[e.id,e]));
 
 /* ---------- PLACES ---------- */
 const HOMES={"Tilburg":[51.5555,5.0913],"Breda":[51.5719,4.7683],"Eindhoven":[51.4416,5.4697],"Den Bosch":[51.6978,5.3037],"Helmond":[51.4793,5.6570],"Oss":[51.7650,5.5180],"Bergen op Zoom":[51.4949,4.2911],"Roosendaal":[51.5308,4.4653],"Amsterdam":[52.3676,4.9041],"Utrecht":[52.0907,5.1214],"Rotterdam":[51.9244,4.4777],"Den Haag":[52.0705,4.3007],"Nijmegen":[51.8126,5.8372],"Arnhem":[51.9851,5.8987],"Zwolle":[52.5168,6.0830],"Groningen":[53.2194,6.5665],"Maastricht":[50.8514,5.6910],"Venlo":[51.3704,6.1724]};
@@ -70,10 +72,20 @@ function travel(vid){const v=V[vid], h=S.homeXY; if(v.lat==null) return {car:nul
 
 /* ---------- STATE ---------- */
 const store={get(k,f){try{const v=localStorage.getItem(k);return v?JSON.parse(v):f}catch{return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
-const S={type:"pop",view:"list",day:-1,month:"",q:"",qAll:true,sort:"date",regio:new Set(),venue:"",genre:new Set(),time:"",maxTravel:0,onlyFav:false,
+const S={type:"pop",view:"list",day:-1,month:"",calMonth:"",q:"",qAll:true,sort:"date",regio:new Set(),venue:"",genre:new Set(),time:"",maxTravel:0,onlyFav:false,
   fav:new Set(store.get("pr_fav2",[])), favV:new Set(store.get("pr_favv",[])), onlyFree:false, vmode:store.get("pr_vmode","list")==="map"?"map":"list", alarms:store.get("pr_alarms",[]), home:store.get("pr_home","Tilburg"), homeXY:null,
   // Uitgevinkte steden en podia (blijven bewaard): niets van tonen
   hideC:new Set(store.get("pr_hideC",[])), hideV:new Set(store.get("pr_hideV",[]))};
+/* Mijn plannen ('Ik ga'): id -> kleine momentopname, zodat een plan zichtbaar blijft als het item uit de agenda verdwijnt */
+const GO=(()=>{const o=store.get("pr_going",{}); return o&&typeof o==="object"&&!Array.isArray(o)?o:{}})();
+const ymd=x=>x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0");
+function pruneGo(){let ch=false; Object.keys(GO).forEach(id=>{const g=GO[id]; if(!g||typeof g.d!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(g.d)||dayNr(g.x||g.d)<0){delete GO[id];ch=true}}); if(ch) store.set("pr_going",GO)}
+pruneGo();
+function toggleGoing(e){
+  if(GO[e.id]){delete GO[e.id]; toast("Uit je plannen gehaald")}
+  else{GO[e.id]={t:e.artist,d:e.rawDate,tm:e.time,v:V[e.v].name+", "+V[e.v].city}; if(e.endDate) GO[e.id].x=ymd(e.endDate); toast("Staat in je plannen")}
+  store.set("pr_going",GO); render();
+}
 const saveHidden=()=>{store.set("pr_hideC",[...S.hideC]);store.set("pr_hideV",[...S.hideV])};
 const hiddenLoc=vid=>{const v=V[vid];return S.hideV.has(vid)||(v&&S.hideC.has(cityKey(v.city)))};
 S.homeXY = S.home==="__geo" ? store.get("pr_geo",HOMES.Tilburg) : (HOMES[S.home]||HOMES.Tilburg);
@@ -219,7 +231,7 @@ function evRow(e,o={}){
       ${e.support.length?`<div class="s">met ${esc(e.support.join(", "))}</div>`:(e.title!==e.artist&&!e.title.startsWith(e.artist+" +")?`<div class="s">${esc(e.title.slice(e.artist.length).replace(/^\s*-\s*/,""))}</div>`:"")}
       <div class="v">${esc(v.name)}, ${esc(v.city)}</div>
       <div class="tt">${tr.car==null?"reistijd onbekend":"± "+tr.car+" min met de auto"}</div>
-      ${kind?`<span class="tag kind">${KIND[e.type]}</span>`:""}${kind&&e.genre===KIND[e.type]?"":`<span class="tag">${esc(e.genre)}</span>`}${e.price!=null?`<span class="tag price${e.price===0?" free":""}">${priceTxt(e.price)}</span>`:""}${e.status==="sold"?'<span class="tag sold">Uitverkocht</span>':""}${o.reason?`<div class="s" style="margin-top:4px">${esc(o.reason)}</div>`:""}</div>
+      ${kind?`<span class="tag kind">${KIND[e.type]}</span>`:""}${kind&&e.genre===KIND[e.type]?"":`<span class="tag">${esc(e.genre)}</span>`}${e.price!=null?`<span class="tag price${e.price===0?" free":""}">${priceTxt(e.price)}</span>`:""}${GO[e.id]?'<span class="tag going">✓ Ik ga</span>':""}${e.status==="sold"?'<span class="tag sold">Uitverkocht</span>':""}${o.reason?`<div class="s" style="margin-top:4px">${esc(o.reason)}</div>`:""}</div>
     <button class="star" data-fav="${e.ak}" data-name="${esc(e.artist)}" aria-pressed="${S.fav.has(e.ak)}" aria-label="Volg ${esc(e.artist)}">★</button>
   </div>`;
 }
@@ -254,6 +266,55 @@ function monthBar(mc){
 }
 // Hoeveel kaarten de lijst toont; begint opnieuw bij 300 zodra datum, maand, zoekterm of filters veranderen
 const LIM={n:300,sig:""};
+/* Snelle acties onder 'Vanavond in de buurt' */
+function quickRow(){
+  const n=EV.reduce((c,e)=>c+(inTab(e)&&e.age<=7?1:0),0);
+  return `<div class="qrow"><button class="qpill" data-surprise type="button">${ICO.dice}Verras me</button><button class="qpill" data-view-go="cal" type="button">${ICO.cal}Kalender</button>${n?`<button class="qpill" data-view-go="new" type="button">${ICO.spark}Nieuw <small>${nf(n)}</small></button>`:""}</div>`;
+}
+/* Verras me: willekeurig iets in de buurt, vanavond; anders dit weekend; anders de komende twee weken */
+const SURP={seen:new Set()};
+function surprise(){
+  const nm=nowMin(), usable=e=>!(e.d===0&&e.time!=null&&e.time<=nm);
+  let when="vanavond", pool=tonightList("today",true).timed.filter(usable);
+  if(!pool.length){when="dit weekend"; pool=tonightList("weekend",true).timed.filter(usable)}
+  if(!pool.length){when="de komende dagen"; pool=EV.filter(e=>e.endD==null&&e.d>=0&&e.d<=14&&e.time!=null&&usable(e)&&TN.kinds.has(e.type)&&!hiddenLoc(e.v)&&(travel(e.v).car??999)<=TN.max)}
+  if(!pool.length){toast("Niets in de buurt gevonden. Kies een grotere afstand bij ‘Vanavond in de buurt’."); return}
+  let fresh=pool.filter(e=>!SURP.seen.has(e.id)); if(!fresh.length){SURP.seen.clear(); fresh=pool}
+  const e=fresh[Math.floor(Math.random()*fresh.length)]; SURP.seen.add(e.id);
+  openDetail(e.id,{surprise:when});
+}
+/* Kalender: maandrooster met per dag hoeveel er te doen is (huidig tabblad en filters) */
+function viewCal(){
+  const list=filtered(true), cur=mKey(today);
+  let h=`<div class="meta"><button data-view-go="list">‹ Agenda</button></div><div class="vhead"><h1>Kalender</h1><div class="s">Tik op een dag voor de lijst. Hoe donkerder, hoe meer er te doen is (${TABNAME[S.type]}).</div></div>`;
+  if(!list.length) return h+emptyState();
+  const lastKey=mKey(dateOf(list.reduce((m,e)=>Math.max(m,e.endD??e.d),0)));
+  let k=S.calMonth||S.month||cur; if(k<cur) k=cur; if(lastKey>=cur&&k>lastKey) k=lastKey; S.calMonth=k;
+  const [y,m]=k.split("-").map(Number), r=mRange(k), nd=r[1]-r[0]+1, counts=new Array(nd).fill(0);
+  list.forEach(e=>{const a=Math.max(e.d,r[0]), z=Math.min(e.endD??e.d,r[1]); for(let d=a;d<=z;d++) counts[d-r[0]]++});
+  const max=Math.max(1,...counts), off=(new Date(y,m-1,1).getDay()+6)%7, total=list.filter(e=>inMonth(e,r)).length, title=cap(monthLabel(k));
+  let cells=off?`<span class="calpad" style="grid-column:span ${off}" aria-hidden="true"></span>`:"";
+  for(let i=0;i<nd;i++){const d=r[0]+i, c=counts[i], hb=c?1+Math.min(3,Math.floor(c*4/(max+.0001))):0;
+    cells+=`<button class="calday h${hb}${d===0?" today":""}" data-calday="${d}" ${d<0||!c?"disabled":""} aria-label="${dayLabel(d)}: ${c} ${LBL[S.type][c===1?0:1]}"><span>${i+1}</span><small>${c||""}</small></button>`}
+  return h+`<div class="calnav"><button data-calnav="-1" aria-label="Vorige maand" ${k<=cur?"disabled":""}>‹</button><h2>${title}</h2><button data-calnav="1" aria-label="Volgende maand" ${k>=lastKey?"disabled":""}>›</button></div>
+    <div class="calgrid" role="group" aria-label="${title}">${["ma","di","wo","do","vr","za","zo"].map(w=>`<span class="calwd">${w}</span>`).join("")}${cells}</div>
+    <p class="s" style="margin-top:12px">${nf(total)} ${LBL[S.type][total===1?0:1]} in ${monthLabel(k)}${hidNote()}</p>`;
+}
+/* Net toegevoegd: wat de afgelopen 7 dagen voor het eerst op de agenda kwam, per dag */
+function viewNew(){
+  const list=filtered(true).filter(e=>e.age<=7).sort((a,b)=>a.age-b.age||a.d-b.d||(a.time??0)-(b.time??0));
+  const sig="new|"+S.type+"|"+S.q+"|"+fcount(); if(sig!==LIM.sig){LIM.sig=sig;LIM.n=100}
+  const n=LIM.n, cnt={}; list.forEach(e=>cnt[e.age]=(cnt[e.age]||0)+1);
+  let h=`<div class="meta"><button data-view-go="list">‹ Agenda</button></div><div class="vhead"><h1>Net toegevoegd</h1><div class="s">Wat de afgelopen 7 dagen nieuw op de agenda is gekomen (${TABNAME[S.type]}).</div></div><div class="meta"><span>${nf(list.length)} ${LBL[S.type][list.length===1?0:1]}${hidNote()}</span></div>`;
+  if(!list.length) return h+`<div class="empty"><strong>Niets nieuws</strong>De afgelopen 7 dagen is er niets bijgekomen dat bij deze filters past.</div>`;
+  let cur=null;
+  list.slice(0,n).forEach(e=>{ if(e.age!==cur){cur=e.age;
+      const fd=e.firstSeen.split("-").map(Number), x=new Date(fd[0],fd[1]-1,fd[2]);
+      h+=`<h2 class="dh">${e.age===0?"Vandaag toegevoegd":e.age===1?"Gisteren toegevoegd":"Toegevoegd op "+WDL[x.getDay()]+" "+x.getDate()+" "+MON[x.getMonth()]} <small>${nf(cnt[e.age])}</small></h2>`+(cnt[e.age]>1500?`<p class="s" style="margin:0 0 8px">Veel op één dag: meestal komt dat doordat er een nieuw podium aan de agenda is toegevoegd.</p>`:"")}
+    h+=evRow(e,{showDate:true})});
+  if(list.length>n) h+=`<button class="btn ghost more" id="moreBtn">Toon meer <small>nog ${nf(list.length-n)}</small></button>`;
+  return h+srcNote();
+}
 // Zoekopdracht: kiezen tussen alle soorten of alleen het huidige tabblad
 function scopeChips(){
   if(!S.q.trim()) return "";
@@ -280,7 +341,7 @@ function viewList(){
   const sig=[S.type,S.day,month,S.q,S.sort,S.venue,S.time,S.maxTravel,S.onlyFav,S.onlyFree,[...S.genre],[...S.regio],S.hideC.size,S.hideV.size].join("|");
   if(sig!==LIM.sig){LIM.sig=sig;LIM.n=300}
   const n=LIM.n;
-  let h=scopeChips()+tonightCta()+monthBar(mc)+`<div class="meta"><span>${nf(list.length)} ${LBL[S.type][list.length===1?0:1]}${month?" in "+monthLabel(month):""}${hidNote()}</span>${fcount()||S.q?'<button id="clearAll">Alles wissen</button>':""}</div>`;
+  let h=scopeChips()+tonightCta()+quickRow()+monthBar(mc)+`<div class="meta"><span>${nf(list.length)} ${LBL[S.type][list.length===1?0:1]}${month?" in "+monthLabel(month):""}${hidNote()}</span>${fcount()||S.q?'<button id="clearAll">Alles wissen</button>':""}</div>`;
   if(!list.length){const alt=month&&mc.find(([k,c])=>c&&k!==month);
     return h+(alt?`<div class="empty"><strong>Niets in ${monthLabel(month)}</strong>Wel in andere maanden, bijvoorbeeld ${monthLabel(alt[0])} (${nf(alt[1])}).<br><button class="btn ghost" data-month="${alt[0]}" style="display:inline-flex;flex:0">Toon ${monthLabel(alt[0])}</button> <button class="btn ghost" data-month="" style="display:inline-flex;flex:0">Alle maanden</button></div>`:emptyState())+srcNote()}
   if(S.sort==="date"){
@@ -297,8 +358,8 @@ const TN={when:"today",max:[15,30,45].includes(store.get("pr_tnmax",30))?store.g
 const nowMin=()=>{const n=new Date();return n.getHours()*60+n.getMinutes()};
 // Dit weekend: vrijdag t/m zondag; is het al vr/za/zo, dan vanaf vandaag
 const weekend=()=>{const wd=today.getDay(); return wd===0?[0,0]:wd>=5?[0,7-wd]:[5-wd,7-wd]};
-function tonightList(when=TN.when){
-  const [a,b]=when==="today"?[0,0]:weekend(), nm=nowMin(), toks=qTokens();
+function tonightList(when=TN.when,ignoreQ){
+  const [a,b]=when==="today"?[0,0]:weekend(), nm=nowMin(), toks=ignoreQ?[]:qTokens();
   const timed=[], period=[];
   EV.forEach(e=>{
     if(!TN.kinds.has(e.type)||hiddenLoc(e.v)) return;
@@ -364,8 +425,22 @@ function viewGrid(){
   if(unk.length) h+=`<div class="unk"><h3>Tijd nog niet bekend</h3>${unk.map(e=>evRow(e)).join("")}</div>`;
   return h;
 }
+function plansBlock(){
+  pruneGo();
+  const ids=Object.keys(GO);
+  let h=`<h2 class="dh" style="margin-top:6px">Mijn plannen${ids.length?` <small>${ids.length}</small>`:""}</h2>`;
+  if(!ids.length) return h+`<p class="s" style="margin:0">Tik in een event op ‘Ik ga’. Je plannen staan dan hier, met een waarschuwing als twee plannen overlappen. Alles in één keer in je agenda zetten kan ook.</p>`;
+  const have=ids.map(id=>BYID.get(id)).filter(Boolean).sort((a,b)=>a.d-b.d||(a.time??0)-(b.time??0));
+  const timed=have.filter(e=>e.time!=null&&e.endD==null);
+  const clash=e=>{ if(e.time==null||e.endD!=null) return ""; const o=timed.find(x=>x!==e&&x.d===e.d&&e.time<(endOf(x)??x.time+120)&&x.time<(endOf(e)??e.time+120)); return o?"⚠ Overlapt met "+o.artist:"" };
+  h+=have.map(e=>evRow(e,{showDate:true,reason:clash(e)})).join("");
+  ids.filter(id=>!BYID.has(id)).forEach(id=>{const g=GO[id], dd=g.d.split("-").map(Number), x=new Date(dd[0],dd[1]-1,dd[2]);
+    h+=`<div class="ev gone"><div class="t">${x.getDate()} ${MON[x.getMonth()]}<small>weg</small></div><div><div class="a">${esc(g.t||"Onbekend")}</div>${g.v?`<div class="v">${esc(g.v)}</div>`:""}<div class="s">Niet meer gevonden in de agenda</div></div><button class="star" data-go-del="${esc(id)}" aria-label="Haal ${esc(g.t||"dit plan")} uit je plannen">✕</button></div>`});
+  if(timed.length) h+=`<button class="btn ghost more" id="icsAll" type="button">Alles in agenda zetten <small>${timed.length}</small></button>`;
+  return h;
+}
 function viewFav(){
-  let h="";
+  let h=plansBlock();
   const newList=EV.filter(e=>NEW.has(e.id)&&inTab(e));
   const newHits=newList.filter(e=>isFav(e)||alarmHit(e));
   // nieuw bij gevolgde podia staat hieronder per podium (alle tabbladen), niet nog eens in deze lijst
@@ -536,15 +611,15 @@ function render(){
   if(!S.q.trim()) S.qAll=true;
   ["thea","film","expo","fest","kids"].forEach(t=>document.body.classList.toggle(t,S.type===t));
   document.querySelectorAll(".seg [data-type]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.type===S.type));
-  const navV=S.view==="tonight"?"list":S.view;
+  const navV=["tonight","cal","new"].includes(S.view)?"list":S.view;
   document.querySelectorAll("nav.tabs button").forEach(b=>b.dataset.view===navV?b.setAttribute("aria-current","page"):b.removeAttribute("aria-current"));
   const n=fcount(); $("#fcount").hidden=!n; $("#fcount").textContent=n;
   $("#newDot").hidden=!EV.some(e=>NEW.has(e.id)&&(isFav(e)||alarmHit(e)||isFavV(e)));
   document.body.classList.toggle("venues",S.view==="venues");
   document.body.classList.toggle("tonight",S.view==="tonight");
-  $("#dates").style.display=S.view==="fav"||S.view==="venues"||S.view==="tonight"?"none":"flex";
+  $("#dates").style.display=["fav","venues","tonight","cal","new"].includes(S.view)?"none":"flex";
   renderDates();
-  $("#main").innerHTML=S.view==="list"?viewList():S.view==="grid"?viewGrid():S.view==="venues"?viewVenues():S.view==="tonight"?viewTonight():viewFav();
+  $("#main").innerHTML=S.view==="list"?viewList():S.view==="grid"?viewGrid():S.view==="venues"?viewVenues():S.view==="tonight"?viewTonight():S.view==="cal"?viewCal():S.view==="new"?viewNew():viewFav();
   if(S.view==="fav") setupFav();
   if(S.view==="venues"&&!S.venuePage&&S.vmode==="map") drawMap();
   const mb=$(".months"), mo=mb&&mb.querySelector('[aria-pressed="true"]'); if(mo) mb.scrollLeft=mo.offsetLeft-(mb.clientWidth-mo.offsetWidth)/2;
@@ -634,17 +709,21 @@ $("#fLoc").addEventListener("change",e=>{
 /* ---------- DETAIL ---------- */
 /* Route (Google Maps, op het podium zelf) en luisteren (zoeklink; er gaat niets vanuit de app naar die diensten) */
 const ICO={pin:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
-  play:'<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>'};
+  play:'<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',
+  dice:'<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="15" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/><circle cx="9" cy="15" r="1" fill="currentColor"/></svg>',
+  cal:'<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+  spark:'<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM18 16l.8 2.2L21 19l-2.2.8L18 22l-.8-2.2L15 19l2.2-.8z"/></svg>'};
 const mapUrl=v=>v.lat!=null&&v.lon!=null?`https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lon}`:"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(v.name+", "+v.city);
 const NOT_MUSIC=/workshop|lezing|cursus|quiz|bingo|borrel|lunch|diner|rondleiding|open dag|proefles|clinic|filmavond|tentoonstelling|expositie|vergadering|netwerk/i;
 const listenOk=e=>e.type==="pop"&&!e.isFest&&e.genre!=="Feest"&&!!e.artist&&!NOT_MUSIC.test(e.title);
-function openDetail(id){
-  const e=EV.find(x=>x.id===id), v=V[e.v], tr=travel(e.v);
+function openDetail(id,o={}){
+  const e=BYID.get(id), v=V[e.v], tr=travel(e.v), going=!!GO[e.id];
   const sl=slots(e);
   const tl=sl.length?sl.map(s=>`<div class="slot${s.k==="main"?" key":""}"><time>${hm(s.s)}</time>${s.a?`<strong>${esc(s.a)}</strong> <span class="s">${s.l.toLowerCase()}</span>`:esc(s.l)} ${s.est?'<span class="est">geschat</span>':""}</div>`).join("")
     :`<p class="s">De tijden zijn nog niet bekend bij de bron. Check de pagina van het podium.</p>`;
   const sims=similar(e);
   $("#detailSheet").innerHTML=`<div class="sheetbar"><button class="sheetx" type="button" data-close><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>Sluiten</button><div class="grab"></div></div>
+   ${o.surprise?`<div class="surp" style="--acc:var(--${e.type});--acc-soft:var(--${e.type}-soft)">🎲 Verrassing voor ${o.surprise}, in de buurt</div>`:""}
    <div class="dhead"><div><div class="dsub">${range(e)?(e.started?"Nu te zien, ":"")+range(e):dayLabel(e.d)}</div><div class="dtitle">${esc(e.artist)}</div>
      ${e.title!==e.artist?`<div class="dsub">${esc(e.title)}</div>`:""}
      <div class="dsub">${esc(v.name)}, ${esc(v.city)} · <button class="linkbtn" data-openvenue="${esc(vgOf(e.v))}">Alles bij dit podium</button></div></div>
@@ -652,6 +731,7 @@ function openDetail(id){
    <div class="facts"><div><small>Genre</small><b>${esc(e.genre)}</b></div>${tr.car!=null?`<div><small>Auto</small><b>± ${tr.car} min</b></div><div><small>OV</small><b>± ${tr.ov} min</b></div>`:""}${e.price!=null?`<div><small>${e.price===0?"Entree":"Prijs vanaf"}</small><b>${priceTxt(e.price)}</b></div>`:""}${e.status==="sold"?`<div><small>Kaarten</small><b style="color:var(--warn)">Uitverkocht</b></div>`:""}</div>
    <div class="timeline">${tl}</div>
    <div class="row2"><a class="btn" href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">Info en kaarten bij ${esc(V[e.v].name)}</a></div>
+   <div class="row2" style="margin-top:10px"><button class="btn ghost go" id="goBtn" type="button" aria-pressed="${going}">${going?"✓ Ik ga":"Ik ga"}</button>${o.surprise?`<button class="btn ghost" id="surpBtn" type="button">${ICO.dice}Nog een verrassing</button>`:""}</div>
    <div class="row2" style="margin-top:10px"><a class="btn ghost" href="${esc(mapUrl(v))}" target="_blank" rel="noopener noreferrer">${ICO.pin}Route</a>${listenOk(e)?`<a class="btn ghost" href="https://open.spotify.com/search/${encodeURIComponent(e.artist)}" target="_blank" rel="noopener noreferrer">${ICO.play}Spotify</a><a class="btn ghost" href="https://www.youtube.com/results?search_query=${encodeURIComponent(e.artist)}" target="_blank" rel="noopener noreferrer">${ICO.play}YouTube</a>`:""}</div>
    <div class="row2" style="margin-top:10px">${e.time!=null?`<button class="btn ghost" id="icsBtn">Zet in agenda</button><a class="btn ghost" id="gcal" target="_blank" rel="noopener">Google Agenda</a>`:`<p class="s">Agenda-knop verschijnt zodra de tijd bekend is.</p>`}</div>
    <div class="row2" style="margin-top:10px"><button class="btn ghost" id="shareBtn" type="button">Delen</button><a class="btn ghost" href="${esc(issueUrl(e))}" target="_blank" rel="noopener noreferrer">Klopt niet?</a></div>
@@ -661,6 +741,8 @@ function openDetail(id){
    <div class="ai" id="simAI" hidden><strong>Wie lijkt hierop?</strong><p>Claude noemt vergelijkbare artiesten en checkt of die in de agenda staan.</p><button class="btn" id="askSim">Vraag Claude</button><div id="simOut"></div></div>`;
   if(e.time!=null){ $("#gcal").href=gcalUrl(e); $("#icsBtn").onclick=()=>saveIcs(e); }
   $("#shareBtn").onclick=()=>share(e);
+  $("#goBtn").onclick=ev=>{toggleGoing(e); const on=!!GO[e.id], b=ev.currentTarget; b.setAttribute("aria-pressed",on); b.textContent=on?"✓ Ik ga":"Ik ga"};
+  if(o.surprise) $("#surpBtn").onclick=surprise;
   if(sample){ $("#simAI").hidden=false; $("#askSim").onclick=()=>askSimilar(e); }
   openSheet("#detailSheet"); $("#detailSheet").scrollTop=0;
 }
@@ -693,14 +775,26 @@ const utc=x=>x.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
 const descr=e=>slots(e).map(s=>hm(s.s)+" "+(s.a||s.l)+(s.est?" (geschat)":"")).join("\n")+"\n\n"+e.url;
 function gcalUrl(e){const v=V[e.v];return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent(e.artist+" @ "+v.name)+"&dates="+utc(dt(e,e.time))+"/"+utc(dt(e,endOf(e)))+"&location="+encodeURIComponent(v.name+", "+v.city)+"&details="+encodeURIComponent(descr(e))}
 let downloads=null, sample=null;
+const icsEsc=t=>String(t).replace(/\\/g,"\\\\").replace(/[;,]/g,"\\$&").replace(/\n/g,"\\n");
+function vevent(e){const v=V[e.v], tr=travel(e.v);
+  return ["BEGIN:VEVENT","UID:"+e.id+"@podiumradar","DTSTAMP:"+utc(new Date()),"DTSTART:"+utc(dt(e,e.time)),"DTEND:"+utc(dt(e,endOf(e))),
+    "SUMMARY:"+icsEsc(e.artist+" @ "+v.name),"LOCATION:"+icsEsc(v.name+", "+v.city),...(e.url!=="#"?["URL:"+e.url]:[]),"DESCRIPTION:"+icsEsc(descr(e)),
+    "BEGIN:VALARM","TRIGGER:-PT"+((tr.car||30)+30)+"M","ACTION:DISPLAY","DESCRIPTION:"+icsEsc("Vertrekken naar "+e.artist),"END:VALARM","END:VEVENT"]}
+const icsDoc=evs=>["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Podiumradar//NL",...evs.flatMap(vevent),"END:VCALENDAR"].join("\r\n");
+// Bestand aanbieden: via het toestel (downloads) of als gewone download; geeft false als het niet lukt
+async function deliverIcs(ics,name,msgDownloaded,msgSaved){
+  if(!downloads){const url=URL.createObjectURL(new Blob([ics],{type:"text/calendar"})), a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);toast(msgDownloaded);return true}
+  try{await downloads.save({filename:name,data:new Blob([ics],{type:"text/calendar"})});toast(msgSaved);return true}
+  catch(err){if(err&&err.code==="unavailable") downloads=null; return false}
+}
 async function saveIcs(e){
-  const v=V[e.v], tr=travel(e.v);
-  const ics=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Podiumradar//NL","BEGIN:VEVENT","UID:"+e.id+"@podiumradar","DTSTAMP:"+utc(new Date()),
-    "DTSTART:"+utc(dt(e,e.time)),"DTEND:"+utc(dt(e,endOf(e))),"SUMMARY:"+e.artist+" @ "+v.name,"LOCATION:"+v.name+"\\, "+v.city,"URL:"+e.url,
-    "DESCRIPTION:"+descr(e).replace(/\n/g,"\\n"),"BEGIN:VALARM","TRIGGER:-PT"+((tr.car||30)+30)+"M","ACTION:DISPLAY","DESCRIPTION:Vertrekken naar "+e.artist,"END:VALARM","END:VEVENT","END:VCALENDAR"].join("\r\n");
-  if(!downloads){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([ics],{type:"text/calendar"}));a.download=e.artist.replace(/[^\w\- ]/g,"")+".ics";document.body.appendChild(a);a.click();a.remove();toast("Agendabestand gedownload, met vertrekherinnering");return}
-  try{await downloads.save({filename:e.artist.replace(/[^\w\- ]/g,"")+".ics",data:new Blob([ics],{type:"text/calendar"})});toast("Agendabestand klaar, met vertrekherinnering")}
-  catch(err){if(err&&err.code==="unavailable"){downloads=null;window.open(gcalUrl(e),"_blank","noopener")}}
+  const ok=await deliverIcs(icsDoc([e]),e.artist.replace(/[^\w\- ]/g,"")+".ics","Agendabestand gedownload, met vertrekherinnering","Agendabestand klaar, met vertrekherinnering");
+  if(!ok) window.open(gcalUrl(e),"_blank","noopener");
+}
+async function saveIcsAll(list){
+  if(!list.length){toast("Geen plannen met een tijd om in je agenda te zetten");return}
+  const ok=await deliverIcs(icsDoc(list),"Podiumradar-plannen.ics",list.length+" plannen als agendabestand gedownload, met vertrekherinnering",list.length+" plannen klaar als agendabestand");
+  if(!ok) toast("Downloaden lukt hier niet. Zet ze één voor één in je agenda.");
 }
 
 /* ---------- CLAUDE ---------- */
@@ -729,6 +823,7 @@ function setupFav(){
   const add=()=>{const v=$("#alarmIn").value.trim(); if(!v) return; if(!S.alarms.includes(v)) S.alarms.push(v); store.set("pr_alarms",S.alarms); toast("Alarm gezet voor "+v); render();};
   $("#alarmAdd").onclick=add; $("#alarmIn").onkeydown=e=>{if(e.key==="Enter") add()};
   const ms=$("#markSeen"); if(ms) ms.onclick=markSeen;
+  const ia=$("#icsAll"); if(ia) ia.onclick=()=>saveIcsAll(Object.keys(GO).map(id=>BYID.get(id)).filter(e=>e&&e.time!=null&&e.endD==null).sort((a,b)=>a.d-b.d||a.time-b.time));
   const box=$("#aiBox"); if(!box) return;
   if(!sample){box.style.display="none";return}
   $("#askAI").onclick=async()=>{
@@ -770,6 +865,10 @@ document.addEventListener("click",e=>{
     if(scrollY>top){if(top) hd.dataset.hold="1"; try{window.scrollTo(0,top)}catch{}}
     const c=kb&&document.querySelector(`#dates [data-d="${S.day}"]`); if(c) c.focus({preventScroll:true}); return}
   // Met het toetsenbord gekozen: focus terug op de gekozen maand (bij tikken geen focusrand)
+  if(e.target.closest("[data-surprise]")){surprise(); return}
+  const gd=e.target.closest("[data-go-del]"); if(gd){delete GO[gd.dataset.goDel]; store.set("pr_going",GO); render(); return}
+  const cn=e.target.closest("[data-calnav]"); if(cn){const [cy,cm]=(S.calMonth||mKey(today)).split("-").map(Number); S.calMonth=mKey(new Date(cy,cm-1+(+cn.dataset.calnav),1)); render(); return}
+  const cd=e.target.closest("[data-calday]"); if(cd){S.day=+cd.dataset.calday;S.month="";S.view="list";render();try{window.scrollTo(0,0)}catch{};return}
   const qa=e.target.closest("[data-qall]"); if(qa){S.qAll=qa.dataset.qall==="1"; render(); return}
   const qb=e.target.closest("[data-qtab]"); if(qb){S.type=qb.dataset.qtab;S.qAll=false;S.genre.clear();S.venue="";S.month="";render();try{window.scrollTo(0,0)}catch{};return}
   const mo=e.target.closest("[data-month]"); if(mo){const top=mo.hasAttribute("data-month-top"), kb=mo.matches(":focus-visible"); S.month=mo.dataset.month;S.day=-1;render();if(top){try{window.scrollTo(0,0)}catch{}}
