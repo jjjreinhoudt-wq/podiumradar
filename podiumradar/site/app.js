@@ -187,7 +187,7 @@ function similar(e,n=4){
 /* ---------- RENDER ---------- */
 function renderDates(){
   const ds=[...new Set(EV.filter(e=>inTab(e)).map(e=>e.d))].sort((a,b)=>a-b).slice(0,70);
-  if(S.view==="grid"&&(S.day<0||!ds.includes(S.day))) S.day=ds[0]??0;
+  if(S.view==="grid"&&(S.day<0||!ds.includes(S.day))){S.day=ds[0]??0;S.month=""}
   let h=S.view!=="grid"?`<button class="day all" data-d="-1" aria-pressed="${S.day<0}">Alle data</button>`:"";
   let pm=ds.length?dateOf(ds[0]).getMonth():null;
   ds.forEach(d=>{const x=dateOf(d),we=x.getDay()===5||x.getDay()===6;
@@ -234,14 +234,14 @@ function dayRows(list,n,o){
 }
 // Aantal per maand (alleen bij Alle data): [["2026-10",812],...]
 function monthCounts(all){
-  const last=all.reduce((m,e)=>Math.max(m,e.d),0), out=[];
+  const last=all.reduce((m,e)=>Math.max(m,e.endD??e.d),0), out=[];
   for(let i=0;i<18;i++){const x=new Date(today.getFullYear(),today.getMonth()+i,1); if(i&&(x-today)/864e5>last) break;
     const k=mKey(x), r=mRange(k), n=all.filter(e=>inMonth(e,r)).length; if(n||k===S.month) out.push([k,n])}
   if(S.month&&!out.some(([k])=>k===S.month)) out.push([S.month,0]);
   return out;
 }
 function monthBar(mc){
-  if(mc.length<2&&!S.month) return "";
+  if(S.day>=0||(mc.length<2&&!S.month)) return "";
   const lab=k=>{const [y,m]=k.split("-").map(Number);return MON[m-1]+(y!==today.getFullYear()?" ’"+String(y).slice(2):"")};
   return `<div class="months" role="group" aria-label="Maand"><button class="chip" data-month="" aria-pressed="${!S.month}">Alle maanden</button>${mc.map(([k,n])=>`<button class="chip" data-month="${k}" aria-pressed="${S.month===k}" aria-label="${monthLabel(k)}, ${n}">${lab(k)}<small>${nf(n)}</small></button>`).join("")}</div>`;
 }
@@ -253,11 +253,12 @@ function viewList(){
   const sig=[S.type,S.day,month,S.q,S.sort,S.venue,S.time,S.maxTravel,S.onlyFav,S.onlyFree,[...S.genre],[...S.regio],S.hideC.size,S.hideV.size].join("|");
   if(sig!==LIM.sig){LIM.sig=sig;LIM.n=300}
   const n=LIM.n;
-  let h=tonightCta()+monthBar(mc)+`<div class="meta"><span>${nf(list.length)} ${LBL[S.type][1]}${month?" in "+monthLabel(month):""}${hidNote()}</span>${fcount()||S.q?'<button id="clearAll">Alles wissen</button>':""}</div>`;
-  if(!list.length) return h+emptyState()+srcNote();
+  let h=tonightCta()+monthBar(mc)+`<div class="meta"><span>${nf(list.length)} ${LBL[S.type][list.length===1?0:1]}${month?" in "+monthLabel(month):""}${hidNote()}</span>${fcount()||S.q?'<button id="clearAll">Alles wissen</button>':""}</div>`;
+  if(!list.length){const alt=month&&mc.find(([k,c])=>c&&k!==month);
+    return h+(alt?`<div class="empty"><strong>Niets in ${monthLabel(month)}</strong>Wel in andere maanden, bijvoorbeeld ${monthLabel(alt[0])} (${nf(alt[1])}).<br><button class="btn ghost" data-month="${alt[0]}" style="display:inline-flex;flex:0">Toon ${monthLabel(alt[0])}</button> <button class="btn ghost" data-month="" style="display:inline-flex;flex:0">Alle maanden</button></div>`:emptyState())+srcNote()}
   if(S.sort==="date"){
     const from=S.day>=0?S.day:mr?Math.max(0,mr[0]):0;
-    h+=dayRows(list,n,{from,months:S.day<0,month,door:from===0?"Nu te zien":S.day>=0?"Loopt al, ook te zien op deze dag":"Al begonnen, loopt door in "+monthLabel(month)});
+    h+=dayRows(list,n,{from,months:S.day<0,month,door:from===0?"Nu te zien":S.day>=0?"Loopt al, ook te zien op deze dag":"Al begonnen, loopt nog"});
   }
   else list.slice(0,n).forEach(e=>h+=evRow(e,{showDate:true}));
   if(list.length>n) h+=`<button class="btn ghost more" id="moreBtn">Toon meer <small>nog ${nf(list.length-n)}</small></button>`;
@@ -312,7 +313,7 @@ function tonightCta(){
 }
 function viewGrid(){
   const all=filtered(false), list=all.filter(e=>e.time!=null), unk=all.filter(e=>e.time==null);
-  let h=`<div class="meta"><span>${dayLabel(S.day)}: ${all.length} ${LBL[S.type][1]}${hidNote()}</span></div>`;
+  let h=`<div class="meta"><span>${dayLabel(S.day)}: ${all.length} ${LBL[S.type][all.length===1?0:1]}${hidNote()}</span></div>`;
   if(!all.length) return h+emptyState();
   if(list.length){
     const from=Math.floor(Math.min(...list.map(e=>e.time-(e.type==="thea"?30:0)))/60)*60;
@@ -409,7 +410,7 @@ function viewVenues(){
   if(!list.length) return h+`<div class="empty"><strong>Geen podium gevonden</strong>Zoek op een andere naam of stad.</div>`;
   if(map) return h+`<div class="mapbox" id="mapbox"><p class="s" style="padding:16px">Kaart laden…</p></div>`;
   list.slice(0,300).forEach(g=>{const tr=travel([...g.ids][0]);
-    h+=`<div class="ev venue" role="button" tabindex="0" data-venue="${esc(g.key)}" style="--acc:var(--${VCOL[g.type]||"pop"})"><div class="t" style="font-size:15px">${g.n}<small>op agenda</small></div>
+    h+=`<div class="ev venue" role="button" tabindex="0" data-venue="${esc(g.key)}" style="--acc:var(--${VCOL[g.type]||"pop"});--acc-soft:var(--${VCOL[g.type]||"pop"}-soft)"><div class="t" style="font-size:15px">${g.n}<small>op agenda</small></div>
       <div><div class="a">${esc(g.name)}</div><div class="v">${esc(g.city)} · ${esc(VKIND[g.type]||"")}</div>
       <div class="tt">${tr.car==null?"reistijd onbekend":"± "+tr.car+" min met de auto"}${g.next?` · eerstvolgend ${g.next.started?"nu":short(g.next)}: ${esc(g.next.artist)}`:""}</div></div>${vStar(g)}</div>`});
   return h;
@@ -525,7 +526,7 @@ function render(){
 function buildHome(){
   $("#homeSel").innerHTML=(S.home==="__geo"?`<option value="__geo" selected>Mijn locatie</option>`:"")+Object.keys(HOMES).map(c=>`<option${c===S.home?" selected":""}>${c}</option>`).join("");
 }
-$("#homeSel").onchange=e=>{S.home=e.target.value; if(S.home!=="__geo"){S.homeXY=HOMES[S.home]} store.set("pr_home",S.home); buildHome(); render();};
+$("#homeSel").onchange=e=>{S.home=e.target.value; if(S.home!=="__geo"){S.homeXY=HOMES[S.home]} store.set("pr_home",S.home); buildHome(); render(); e.target.blur();};
 $("#geoBtn").onclick=()=>{
   if(!navigator.geolocation){toast("Locatie is hier niet beschikbaar. Kies een plaats.");return}
   navigator.geolocation.getCurrentPosition(p=>{S.homeXY=[p.coords.latitude,p.coords.longitude];S.home="__geo";store.set("pr_geo",S.homeXY);store.set("pr_home","__geo");buildHome();render();toast("Reistijden vanaf je locatie")},
@@ -720,9 +721,11 @@ document.addEventListener("click",e=>{
     document.querySelectorAll(`#detailSheet [data-fav="${ak}"]`).forEach(b=>b.setAttribute("aria-pressed",S.fav.has(ak))); return}
   const al=e.target.closest("[data-alarm]"); if(al){S.alarms.splice(+al.dataset.alarm,1);store.set("pr_alarms",S.alarms);render();return}
   const ev=e.target.closest("[data-ev]"); if(ev){openDetail(ev.dataset.ev);return}
-  const d=e.target.closest(".day"); if(d){S.day=+d.dataset.d;S.month="";render();return}
-  const mo=e.target.closest("[data-month]"); if(mo){S.month=mo.dataset.month;S.day=-1;render();if(mo.hasAttribute("data-month-top")){try{window.scrollTo(0,0)}catch{}};return}
-  if(e.target.closest("#moreBtn")){const c=document.querySelectorAll("#main .ev").length; LIM.n+=300; render(); const nx=document.querySelectorAll("#main .ev")[c]; if(nx) nx.focus({preventScroll:true}); return}
+  const d=e.target.closest(".day"); if(d){S.day=+d.dataset.d;S.month="";render();if(scrollY>0){try{window.scrollTo(0,0)}catch{}};return}
+  // Met het toetsenbord gekozen: focus terug op de gekozen maand (bij tikken geen focusrand)
+  const mo=e.target.closest("[data-month]"); if(mo){const top=mo.hasAttribute("data-month-top"), kb=mo.matches(":focus-visible"); S.month=mo.dataset.month;S.day=-1;render();if(top){try{window.scrollTo(0,0)}catch{}}
+    const c=kb&&document.querySelector(`.months [data-month="${S.month}"]`); if(c) c.focus({preventScroll:true}); return}
+  const mb=e.target.closest("#moreBtn"); if(mb){const kb=mb.matches(":focus-visible"), c=document.querySelectorAll("#main .ev").length; LIM.n+=300; render(); const nx=kb&&document.querySelectorAll("#main .ev")[c]; if(nx) nx.focus({preventScroll:true}); return}
   const vk=e.target.closest("[data-vkind]"); if(vk){S.vkind=vk.dataset.vkind;render();return}
   const vb=e.target.closest("[data-vback]"); if(vb){S.venuePage=null;render();try{window.scrollTo(0,0)}catch{};return}
   const ov=e.target.closest("[data-openvenue]"); if(ov){closeSheets();S.view="venues";S.venuePage=ov.dataset.openvenue;S.q="";$("#q").value="";render();try{window.scrollTo(0,0)}catch{};return}
@@ -758,24 +761,32 @@ document.addEventListener("click",ev=>{if(Date.now()<noClickUntil){ev.stopPropag
 /* Scrollwiel boven de datumrij schuift die opzij */
 document.addEventListener("wheel",e=>{
   const el=e.target.closest(".dates,.months"); if(!el||el.scrollWidth<=el.clientWidth||e.shiftKey||Math.abs(e.deltaX)>Math.abs(e.deltaY)) return;
+  // Aan het eind van de rij: gewoon de pagina laten scrollen
+  const max=el.scrollWidth-el.clientWidth; if((e.deltaY>0&&el.scrollLeft>=max-1)||(e.deltaY<0&&el.scrollLeft<=0)) return;
   el.scrollLeft+=e.deltaY; e.preventDefault();
 },{passive:false});
-document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheets();if(e.key==="Enter"&&e.target.matches(".ev[data-ev]"))openDetail(e.target.dataset.ev);if(e.key==="Enter"&&e.target.matches("[data-venue]"))e.target.click()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheets();if(e.key==="Enter"&&e.target.id==="q")e.target.blur();if(e.key==="Enter"&&e.target.matches(".ev[data-ev]"))openDetail(e.target.dataset.ev);if(e.key==="Enter"&&e.target.matches("[data-venue]"))e.target.click()});
 document.querySelectorAll(".seg [data-type]").forEach(b=>b.onclick=()=>{S.type=b.dataset.type;S.genre.clear();S.venue="";S.month="";if(S.view!=="grid")S.day=-1;render()});
 let qt;$("#q").oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{S.q=e.target.value;render()},150)};
 
 /* Kop inklappen bij naar beneden scrollen: alleen de datumrij blijft staan (of niets, als die er niet is); een stukje omhoog haalt alles terug */
 (()=>{const hd=$("header"), ds=$("#dates"); let lastY=Math.max(0,scrollY), busy=false;
-  const upd=()=>{busy=false; const y=Math.max(0,scrollY), dy=y-lastY, full=hd.offsetHeight;
+  // Zonder datumrij helemaal weg, inclusief schaduw (procent = eigen hoogte, dus geen afrondingsrandje)
+  const setT=()=>hd.style.setProperty("--tuck",ds.style.display==="none"?"calc(100% + 24px)":ds.offsetTop+"px");
+  const upd=()=>{busy=false; const y=Math.max(0,scrollY), dy=y-lastY;
     hd.classList.toggle("scrolled",y>2);
+    if(y<hd.offsetHeight){hd.classList.remove("tuck");lastY=y;return}
     if(y+innerHeight>=document.documentElement.scrollHeight-2&&dy<0){lastY=y;return} // terugveren onderaan telt niet
-    if(y<full) hd.classList.remove("tuck");
-    else if(dy>6&&!(hd.contains(document.activeElement)&&document.activeElement.matches("input,select"))){hd.style.setProperty("--tuck",(ds.style.display==="none"?full:ds.offsetTop)+"px"); hd.classList.add("tuck")}
+    if(dy>6&&!(hd.contains(document.activeElement)&&document.activeElement.matches("input,select"))){setT();hd.classList.add("tuck")}
     else if(dy<-6) hd.classList.remove("tuck");
-    if(Math.abs(dy)>6||y<full) lastY=y};
+    if(Math.abs(dy)>6) lastY=y};
   addEventListener("scroll",()=>{if(!busy){busy=true;requestAnimationFrame(upd)}},{passive:true});
+  // Andere hoogte (draaien, datumrij aan/uit) terwijl hij ingeklapt is: opnieuw meten
+  if(window.ResizeObserver) new ResizeObserver(()=>{if(hd.classList.contains("tuck")) setT()}).observe(hd);
   // Met het toetsenbord (Tab) of in het zoekveld: kop weer helemaal tonen; een tik op een datum laat hem ingeklapt
   hd.addEventListener("focusin",e=>{if(e.target.matches(":focus-visible,input,select")) hd.classList.remove("tuck")});
+  // Tab: eerst zonder animatie uitklappen, anders schuift de browser de pagina naar de (nog verborgen) kop
+  addEventListener("keydown",e=>{if(e.key==="Tab"&&hd.classList.contains("tuck")){hd.style.transition="none";hd.classList.remove("tuck");hd.offsetHeight;requestAnimationFrame(()=>hd.style.transition="")}},true);
 })();
 
 buildHome(); render();
