@@ -13,6 +13,7 @@ const KIDS_WORDS=/kinder(?!loos|achtig)|\bkids?\b|familie(voorstelling|concert|f
 const ageOf=t=>{const m=String(t).match(/\(?\b(\d{1,2})\s*\+\)?|\bvanaf\s+(\d{1,2})\s+jaar/i);return m?+(m[1]||m[2]):null};
 function isKids(title,genre){const a=ageOf(title); if(a!=null) return a<=12; if(/\b(16|18)\s*\+|\bvolwassen/i.test(title)) return false;
   return KIDS_WORDS.test(title)}  // genre "Jeugd" alleen niet genoeg: dat komt soms van "familie" in een titel
+const TABNAME={pop:"Concerten",thea:"Theater",film:"Film",expo:"Musea",fest:"Festivals",kids:"Kids"};
 const LBL={kids:["activiteit voor kinderen","activiteiten voor kinderen"],pop:["concert","concerten"],thea:["voorstelling","voorstellingen"],film:["filmvoorstelling","filmvoorstellingen"],expo:["tentoonstelling","tentoonstellingen"],fest:["festival","festivals"]};
 const today=new Date(); today.setHours(0,0,0,0);
 const toMin=t=>t?(+t.slice(0,2))*60+(+t.slice(3,5)):null;
@@ -54,8 +55,11 @@ DATA.events.forEach(r=>{
 });
 const SNAPSHOT=(()=>{const [dpart,t]=DATA.updated.split(" ");const [y,m,d]=dpart.split("-").map(Number);return d+" "+["januari","februari","maart","april","mei","juni","juli","augustus","september","oktober","november","december"][m-1]+" om "+t})();
 const recent=e=>e.firstSeen&&(today-new Date(e.firstSeen))/864e5<=3;
+// Zoeken: zonder hoofdletters/accenten, alle woorden moeten voorkomen ("amity 013" vindt The Amity Affliction bij 013)
+const norm=s=>String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 const artistKey=n=>n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
-EV.forEach(e=>{e.ak=artistKey(e.artist); if(e.time==null&&e.times) e.time=e.times[0].s});
+EV.forEach(e=>{e.ak=artistKey(e.artist); if(e.time==null&&e.times) e.time=e.times[0].s;
+  const v=V[e.v]; e.hay=norm([e.title,v.name,v.city,e.genre,e.support.join(" ")].join(" "))});
 
 /* ---------- PLACES ---------- */
 const HOMES={"Tilburg":[51.5555,5.0913],"Breda":[51.5719,4.7683],"Eindhoven":[51.4416,5.4697],"Den Bosch":[51.6978,5.3037],"Helmond":[51.4793,5.6570],"Oss":[51.7650,5.5180],"Bergen op Zoom":[51.4949,4.2911],"Roosendaal":[51.5308,4.4653],"Amsterdam":[52.3676,4.9041],"Utrecht":[52.0907,5.1214],"Rotterdam":[51.9244,4.4777],"Den Haag":[52.0705,4.3007],"Nijmegen":[51.8126,5.8372],"Arnhem":[51.9851,5.8987],"Zwolle":[52.5168,6.0830],"Groningen":[53.2194,6.5665],"Maastricht":[50.8514,5.6910],"Venlo":[51.3704,6.1724]};
@@ -66,7 +70,7 @@ function travel(vid){const v=V[vid], h=S.homeXY; if(v.lat==null) return {car:nul
 
 /* ---------- STATE ---------- */
 const store={get(k,f){try{const v=localStorage.getItem(k);return v?JSON.parse(v):f}catch{return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
-const S={type:"pop",view:"list",day:-1,month:"",q:"",sort:"date",regio:new Set(),venue:"",genre:new Set(),time:"",maxTravel:0,onlyFav:false,
+const S={type:"pop",view:"list",day:-1,month:"",q:"",qAll:true,sort:"date",regio:new Set(),venue:"",genre:new Set(),time:"",maxTravel:0,onlyFav:false,
   fav:new Set(store.get("pr_fav2",[])), favV:new Set(store.get("pr_favv",[])), onlyFree:false, vmode:store.get("pr_vmode","list")==="map"?"map":"list", alarms:store.get("pr_alarms",[]), home:store.get("pr_home","Tilburg"), homeXY:null,
   // Uitgevinkte steden en podia (blijven bewaard): niets van tonen
   hideC:new Set(store.get("pr_hideC",[])), hideV:new Set(store.get("pr_hideV",[]))};
@@ -142,10 +146,12 @@ function slots(e){
 }
 const endOf=e=>{const s=slots(e);return s.length?s[s.length-1].e:null};
 
-function filtered(ignoreDay,ignoreMonth){
-  const q=S.q.trim().toLowerCase(), mr=!ignoreDay&&!ignoreMonth&&S.day<0&&S.month?mRange(S.month):null;
+const qTokens=()=>norm(S.q.trim()).split(/\s+/).filter(Boolean);
+const matchQ=(e,toks)=>toks.every(t=>e.hay.includes(t));
+function filtered(ignoreDay,ignoreMonth,allTypes){
+  const toks=qTokens(), mr=!ignoreDay&&!ignoreMonth&&S.day<0&&S.month?mRange(S.month):null;
   let list=EV.filter(e=>{
-    if(!inTab(e)) return false;
+    if(!allTypes&&!inTab(e)) return false;
     const v=V[e.v];
     if(!ignoreDay&&S.day>=0&&!onDay(e,S.day)) return false;
     if(mr&&!inMonth(e,mr)) return false;
@@ -160,7 +166,7 @@ function filtered(ignoreDay,ignoreMonth){
     if(S.maxTravel){const c=travel(e.v).car; if(c==null||c>S.maxTravel) return false;}
     if(S.onlyFav&&!isFav(e)&&!isFavV(e)) return false;
     if(S.onlyFree&&e.price!==0) return false;
-    if(q&&![e.title,v.name,v.city,e.genre].join(" ").toLowerCase().includes(q)) return false;
+    if(toks.length&&!matchQ(e,toks)) return false;
     return true;
   });
   const tm=e=>e.time==null?20*60:e.time;
@@ -186,7 +192,8 @@ function similar(e,n=4){
 
 /* ---------- RENDER ---------- */
 function renderDates(){
-  const ds=[...new Set(EV.filter(e=>inTab(e)).map(e=>e.d))].sort((a,b)=>a-b).slice(0,70);
+  const toks=qTokens(), all=S.view==="list"&&S.q.trim()&&S.qAll;
+  const ds=[...new Set(EV.filter(e=>(all||inTab(e))&&(!toks.length||matchQ(e,toks))).map(e=>e.d))].sort((a,b)=>a-b).slice(0,70);
   if(S.view==="grid"&&(S.day<0||!ds.includes(S.day))){S.day=ds[0]??0;S.month=""}
   let h=S.view!=="grid"?`<button class="day all" data-d="-1" aria-pressed="${S.day<0}">Alle data</button>`:"";
   let pm=ds.length?dateOf(ds[0]).getMonth():null;
@@ -247,13 +254,33 @@ function monthBar(mc){
 }
 // Hoeveel kaarten de lijst toont; begint opnieuw bij 300 zodra datum, maand, zoekterm of filters veranderen
 const LIM={n:300,sig:""};
+// Zoekopdracht: kiezen tussen alle soorten of alleen het huidige tabblad
+function scopeChips(){
+  if(!S.q.trim()) return "";
+  return `<div class="chips scope" role="group" aria-label="Zoeken in"><button class="chip" data-qall="1" aria-pressed="${S.qAll}">Alle soorten</button><button class="chip" data-qall="0" aria-pressed="${!S.qAll}">Alleen ${TABNAME[S.type]}</button></div>`;
+}
+// Zoeken over alle tabbladen: per soort een kopje met de eerste treffers
+const SEARCH_CAP=12;
+function viewSearch(){
+  const list=filtered(false,false,true), month=S.day<0&&S.month?S.month:"";
+  const mc=S.day<0?monthCounts(month?filtered(false,true,true):list):[];
+  let h=scopeChips()+monthBar(mc)+`<div class="meta"><span>${nf(list.length)} ${list.length===1?"resultaat":"resultaten"} voor “${esc(S.q.trim())}”${month?" in "+monthLabel(month):""}${hidNote()}</span><button id="clearAll">Alles wissen</button></div>`;
+  if(!list.length) return h+`<div class="empty"><strong>Niets gevonden</strong>Geen resultaat voor “${esc(S.q.trim())}” in alle soorten. Probeer een andere naam, kies een andere datum of haal een filter weg.<br><button class="btn ghost" id="clearAll2" style="display:inline-flex;flex:0">Filters wissen</button></div>`+srcNote();
+  const by={}; list.forEach(e=>(by[e.type]=by[e.type]||[]).push(e));
+  const order=["pop","thea","film","expo","fest"]; if(order.includes(S.type)) order.unshift(...order.splice(order.indexOf(S.type),1));
+  order.forEach(t=>{const a=by[t]; if(!a) return;
+    h+=`<h2 class="dh" style="--acc:var(--${t})">${TABNAME[t]} <small>${nf(a.length)}</small></h2>`+a.slice(0,SEARCH_CAP).map(e=>evRow(e,{showDate:true,kind:true})).join("");
+    if(a.length>SEARCH_CAP) h+=`<button class="btn ghost more" data-qtab="${t}" style="--acc:var(--${t})">Toon alle ${nf(a.length)} bij ${TABNAME[t]} ›</button>`});
+  return h+srcNote();
+}
 function viewList(){
+  if(S.q.trim()&&S.qAll) return viewSearch();
   const list=filtered(false), month=S.day<0&&S.month?S.month:"", mr=month?mRange(month):null;
   const mc=S.day<0?monthCounts(month?filtered(false,true):list):[];
   const sig=[S.type,S.day,month,S.q,S.sort,S.venue,S.time,S.maxTravel,S.onlyFav,S.onlyFree,[...S.genre],[...S.regio],S.hideC.size,S.hideV.size].join("|");
   if(sig!==LIM.sig){LIM.sig=sig;LIM.n=300}
   const n=LIM.n;
-  let h=tonightCta()+monthBar(mc)+`<div class="meta"><span>${nf(list.length)} ${LBL[S.type][list.length===1?0:1]}${month?" in "+monthLabel(month):""}${hidNote()}</span>${fcount()||S.q?'<button id="clearAll">Alles wissen</button>':""}</div>`;
+  let h=scopeChips()+tonightCta()+monthBar(mc)+`<div class="meta"><span>${nf(list.length)} ${LBL[S.type][list.length===1?0:1]}${month?" in "+monthLabel(month):""}${hidNote()}</span>${fcount()||S.q?'<button id="clearAll">Alles wissen</button>':""}</div>`;
   if(!list.length){const alt=month&&mc.find(([k,c])=>c&&k!==month);
     return h+(alt?`<div class="empty"><strong>Niets in ${monthLabel(month)}</strong>Wel in andere maanden, bijvoorbeeld ${monthLabel(alt[0])} (${nf(alt[1])}).<br><button class="btn ghost" data-month="${alt[0]}" style="display:inline-flex;flex:0">Toon ${monthLabel(alt[0])}</button> <button class="btn ghost" data-month="" style="display:inline-flex;flex:0">Alle maanden</button></div>`:emptyState())+srcNote()}
   if(S.sort==="date"){
@@ -271,7 +298,7 @@ const nowMin=()=>{const n=new Date();return n.getHours()*60+n.getMinutes()};
 // Dit weekend: vrijdag t/m zondag; is het al vr/za/zo, dan vanaf vandaag
 const weekend=()=>{const wd=today.getDay(); return wd===0?[0,0]:wd>=5?[0,7-wd]:[5-wd,7-wd]};
 function tonightList(when=TN.when){
-  const [a,b]=when==="today"?[0,0]:weekend(), nm=nowMin(), q=S.q.trim().toLowerCase();
+  const [a,b]=when==="today"?[0,0]:weekend(), nm=nowMin(), toks=qTokens();
   const timed=[], period=[];
   EV.forEach(e=>{
     if(!TN.kinds.has(e.type)||hiddenLoc(e.v)) return;
@@ -280,7 +307,7 @@ function tonightList(when=TN.when){
       // vandaag: alleen wat nog moet beginnen of nog bezig is
       if(e.d===0&&e.time!=null&&(endOf(e)??e.time+120)<=nm) return; }
     const c=travel(e.v).car; if(c==null||c>TN.max) return;
-    if(q&&![e.title,V[e.v].name,V[e.v].city,e.genre].join(" ").toLowerCase().includes(q)) return;
+    if(toks.length&&!matchQ(e,toks)) return;
     (e.endD!=null?period:timed).push(e);
   });
   timed.sort((x,y)=>x.d-y.d||(x.time??1e4)-(y.time??1e4)||(travel(x.v).car??999)-(travel(y.v).car??999));
@@ -506,6 +533,7 @@ function setupMap(){
 }
 
 function render(){
+  if(!S.q.trim()) S.qAll=true;
   ["thea","film","expo","fest","kids"].forEach(t=>document.body.classList.toggle(t,S.type===t));
   document.querySelectorAll(".seg [data-type]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.type===S.type));
   const navV=S.view==="tonight"?"list":S.view;
@@ -604,6 +632,12 @@ $("#fLoc").addEventListener("change",e=>{
 });
 
 /* ---------- DETAIL ---------- */
+/* Route (Google Maps, op het podium zelf) en luisteren (zoeklink; er gaat niets vanuit de app naar die diensten) */
+const ICO={pin:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
+  play:'<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>'};
+const mapUrl=v=>v.lat!=null&&v.lon!=null?`https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lon}`:"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(v.name+", "+v.city);
+const NOT_MUSIC=/workshop|lezing|cursus|quiz|bingo|borrel|lunch|diner|rondleiding|open dag|proefles|clinic|filmavond|tentoonstelling|expositie|vergadering|netwerk/i;
+const listenOk=e=>e.type==="pop"&&!e.isFest&&e.genre!=="Feest"&&!!e.artist&&!NOT_MUSIC.test(e.title);
 function openDetail(id){
   const e=EV.find(x=>x.id===id), v=V[e.v], tr=travel(e.v);
   const sl=slots(e);
@@ -618,6 +652,7 @@ function openDetail(id){
    <div class="facts"><div><small>Genre</small><b>${esc(e.genre)}</b></div>${tr.car!=null?`<div><small>Auto</small><b>± ${tr.car} min</b></div><div><small>OV</small><b>± ${tr.ov} min</b></div>`:""}${e.price!=null?`<div><small>${e.price===0?"Entree":"Prijs vanaf"}</small><b>${priceTxt(e.price)}</b></div>`:""}${e.status==="sold"?`<div><small>Kaarten</small><b style="color:var(--warn)">Uitverkocht</b></div>`:""}</div>
    <div class="timeline">${tl}</div>
    <div class="row2"><a class="btn" href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">Info en kaarten bij ${esc(V[e.v].name)}</a></div>
+   <div class="row2" style="margin-top:10px"><a class="btn ghost" href="${esc(mapUrl(v))}" target="_blank" rel="noopener noreferrer">${ICO.pin}Route</a>${listenOk(e)?`<a class="btn ghost" href="https://open.spotify.com/search/${encodeURIComponent(e.artist)}" target="_blank" rel="noopener noreferrer">${ICO.play}Spotify</a><a class="btn ghost" href="https://www.youtube.com/results?search_query=${encodeURIComponent(e.artist)}" target="_blank" rel="noopener noreferrer">${ICO.play}YouTube</a>`:""}</div>
    <div class="row2" style="margin-top:10px">${e.time!=null?`<button class="btn ghost" id="icsBtn">Zet in agenda</button><a class="btn ghost" id="gcal" target="_blank" rel="noopener">Google Agenda</a>`:`<p class="s">Agenda-knop verschijnt zodra de tijd bekend is.</p>`}</div>
    <div class="row2" style="margin-top:10px"><button class="btn ghost" id="shareBtn" type="button">Delen</button><a class="btn ghost" href="${esc(issueUrl(e))}" target="_blank" rel="noopener noreferrer">Klopt niet?</a></div>
    <p class="note">Gegevens van ${SNAPSHOT}, overgenomen van de site van ${esc(V[e.v].name)}. Tijden, prijzen en beschikbaarheid kunnen veranderen: kijk altijd op die site voordat je gaat of kaarten koopt.</p>
@@ -735,6 +770,8 @@ document.addEventListener("click",e=>{
     if(scrollY>top){if(top) hd.dataset.hold="1"; try{window.scrollTo(0,top)}catch{}}
     const c=kb&&document.querySelector(`#dates [data-d="${S.day}"]`); if(c) c.focus({preventScroll:true}); return}
   // Met het toetsenbord gekozen: focus terug op de gekozen maand (bij tikken geen focusrand)
+  const qa=e.target.closest("[data-qall]"); if(qa){S.qAll=qa.dataset.qall==="1"; render(); return}
+  const qb=e.target.closest("[data-qtab]"); if(qb){S.type=qb.dataset.qtab;S.qAll=false;S.genre.clear();S.venue="";S.month="";render();try{window.scrollTo(0,0)}catch{};return}
   const mo=e.target.closest("[data-month]"); if(mo){const top=mo.hasAttribute("data-month-top"), kb=mo.matches(":focus-visible"); S.month=mo.dataset.month;S.day=-1;render();if(top){try{window.scrollTo(0,0)}catch{}}
     const c=kb&&(document.querySelector(`.months [data-month="${S.month}"]`)||document.querySelector("#main .ev")); if(c) c.focus({preventScroll:true}); return}
   const mb=e.target.closest("#moreBtn"); if(mb){const kb=mb.matches(":focus-visible"), c=document.querySelectorAll("#main .ev").length; LIM.n+=300; render(); const nx=document.querySelectorAll("#main .ev")[c]; if(nx) nx.focus({preventScroll:true,focusVisible:kb}); return}
@@ -780,7 +817,7 @@ document.addEventListener("wheel",e=>{
   el.scrollLeft+=e.deltaY; e.preventDefault();
 },{passive:false});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheets();if(e.key==="Enter"&&e.target.id==="q")e.target.blur();if(e.key==="Enter"&&e.target.matches(".ev[data-ev]"))openDetail(e.target.dataset.ev);if(e.key==="Enter"&&e.target.matches("[data-venue]"))e.target.click()});
-document.querySelectorAll(".seg [data-type]").forEach(b=>b.onclick=()=>{S.type=b.dataset.type;S.genre.clear();S.venue="";S.month="";if(S.view!=="grid")S.day=-1;render()});
+document.querySelectorAll(".seg [data-type]").forEach(b=>b.onclick=()=>{S.type=b.dataset.type;S.genre.clear();S.venue="";S.month="";if(S.q.trim())S.qAll=false;if(S.view!=="grid")S.day=-1;render()});
 let qt;$("#q").oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{S.q=e.target.value;render()},150)};
 
 /* Kop inklappen bij naar beneden scrollen: alleen de datumrij blijft staan (of niets, als die er niet is); een stukje omhoog haalt alles terug */
@@ -815,6 +852,14 @@ let qt;$("#q").oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{S.q=e.target.valu
       const by=r.top<hb?r.top-hb-8:r.bottom>nt?r.bottom-nt+8:0; if(by){hd.dataset.hold="1";scrollBy(0,by)}})});
   // Op de telefoon: scrollen in de lijst sluit het toetsenbord van het zoekveld, zodat de kop weer kan inklappen
   $("#main").addEventListener("touchmove",()=>{const a=document.activeElement; if(a&&a.id==="q") a.blur()},{passive:true});
+})();
+
+/* Snelkoppelingen van het app-icoon (manifest.json): ?snel=vanavond / weekend / plannen */
+(()=>{let q=""; try{q=new URLSearchParams(location.search).get("snel")||""}catch{}
+  if(!q) return;
+  if(q==="vanavond"||q==="weekend"){S.view="tonight";TN.when=q==="weekend"?"weekend":"today"}
+  else if(q==="plannen") S.view="fav";
+  try{history.replaceState(null,"",location.pathname+location.hash)}catch{}
 })();
 
 buildHome(); render();
