@@ -785,7 +785,9 @@ let qt;$("#q").oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{S.q=e.target.valu
     // Pas inklappen als de lijst direct onder de datumrij zou aansluiten; daarboven altijd helemaal tonen
     if(y<(ds.style.display==="none"?hd.offsetHeight:ds.offsetTop)){hd.classList.remove("tuck");lastY=y;return}
     if(y+innerHeight>=document.documentElement.scrollHeight-2&&dy<0){lastY=y;return} // terugveren onderaan telt niet
-    if(dy>6&&!(hd.contains(document.activeElement)&&document.activeElement.matches("input"))){setT();hd.classList.add("tuck")}
+    // Niet tijdens typen in het zoekveld; 'Vanaf' en andere knoppen die wegschuiven verliezen hun focus (anders veranderen pijltjes onzichtbaar de stad)
+    const a=document.activeElement;
+    if(dy>6&&!(hd.contains(a)&&a.matches("input"))){if(hd.contains(a)&&!ds.contains(a)) a.blur(); setT();hd.classList.add("tuck")}
     else if(dy<-6) hd.classList.remove("tuck");
     if(Math.abs(dy)>6) lastY=y};
   addEventListener("scroll",()=>{if(!busy){busy=true;requestAnimationFrame(upd)}},{passive:true});
@@ -798,6 +800,11 @@ let qt;$("#q").oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{S.q=e.target.valu
   let tabOpen=false;
   addEventListener("keydown",e=>{if(e.key==="Tab"&&hd.classList.contains("tuck")){tabOpen=true;hd.style.transition="none";hd.classList.remove("tuck");hd.offsetHeight;requestAnimationFrame(()=>{hd.style.transition="";tabOpen=false})}},true);
   document.addEventListener("focusin",e=>{if(tabOpen&&!hd.contains(e.target)){tabOpen=false;hd.classList.add("tuck")}});
+  // Toetsenbordfocus in de lijst die onder de kop of de tabbalk valt (Shift+Tab): net genoeg bijschuiven, kop blijft zoals hij is
+  const nav=$("nav.tabs");
+  document.addEventListener("focusin",e=>{const t=e.target; if(!t.closest||!t.closest("#main")||!t.matches(":focus-visible")) return;
+    requestAnimationFrame(()=>{const r=t.getBoundingClientRect(), hb=hd.getBoundingClientRect().bottom, nt=nav.getBoundingClientRect().top;
+      const by=r.top<hb?r.top-hb-8:r.bottom>nt?r.bottom-nt+8:0; if(by){hd.dataset.hold="1";scrollBy(0,by)}})});
   // Op de telefoon: scrollen in de lijst sluit het toetsenbord van het zoekveld, zodat de kop weer kan inklappen
   $("#main").addEventListener("touchmove",()=>{const a=document.activeElement; if(a&&a.id==="q") a.blur()},{passive:true});
 })();
