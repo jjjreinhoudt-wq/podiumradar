@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["podiumradar/site/**"]
+    paths: ["podiumradar/site/**", ".github/workflows/update.yml"]
 
 permissions:
   contents: write
@@ -14,7 +14,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: podiumradar
+  # Nieuwe naam: run #35 (6 okt) bleef op 'waiting' hangen en liet zich niet annuleren; in de oude wachtrij 'podiumradar' blokkeerde hij alle runs erachter
+  group: podiumradar-bijwerken
   cancel-in-progress: false
 
 jobs:
