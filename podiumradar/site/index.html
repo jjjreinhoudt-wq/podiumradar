@@ -183,6 +183,11 @@ html:has(#scrim.open){overflow:hidden}
 .sheet.open{transform:none}
 @media (prefers-reduced-motion:reduce){.sheet{transition:none}}
 .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:4px auto 12px}
+/* Sluitbalk bovenaan elk scherm: blijft staan bij scrollen */
+.sheetbar{position:sticky;top:-8px;z-index:3;height:54px;margin:-8px -18px 2px;background:var(--paper);border-radius:24px 24px 0 0}
+.sheetbar .grab{position:absolute;top:12px;left:50%;margin:0;transform:translateX(-50%)}
+.sheetx{position:absolute;left:12px;top:9px;display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 14px 0 11px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-weight:600;font-size:14px;box-shadow:var(--shadow);transition:transform .1s}
+.sheetx:active{transform:scale(.95)}
 .sheet h3{font-size:14px;margin:18px 0 8px;color:var(--muted);font-weight:600}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-size:14px;transition:background .15s,border-color .15s,color .15s}
@@ -340,7 +345,7 @@ select.sel{width:100%;padding:10px;border-radius:10px;border:1px solid var(--lin
 </nav>
 <div class="scrim" id="scrim"></div>
 <section class="sheet" id="filterSheet" aria-label="Filters" role="dialog">
-  <div class="grab"></div>
+  <div class="sheetbar"><button class="sheetx" type="button" data-close><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>Sluiten</button><div class="grab"></div></div>
   <div class="dhead"><strong style="font-size:20px">Filters</strong><button class="btn ghost" style="flex:0" id="resetF">Wissen</button></div>
   <h3>Sorteren</h3><div class="chips" id="fSort"></div>
   <h3>Reistijd vanaf je vertrekpunt</h3><div class="chips" id="fTravel"></div>
