@@ -111,7 +111,7 @@ check("zonder sleutels maar met cache: blijft staan", (pub["found"], len(pub["pe
 pub, _ = nep_run(Nep(), DATA, overrides={kA: ID2, kB: None, kC: "skip"})
 check("override id", pub["found"], {kA: ID2})
 check("override grijs", pub["none"], [kB])
-check("override skip", kC in pub["found"] or kC in pub["none"] or kC in pub["pending"], False)
+check("override skip", (kC in pub["found"] or kC in pub["none"] or kC in pub["pending"], pub["skip"]), (False, [kC]))
 
 # ---- opruimen
 pub, cache = nep_run(Nep(), DATA, cache={"oudeartiest": {"id": ID1, "t": "2024-01-01"}, "recent": {"id": None, "t": "2026-09-01"}})

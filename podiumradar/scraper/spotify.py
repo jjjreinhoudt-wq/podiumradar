@@ -18,8 +18,9 @@ De artiestsleutel is dezelfde als in de app (zie key() in meldingen.py); hij sta
 
 Bestanden:
   scraper/spotify_cache.json  {"v":1,"artists":{sleutel: {"id": id of null, "t": datum van opzoeken}}}
-  site/spotify.json           {"v":1,"updated":datum,"found":{sleutel: id},"none":[sleutel],"pending":[sleutel]}
-                              (alleen artiesten waarbij de app een Spotify-knop toont)
+  site/spotify.json           {"v":1,"updated":datum,"found":{sleutel: id},"none":[sleutel],"pending":[sleutel],"skip":[sleutel]}
+                              (alleen artiesten waarbij de app een Spotify-knop toont; 'pending' is informatief, de app
+                              toont daar een gewone zoeklink; 'skip' = handmatig verborgen via de overrides)
 Opgeslagen wordt alleen het Spotify-id en of het gevonden is, geen namen, plaatjes of andere gegevens.
 
 Gebruik:  python scraper/spotify.py [--max-minuten 15] [--max-verzoeken 2500] [--droog]
@@ -51,7 +52,8 @@ TYPE_OF = {"thea": "thea", "film": "film", "museum": "expo", "festival": "fest"}
 ARTIEST_GENRES = {"Cabaret", "Comedy"}   # de titel is de naam van de cabaretier of comedian
 GEEN_MUZIEK = {"Feest", "Lezing"}
 NOT_MUSIC = re.compile(r"workshop|lezing|cursus|quiz|bingo|borrel|lunch|diner|rondleiding|open dag|proefles|clinic|"
-                       r"filmavond|tentoonstelling|expositie|vergadering|netwerk", re.I)
+                       r"filmavond|tentoonstelling|expositie|vergadering|netwerk|markt|\wbeurs\b|yoga|game night|jam ?sessi(e|on)|"
+                       r"open (mic|podium|stage)|proeverij|proefavond|springkussen|boekenclub|(hedon|nacht) academy", re.I)
 
 
 class Gestopt(Exception):
@@ -223,10 +225,11 @@ def zoek_op(client, naam, slaap=time.sleep):
 
 def publiceer(arts, cache, overrides, vandaag):
     """Maakt de inhoud van site/spotify.json."""
-    found, none, pending = {}, [], []
+    found, none, pending, skip = {}, [], [], []
     for k in sorted(arts):
         o = overrides.get(k, "geen") if isinstance(overrides, dict) else "geen"
         if o == "skip":
+            skip.append(k)
             continue
         if o != "geen":                           # id of null uit de overrides
             if o and ID_RE.match(str(o)):
@@ -241,7 +244,7 @@ def publiceer(arts, cache, overrides, vandaag):
             found[k] = c["id"]
         else:
             none.append(k)
-    return {"v": 1, "updated": vandaag.isoformat(), "found": found, "none": none, "pending": pending}
+    return {"v": 1, "updated": vandaag.isoformat(), "found": found, "none": none, "pending": pending, "skip": skip}
 
 
 def schrijf(pad, obj):
