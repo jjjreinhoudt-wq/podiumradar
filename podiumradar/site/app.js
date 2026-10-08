@@ -549,9 +549,17 @@ function buildFilters(){
   $("#fOnlyFav").checked=S.onlyFav; $("#fOnlyFree").checked=S.onlyFree;
   buildLocList();
 }
-function openSheet(id){$("#scrim").classList.add("open");$(id).classList.add("open")}
-function closeSheets(){$("#scrim").classList.remove("open");document.querySelectorAll(".sheet").forEach(s=>s.classList.remove("open"));
-  if(location.hash) try{history.replaceState(null,"",location.pathname+location.search)}catch{}}
+/* Eén geschiedenisstap per open scherm: de terugknop (of veegbeweging) van de telefoon sluit dan het scherm in plaats van de app */
+let sheetPushed=false, backing=false;
+function openSheet(id){$("#scrim").classList.add("open");$(id).classList.add("open");
+  if(!sheetPushed){try{history.pushState({prSheet:1},"");sheetPushed=true}catch{}}}
+function closeSheets(fromPop){$("#scrim").classList.remove("open");document.querySelectorAll(".sheet").forEach(s=>s.classList.remove("open"));
+  if(sheetPushed){sheetPushed=false; if(fromPop!==true){backing=true; setTimeout(()=>backing=false,1500); try{history.back()}catch{backing=false}}}
+  stripHash()}
+function stripHash(){if(location.hash) try{history.replaceState(null,"",location.pathname+location.search)}catch{}}
+// Alleen opruimen na een terugstap die wij zelf deden of die het scherm sloot; een #-link in een open app moet gewoon het item openen
+window.addEventListener("popstate",()=>{ if(sheetPushed) closeSheets(true); else if(backing){backing=false; stripHash()} });
+document.addEventListener("click",e=>{if(e.target.closest("[data-close]")) closeSheets()});
 $("#openFilters").onclick=()=>{buildFilters();openSheet("#filterSheet")};
 $("#scrim").onclick=closeSheets;
 $("#applyF").onclick=()=>{closeSheets();render()};
@@ -602,7 +610,7 @@ function openDetail(id){
   const tl=sl.length?sl.map(s=>`<div class="slot${s.k==="main"?" key":""}"><time>${hm(s.s)}</time>${s.a?`<strong>${esc(s.a)}</strong> <span class="s">${s.l.toLowerCase()}</span>`:esc(s.l)} ${s.est?'<span class="est">geschat</span>':""}</div>`).join("")
     :`<p class="s">De tijden zijn nog niet bekend bij de bron. Check de pagina van het podium.</p>`;
   const sims=similar(e);
-  $("#detailSheet").innerHTML=`<div class="grab"></div>
+  $("#detailSheet").innerHTML=`<div class="sheetbar"><button class="sheetx" type="button" data-close><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>Sluiten</button><div class="grab"></div></div>
    <div class="dhead"><div><div class="dsub">${range(e)?(e.started?"Nu te zien, ":"")+range(e):dayLabel(e.d)}</div><div class="dtitle">${esc(e.artist)}</div>
      ${e.title!==e.artist?`<div class="dsub">${esc(e.title)}</div>`:""}
      <div class="dsub">${esc(v.name)}, ${esc(v.city)} · <button class="linkbtn" data-openvenue="${esc(vgOf(e.v))}">Alles bij dit podium</button></div></div>
