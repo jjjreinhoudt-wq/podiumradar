@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "7 1 * * *"  # 03:07 NL-zomertijd; niet op een heel of half uur, dan is GitHub druk en start hij uren later
   workflow_dispatch:
+    inputs:
+      alleen_spotify:
+        description: "Alleen Spotify bijwerken (de agenda niet opnieuw ophalen; veel sneller)"
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths: ["podiumradar/site/**", ".github/workflows/update.yml"]
@@ -32,12 +37,24 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r scraper/requirements.txt
-      - run: python -u scraper/scrape.py
+      - name: Agenda ophalen
+        if: ${{ inputs.alleen_spotify != true }}
+        run: python -u scraper/scrape.py
       - name: Meldingen versturen
         # Pushmeldingen via ntfy bij nieuwe shows van gevolgde artiesten/podia; zonder secret NTFY_TOPIC doet dit niets
+        if: ${{ inputs.alleen_spotify != true }}
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python -u scraper/meldingen.py || echo "Meldingen mislukt (agenda is wel bijgewerkt)"
+      - name: Spotify bijwerken
+        # Zoekt per artiest op of die op Spotify staat (scraper/spotify.py). Zonder de secrets SPOTIFY_CLIENT_ID en
+        # SPOTIFY_CLIENT_SECRET doet dit niets nieuws. Een fout hier mag de agenda nooit tegenhouden.
+        env:
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          MAX_MIN: ${{ inputs.alleen_spotify == true && '90' || '15' }}
+          MAX_VERZ: ${{ inputs.alleen_spotify == true && '9000' || '2500' }}
+        run: python -u scraper/spotify.py --max-minuten "$MAX_MIN" --max-verzoeken "$MAX_VERZ" || echo "Spotify mislukt (agenda is wel bijgewerkt)"
       - name: Wijzigingen opslaan
         run: |
           git config user.name "podiumradar-bot"
