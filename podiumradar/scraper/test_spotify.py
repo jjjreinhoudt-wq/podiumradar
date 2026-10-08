@@ -55,7 +55,7 @@ class Nep:
         if self.fout: raise self.fout
         return self.db.get(naam, [])
 
-def nep_run(client, data, cache=None, overrides=None, **kw):
+def nep_run(client, data, cache=None, overrides=None, overrides_raw=None, **kw):
     """Draait run() met tijdelijke bestanden; geeft (spotify.json, cache) terug."""
     with tempfile.TemporaryDirectory() as t:
         t = pathlib.Path(t)
@@ -63,8 +63,13 @@ def nep_run(client, data, cache=None, overrides=None, **kw):
         sp.DATA.write_text(json.dumps(data))
         if cache is not None: sp.CACHE.write_text(json.dumps({"v": 1, "artists": cache}))
         if overrides is not None: sp.OVERRIDES.write_text(json.dumps(overrides))
-        sp.run(client, vandaag=VANDAAG, slaap=lambda s: None, **kw)
-        return (json.loads(sp.OUT.read_text()) if sp.OUT.exists() else None), (json.loads(sp.CACHE.read_text())["artists"] if sp.CACHE.exists() else None)
+        if overrides_raw is not None: sp.OVERRIDES.write_text(overrides_raw)
+        nep_run.rc = sp.run(client, vandaag=VANDAAG, slaap=lambda s: None, **kw)
+        nep_run.tmp = [x.name for x in t.iterdir() if x.name.endswith(".tmp")]
+        pub = json.loads(sp.OUT.read_text()) if sp.OUT.exists() else None
+        if pub is not None:   # 'pending' staat niet in het bestand voor de app; hier afgeleid zodat de tests het kunnen controleren
+            pub["pending"] = sorted(set(sp.artiesten(data)) - set(pub["found"]) - set(pub["none"]) - set(pub["skip"]))
+        return pub, (json.loads(sp.CACHE.read_text())["artists"] if sp.CACHE.exists() else None)
 
 DATA = {"venues": V, "events": [ev("Band A", "Overig", id_="s1"), ev("Band B", "Overig", id_="s2"), ev("Band C", "Overig", id_="s3"), ev("Hamlet", "Toneel", "thea1", "s4")]}
 kA, kB, kC = sp.key("Band A"), sp.key("Band B"), sp.key("Band C")
@@ -143,6 +148,63 @@ for code, js, hdr in [(429, {"reason": "QUOTA_EXCEEDED"}, {"Retry-After": "5"}),
     check(f"{code} {js or hdr}: Gestopt", gestopt, True)
 s = Sessie([Antw(503), Antw(200, {"artists": {"items": []}})])
 check("5xx: opnieuw", sp.Spotify("id", "geheim", s, lambda x: None).zoek("X"), [])
+
+
+# ---- voorstelling - artiest, reeksen, voetbal
+check("'Voorstelling - Artiest' (klassiek): niet opzoeken", sp.eligible(ev("Grip - Rayen Panday", "Klassiek", "thea1"), V["thea1"]), False)
+check("  ...maar wel een knop (zoeklink)", sp.basis(ev("Beethoven - Pavel Haas Quartet", "Klassiek"), V["pop1"]), True)
+check("pop 'Band - Zaal' wel opzoeken", sp.eligible(ev("Band X - Live", "Overig"), V["pop1"]), True)
+check("reeks (Comedy Tunes) geen artiest", sp.eligible(ev("Comedy Tunes", "Comedy", "thea1"), V["thea1"]), False)
+check("cabaretier wel", sp.eligible(ev("Hans Teeuwen", "Cabaret", "thea1"), V["thea1"]), True)
+check("voetbal (Ajax - NEC) geen knop", sp.basis(ev("Ajax - N.E.C.", "Overig"), V["pop1"]), False)
+check("masterclass geen knop", sp.basis(ev("Masterclass", "Klassiek"), V["pop1"]), False)
+
+# ---- 'Reeks: Artiest': beide kanten, alleen bij precies één treffer
+def kant(db): return sp.zoek_op(Nep(db), "Discover: Ronker", lambda x: None)
+check("dubbele punt: alleen artiest bestaat", kant({"Ronker": [{"id": ID1, "name": "Ronker"}]}), ID1)
+check("dubbele punt: alleen reeks bestaat", kant({"Discover": [{"id": ID2, "name": "Discover"}]}), ID2)
+check("dubbele punt: allebei bestaan -> grijs", kant({"Ronker": [{"id": ID1, "name": "Ronker"}], "Discover": [{"id": ID2, "name": "Discover"}]}), None)
+nep = Nep({"Discover: Ronker": [{"id": ID3, "name": "Discover: Ronker"}], "Ronker": [{"id": ID1, "name": "Ronker"}]})
+check("hele naam wint van de delen", (sp.zoek_op(nep, "Discover: Ronker", lambda x: None), nep.vragen), (ID3, ["Discover: Ronker"]))
+
+# ---- programma-achtige namen worden nooit grijs
+D2 = {"venues": V, "events": [ev("Bill Stewart Trio ft. Larry Grenadier", "Overig", id_="s1"), ev("Gewone Band", "Overig", id_="s2")]}
+pub, _ = nep_run(Nep(), D2)
+check("ft.-naam: zoeklink in plaats van grijs", (sp.key("Bill Stewart Trio ft. Larry Grenadier") in pub["pending"], sp.key("Gewone Band") in pub["none"]), (True, True))
+
+# ---- overrides
+pub, _ = nep_run(Nep(), DATA, overrides_raw='{"Band A": " Skip ", "bandb": null,}')
+check("ongeldige overrides: niets gepubliceerd, rc 1", (pub, nep_run.rc), (None, 1))
+pub, _ = nep_run(Nep(), DATA, overrides_raw='{"Band A": " Skip "}')
+check("overrides: leesbare naam en hoofdletters", pub["skip"], [kA])
+
+# ---- atomisch schrijven en corrupte cache
+pub, _ = nep_run(Nep(), DATA)
+check("geen .tmp-bestand achtergebleven", nep_run.tmp, [])
+import io, contextlib
+with tempfile.TemporaryDirectory() as t:
+    t = pathlib.Path(t); (t / "c.json").write_text('{"v":1,"artists":{"ban')
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf): res = sp.laad(t / "c.json", {})
+    check("corrupte cache: melding en leeg", (res, "onleesbaar" in buf.getvalue()), ({}, True))
+
+# ---- tijdbudget
+class Sessie2(Sessie):
+    pass
+c = sp.Spotify("id", "geheim", Sessie([Antw(200, {"artists": {"items": []}})]), lambda x: None)
+c.deadline = 0.0   # al verstreken
+try:
+    c.zoek("X"); b = False
+except sp.Gestopt:
+    b = True
+check("deadline verstreken: Gestopt", b, True)
+c = sp.Spotify("id", "geheim", Sessie([Antw(429, headers={"Retry-After": "60"})]), lambda x: None)
+c.deadline = __import__("time").monotonic() + 10
+try:
+    c.zoek("X"); b = False
+except sp.Gestopt:
+    b = True
+check("wachten voorbij de deadline: Gestopt", b, True)
 
 print("\n" + ("ALLES GOED" if not fouten else f"{fouten} FOUT(EN)"))
 sys.exit(1 if fouten else 0)

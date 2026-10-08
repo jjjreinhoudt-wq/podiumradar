@@ -47,6 +47,8 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python -u scraper/meldingen.py || echo "Meldingen mislukt (agenda is wel bijgewerkt)"
       - name: Spotify bijwerken
+        timeout-minutes: 100
+        continue-on-error: true
         # Zoekt per artiest op of die op Spotify staat (scraper/spotify.py). Zonder de secrets SPOTIFY_CLIENT_ID en
         # SPOTIFY_CLIENT_SECRET doet dit niets nieuws. Een fout hier mag de agenda nooit tegenhouden.
         env:

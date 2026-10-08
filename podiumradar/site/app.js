@@ -59,7 +59,7 @@ const recent=e=>e.firstSeen&&(today-new Date(e.firstSeen))/864e5<=3;
 const FOLD={"ø":"o","đ":"d","ł":"l","ı":"i","æ":"ae","œ":"oe","ß":"ss","ð":"d","þ":"th"};
 const norm=s=>String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f\u00ad\u200b-\u200d\ufeff]/g,"").replace(/[øđłıæœßðþ]/g,c=>FOLD[c]).replace(/[\u2018\u2019\u02bc`\u00b4]/g,"'").replace(/[\u201c\u201d\u201e]/g,'"');
 // Zoeken op de bekende schrijfwijze van een plaats ("den bosch" vindt 's-Hertogenbosch)
-const CITY_AKA=c=>/hertogenbosch/i.test(c)?"den bosch":/^den haag$/i.test(c)?"s-gravenhage":"";
+const CITY_AKA=c=>/hertogenbosch/i.test(c)?"den bosch":/^den haag$/i.test(c)?"s-gravenhage 's-gravenhage":"";
 const artistKey=n=>n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
 EV.forEach(e=>{e.ak=artistKey(e.artist); if(e.time==null&&e.times) e.time=e.times[0].s;
   const v=V[e.v]; e.hay=norm([e.title,v.name,v.city,CITY_AKA(v.city),e.genre,e.support.join(" ")].join(" "));
@@ -87,8 +87,9 @@ pruneGo();
 // Verplaatst of hernoemd item (nieuw id): het plan koppelt aan hetzelfde item op dezelfde dag en hetzelfde podium
 function migrateGo(){let ch=false; Object.keys(GO).forEach(id=>{const g=GO[id]; if(BYID.has(id)) return;
   const c=EV.filter(e=>e.rawDate===g.d&&V[e.v].name+", "+V[e.v].city===g.v&&norm(e.artist)===norm(g.t||"")&&!GO[e.id]);
-  const e=c.find(x=>x.time===g.tm)||(c.length===1?c[0]:null);   // films: zelfde titel en dag, dus liefst dezelfde tijd
-  if(e){g.t=e.artist; GO[e.id]=g; delete GO[id]; ch=true}}); if(ch) store.set("pr_going",GO)}
+  const near=x=>g.tm==null||x.time==null||Math.abs(x.time-g.tm)<=30;
+  const e=c.find(x=>x.time===g.tm)||(c.length===1&&near(c[0])?c[0]:null);   // films: zelfde titel en dag, dus liefst dezelfde tijd
+  if(e){g.t=e.artist; g.tm=e.time; GO[e.id]=g; delete GO[id]; ch=true}}); if(ch) store.set("pr_going",GO)}
 migrateGo();
 function toggleGoing(e){
   if(GO[e.id]){delete GO[e.id]; toast("Uit je plannen gehaald")}
@@ -213,6 +214,8 @@ function similar(e,n=4){
 }
 
 /* ---------- RENDER ---------- */
+// Gemarkeerde datum in het midden van de rij zetten (na wisselen van weergave of kiezen in de Kalender)
+const showDay=()=>{const dp=$('#dates .day[aria-pressed="true"]:not(.all)'), dd=$("#dates"); if(dp&&dd.offsetParent){const a=dp.getBoundingClientRect(), b=dd.getBoundingClientRect(); if(a.left<b.left||a.right>b.right) dd.scrollLeft+=a.left-b.left-(dd.clientWidth-dp.offsetWidth)/2}};
 let dayHold=null;   // Blokkenschema: dag die een zoekopdracht even wegdrukte
 function renderDates(){
   const toks=qTokens(), all=S.view==="list"&&S.q.trim()&&S.qAll;
@@ -323,7 +326,7 @@ function viewCal(){
     cells+=`<button class="calday h${hb}${d===0?" today":""}" data-calday="${d}" ${d<0||!c?"disabled":""} aria-label="${dayLabel(d)}: ${c} ${LBL[S.type][c===1?0:1]}"><span>${i+1}</span><small>${c||""}</small></button>`}
   return h+`<div class="calnav"><button data-calnav="-1" aria-label="Vorige maand" ${k<=cur?"disabled":""}>‹</button><h2>${title}</h2><button data-calnav="1" aria-label="Volgende maand" ${k>=lastKey?"disabled":""}>›</button></div>
     <div class="calgrid" role="group" aria-label="${title}">${["ma","di","wo","do","vr","za","zo"].map(w=>`<span class="calwd">${w}</span>`).join("")}${cells}</div>
-    <p class="s" style="margin-top:12px">${nf(total)} ${LBL[S.type][total===1?0:1]} in ${monthLabel(k)}${hidNote()}</p>`;
+    <div class="meta" style="margin-top:2px"><span>${nf(total)} ${LBL[S.type][total===1?0:1]} in ${monthLabel(k)}${hidNote()}</span></div>`;
 }
 /* Net toegevoegd: wat de afgelopen 7 dagen voor het eerst op de agenda kwam, per dag */
 function viewNew(){
@@ -513,7 +516,7 @@ function viewFav(){
 const VKIND={pop:"Poppodium",concert:"Concertzaal",arena:"Arena",cafe:"Café",thea:"Theater",film:"Bioscoop / filmhuis",museum:"Museum",festival:"Festival"};
 const VGROUPS=[{k:"",l:"Alles"},{k:"muz",l:"Muziek",t:["pop","concert","arena","cafe"]},{k:"thea",l:"Theater",t:["thea"]},{k:"film",l:"Film",t:["film"]},{k:"museum",l:"Musea",t:["museum"]},{k:"festival",l:"Festivals",t:["festival"]}];
 const VG=(()=>{const m={}; EV.forEach(e=>{const v=V[e.v]; const k=(v.name+"|"+v.city).toLowerCase();
-  const g=m[k]||(m[k]={key:k,name:v.name,city:v.city,type:v.type,ids:new Set(),n:0,next:null,hay:norm(v.name+" "+v.city)}); g.ids.add(e.v); g.n++;
+  const g=m[k]||(m[k]={key:k,name:v.name,city:v.city,type:v.type,ids:new Set(),n:0,next:null,hay:norm(v.name+" "+v.city+" "+CITY_AKA(v.city))}); g.ids.add(e.v); g.n++;
   if(!g.next||e.d<g.next.d) g.next=e}); return Object.values(m)})();
 const vgOf=vid=>{const v=V[vid]; return (v.name+"|"+v.city).toLowerCase()};
 const VCOL={pop:"pop",concert:"pop",arena:"pop",cafe:"pop",thea:"thea",film:"film",museum:"expo",festival:"fest"};
@@ -743,27 +746,37 @@ const ICO={pin:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stro
   cal:'<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
   spark:'<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM18 16l.8 2.2L21 19l-2.2.8L18 22l-.8-2.2L15 19l2.2-.8z"/></svg>'};
 const mapUrl=v=>v.lat!=null&&v.lon!=null?`https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lon}`:"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(v.name+", "+v.city);
-const NOT_MUSIC=/workshop|lezing|cursus|quiz|bingo|borrel|lunch|diner|rondleiding|open dag|proefles|clinic|filmavond|tentoonstelling|expositie|vergadering|netwerk|markt|\wbeurs\b|yoga|game night|jam ?sessi(e|on)|open (mic|podium|stage)|proeverij|proefavond|springkussen|boekenclub|(hedon|nacht) academy/i;
-const listenOk=e=>e.type==="pop"&&!e.isFest&&e.genre!=="Feest"&&!!e.artist&&!NOT_MUSIC.test(e.title);
+const NOT_MUSIC=/workshop|lezing|cursus|quiz|bingo|borrel|lunch|diner|rondleiding|open dag|proefles|clinic|filmavond|tentoonstelling|expositie|vergadering|netwerk|markt|\wbeurs\b|yoga|game night|jam ?sessi(e|on)|open (mic|podium|stage)|proeverij|proefavond|springkussen|boekenclub|(hedon|nacht) academy|publieke tribune|masterclass|^(ajax|vitesse)\s+-\s/i;
 /* Spotify: scraper/spotify.py zoekt 's nachts per artiest op of die op Spotify staat (site/spotify.json:
-   found = id, none = niet gevonden, pending = nog niet gezocht). Per event dus:
+   found = id, none = niet gevonden, skip = handmatig verborgen). Per event dus:
    link = direct naar de artiest, none = grijze knop, search = zoeklink, skip = geen Spotify-knop.
-   Ontbreekt het bestand (nog geen sleutels ingesteld), dan blijft het een zoeklink bij concerten. */
+   Zonder bestand (nog geen sleutels ingesteld) blijft het een zoeklink. De regels hieronder zijn dezelfde als basis() en
+   eligible() in scraper/spotify.py (NOT_MUSIC, SERIE en de genres staan op twee plaatsen!). */
+// Titel 'Voorstelling - Artiest' (klassiek, cabaret, comedy, tribute): het deel voor het streepje is meestal de voorstelling, dus geen artiest
+const showFirst=e=>/ - /.test(e.title)&&["Klassiek","Cabaret","Comedy","Tribute"].includes(e.genre);
+const SERIE=/comedy|cabaret|stand-?up|try-?out|conferen|caf[eé]\b|\bclub\b|night|train\b|kwis/i;   // reeksen en avonden, geen artiest (alleen bij cabaret/comedy)
+const isCab=e=>e.genre==="Cabaret"||e.genre==="Comedy";
+const spotBase=e=>!!e.artist&&!e.isFest&&e.type!=="film"&&e.type!=="expo"&&e.type!=="fest"&&!NOT_MUSIC.test(e.title)&&(isCab(e)||(e.type==="pop"&&e.genre!=="Feest"&&e.genre!=="Lezing"));
 let SPOT=null, lastDetail=null;
-const linkName=e=>String(e.artist).split(" ✦ ")[0].replace(/\\/g,"").trim();   // zonder datum/zaal-ruis en rare tekens
 const SPOT_ID=/^[A-Za-z0-9]{22}$/;
+// Zoeknaam voor de links: zonder 'datum ✦ zaal'-ruis en backslashes; bij 'Voorstelling - Artiest' de hele titel
+const linkName=e=>String(showFirst(e)?e.title:e.artist).split(" ✦ ")[0].replace(/\\/g,"").trim();
+const linkRow=e=>`<a class="btn ghost" href="${esc(mapUrl(V[e.v]))}" target="_blank" rel="noopener noreferrer">${ICO.pin}Route</a>${spotBtn(e)}${ytBtn(e)}`;
 fetch("spotify.json",{cache:"no-cache"}).then(r=>r.ok?r.json():null).then(j=>{
   if(!j||j.v!==1||!j.found||typeof j.found!=="object") return;
-  SPOT={found:new Map(Object.entries(j.found)),none:new Set(Array.isArray(j.none)?j.none:[]),skip:new Set(Array.isArray(j.skip)?j.skip:[])};
-  if(lastDetail&&$("#detailSheet").classList.contains("open")) openDetail(lastDetail.id,lastDetail.o);   // scherm stond al open: knoppen bijwerken
+  SPOT={found:new Map(Object.entries(j.found).filter(([,v])=>typeof v==="string"&&SPOT_ID.test(v))),none:new Set(Array.isArray(j.none)?j.none:[]),skip:new Set(Array.isArray(j.skip)?j.skip:[])};
+  // Detailscherm stond al open: alleen de knoppenrij bijwerken (scrollstand en focus blijven)
+  const d=lastDetail&&BYID.get(lastDetail.id), r=$("#linkRow");
+  if(d&&r&&$("#detailSheet").classList.contains("open")){const h=linkRow(d); if(h!==lastDetail.row){r.innerHTML=h; lastDetail.row=h}}
 }).catch(()=>{});
-// Heeft dit event een artiest met een Spotify-knop? (zelfde regel als eligible() in scraper/spotify.py: dezelfde naam kan ook bij een film of toneelstuk staan)
-const spotElig=e=>!!e.artist&&!e.isFest&&e.type!=="film"&&e.type!=="expo"&&e.type!=="fest"&&(e.genre==="Cabaret"||e.genre==="Comedy"||(e.type==="pop"&&e.genre!=="Feest"&&e.genre!=="Lezing"&&!NOT_MUSIC.test(e.title)));
 function spotState(e){
-  if(!SPOT) return listenOk(e)?{k:"search"}:{k:"skip"};
-  if(!spotElig(e)||SPOT.skip.has(e.ak)) return {k:"skip"};
+  if(!spotBase(e)) return {k:"skip"};
+  if(showFirst(e)) return {k:"search"};                       // de titel is de voorstelling: geen artiest opzoeken
+  if(isCab(e)&&SERIE.test(e.artist)) return {k:"skip"};       // reeks of avond, geen artiest
+  if(!SPOT) return {k:"search"};
+  if(SPOT.skip.has(e.ak)) return {k:"skip"};
   const id=SPOT.found.get(e.ak);
-  if(id&&SPOT_ID.test(id)) return {k:"link",id};
+  if(id) return {k:"link",id};
   return SPOT.none.has(e.ak)?{k:"none"}:{k:"search"};   // nog niet opgezocht of niet in het bestand: gewone zoeklink
 }
 function spotBtn(e){
@@ -796,7 +809,7 @@ function openDetail(id,o={}){
    <div class="timeline">${tl}</div>
    <div class="row2"><a class="btn" href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">Info en kaarten bij ${esc(V[e.v].name)}</a></div>
    <div class="row2" style="margin-top:10px"><button class="btn ghost go" id="goBtn" type="button" aria-pressed="${going}">${going?"✓ Ik ga":"Ik ga"}</button>${o.surprise?`<button class="btn ghost" id="surpBtn" type="button">${ICO.dice}Nog een verrassing</button>`:""}</div>
-   <div class="row2 wrapr" style="margin-top:10px"><a class="btn ghost" href="${esc(mapUrl(v))}" target="_blank" rel="noopener noreferrer">${ICO.pin}Route</a>${spotBtn(e)}${ytBtn(e)}</div>
+   <div class="row2 wrapr" id="linkRow" style="margin-top:10px">${linkRow(e)}</div>
    <div class="row2" style="margin-top:10px">${e.time!=null?`<button class="btn ghost" id="icsBtn">Zet in agenda</button><a class="btn ghost" id="gcal" target="_blank" rel="noopener">Google Agenda</a>`:`<p class="s">Agenda-knop verschijnt zodra de tijd bekend is.</p>`}</div>
    <div class="row2" style="margin-top:10px"><button class="btn ghost" id="shareBtn" type="button">Delen</button><a class="btn ghost" href="${esc(issueUrl(e))}" target="_blank" rel="noopener noreferrer">Klopt niet?</a></div>
    <p class="note">Gegevens van ${SNAPSHOT}, overgenomen van de site van ${esc(V[e.v].name)}. Tijden, prijzen en beschikbaarheid kunnen veranderen: kijk altijd op die site voordat je gaat of kaarten koopt.</p>
@@ -804,6 +817,7 @@ function openDetail(id,o={}){
    <div class="simlist">${sims.length?sims.map(o=>`<div class="ev" role="button" tabindex="0" data-ev="${o.id}"><div><div class="a">${esc(o.artist)}</div><div class="v">${short(o)}, ${esc(V[o.v].name)} ${travel(o.v).car!=null?"(± "+travel(o.v).car+" min)":""}</div></div><button class="star" data-fav="${o.ak}" data-name="${esc(o.artist)}" aria-pressed="${S.fav.has(o.ak)}" aria-label="Volg ${esc(o.artist)}">★</button></div>`).join(""):'<p class="s">Geen genre-match in de huidige agenda.</p>'}</div>
    <div class="ai" id="simAI" hidden><strong>Wie lijkt hierop?</strong><p>Claude noemt vergelijkbare artiesten en checkt of die in de agenda staan.</p><button class="btn" id="askSim">Vraag Claude</button><div id="simOut"></div></div>`;
   if(e.time!=null){ $("#gcal").href=gcalUrl(e); $("#icsBtn").onclick=()=>saveIcs(e); }
+  lastDetail.row=linkRow(e);
   $("#shareBtn").onclick=()=>share(e);
   $("#goBtn").onclick=ev=>{toggleGoing(e); const on=!!GO[e.id], b=ev.currentTarget; b.setAttribute("aria-pressed",on); b.textContent=on?"✓ Ik ga":"Ik ga"};
   if(o.surprise) $("#surpBtn").onclick=()=>surprise(true);
@@ -915,7 +929,7 @@ document.addEventListener("click",e=>{
     if(z==="in") zoomBy(1/1.6); else if(z==="out") zoomBy(1.6);
     else if(z==="home"){const [x,y]=proj(S.homeXY[0],S.homeXY[1]); zoomTo(x,y,NL.w/4)} else {MAPV.vb=[0,0,NL.w,NL.h]; applyView()}
     return}
-  const go=e.target.closest("[data-view-go]"); if(go){if(go.classList.contains("tncta")) TN.when="today"; if(go.dataset.viewGo==="cal"&&S.month) S.calMonth=S.month; S.view=go.dataset.viewGo; render(); try{window.scrollTo(0,0)}catch{}; return}
+  const go=e.target.closest("[data-view-go]"); if(go){if(go.classList.contains("tncta")) TN.when="today"; if(go.dataset.viewGo==="cal"){ if(S.month) S.calMonth=S.month; else if(S.day>=0) S.calMonth=mKey(dateOf(S.day)) } S.view=go.dataset.viewGo; render(); try{window.scrollTo(0,0)}catch{} showDay(); return}
   const tw=e.target.closest("[data-tn-when]"); if(tw){TN.when=tw.dataset.tnWhen; render(); return}
   const tm=e.target.closest("[data-tn-max]"); if(tm){TN.max=+tm.dataset.tnMax; store.set("pr_tnmax",TN.max); render(); return}
   const tk=e.target.closest("[data-tn-kind]"); if(tk){const k=tk.dataset.tnKind; TN.kinds.has(k)?TN.kinds.delete(k):TN.kinds.add(k); if(!TN.kinds.size) TN.kinds.add(k); render(); return}
@@ -935,7 +949,7 @@ document.addEventListener("click",e=>{
   const cn=e.target.closest("[data-calnav]"); if(cn){const kb=cn.matches(":focus-visible"), dir=cn.dataset.calnav, [cy,cm]=(S.calMonth||mKey(today)).split("-").map(Number); S.calMonth=mKey(new Date(cy,cm-1+(+dir),1)); render();
     if(kb){const c=document.querySelector(`[data-calnav="${dir}"]:not([disabled])`)||document.querySelector("[data-calnav]:not([disabled])"); if(c) c.focus({preventScroll:true})} return}
   const cd=e.target.closest("[data-calday]"); if(cd){S.day=+cd.dataset.calday;S.month="";S.view="list";if(S.q.trim())S.qAll=false;render();try{window.scrollTo(0,0)}catch{}
-    const dp=$('#dates .day[aria-pressed="true"]:not(.all)'), dd=$("#dates"); if(dp) dd.scrollLeft+=dp.getBoundingClientRect().left-dd.getBoundingClientRect().left-(dd.clientWidth-dp.offsetWidth)/2; return}
+    showDay(); return}
   const qa=e.target.closest("[data-qall]"); if(qa){const kb=qa.matches(":focus-visible"), v=qa.dataset.qall; S.qAll=v==="1"; render(); if(kb){const c=document.querySelector(`.scope [data-qall="${v}"]`); if(c) c.focus({preventScroll:true})} return}
   const qb=e.target.closest("[data-qtab]"); if(qb){S.type=qb.dataset.qtab;S.qAll=false;render();try{window.scrollTo(0,0)}catch{};return}
   const mo=e.target.closest("[data-month]"); if(mo){const top=mo.hasAttribute("data-month-top"), kb=mo.matches(":focus-visible"); S.month=mo.dataset.month;S.day=-1;render();if(top){try{window.scrollTo(0,0)}catch{}}
@@ -945,7 +959,7 @@ document.addEventListener("click",e=>{
   const vb=e.target.closest("[data-vback]"); if(vb){S.venuePage=null;render();try{window.scrollTo(0,0)}catch{};return}
   const ov=e.target.closest("[data-openvenue]"); if(ov){closeSheets();S.view="venues";S.venuePage=ov.dataset.openvenue;S.q="";$("#q").value="";render();try{window.scrollTo(0,0)}catch{};return}
   const vn=e.target.closest("[data-venue]"); if(vn){S.view="venues";S.venuePage=vn.dataset.venue;render();try{window.scrollTo(0,0)}catch{};return}
-  const t=e.target.closest("nav.tabs button"); if(t){S.view=t.dataset.view;if(t.dataset.view==="venues")S.venuePage=null;render();try{window.scrollTo(0,0)}catch{};return}
+  const t=e.target.closest("nav.tabs button"); if(t){S.view=t.dataset.view;if(t.dataset.view==="venues")S.venuePage=null;render();try{window.scrollTo(0,0)}catch{} showDay();return}
   if(e.target.id==="tnClearQ"){S.q="";$("#q").value="";render();return}
   if(e.target.id==="showHidden"){S.hideC.clear();S.hideV.clear();saveHidden();render();return}
   if(e.target.id==="clearAll"||e.target.id==="clearAll2"){resetFilters();S.q="";$("#q").value="";if(S.view!=="grid"){S.day=-1;S.month=""}render()}
