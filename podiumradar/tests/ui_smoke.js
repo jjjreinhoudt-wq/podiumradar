@@ -18,6 +18,10 @@ const server = http.createServer((req, res) => {
 let fouten = 0;
 const check = (naam, ok, extra) => { if (!ok) fouten++; console.log((ok ? 'ok   ' : 'FOUT ') + naam + (ok || extra === undefined ? '' : ' -> ' + JSON.stringify(extra))); };
 const real = JSON.parse(fs.readFileSync(path.join(SITE, 'data.json'), 'utf8'));
+const nlMs = s => { const m = s.match(/^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d)/); const g = Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5]);
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Amsterdam', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(g)).map(x => [x.type, x.value]));
+  return g - (Date.UTC(+p.year, p.month - 1, +p.day, +p.hour, +p.minute) - g); };
+const UPD = nlMs(real.updated);
 
 (async () => {
   await new Promise(r => server.listen(0, '127.0.0.1', r));
@@ -34,12 +38,12 @@ const real = JSON.parse(fs.readFileSync(path.join(SITE, 'data.json'), 'utf8'));
   const start = async p => { await p.goto(BASE + 'index.html'); await p.waitForSelector('.ev', { timeout: 20000 }); };
 
   // 1. opstarten
-  let p = await newPage(); await start(p);
+  let p = await newPage(); await p.clock.install({ time: new Date(UPD + 3600e3) }); await start(p);
   check('opstarten zonder fouten', p.errs.length === 0, p.errs);
   check('geen verzoeken naar andere sites', p.ext.length === 0, p.ext);
   check('kaarten getoond', (await p.locator('#main .ev').count()) > 5);
   check('noindex in index.html', (await p.locator('meta[name=robots]').getAttribute('content')) === 'noindex, nofollow');
-  check('geen waarschuwing bij verse data', (await p.locator('.stale').count()) === 0 || real.updated < '2000');
+  check('geen waarschuwing bij verse data', (await p.locator('.stale').count()) === 0);
 
   // 2. tabbladen en zoeken
   for (const t of ['thea', 'film', 'expo', 'fest', 'kids', 'pop']) { await p.click(`.seg [data-type="${t}"]`); await p.waitForTimeout(120); }
@@ -73,9 +77,21 @@ const real = JSON.parse(fs.readFileSync(path.join(SITE, 'data.json'), 'utf8'));
   await p.context().close();
 
   // 4. verouderde data geeft een waarschuwing
-  const upd = new Date(+real.updated.slice(0, 4), +real.updated.slice(5, 7) - 1, +real.updated.slice(8, 10), +real.updated.slice(11, 13), +real.updated.slice(14, 16));
-  p = await newPage(); await p.clock.install({ time: new Date(upd.getTime() + 3 * 864e5) }); await start(p);
+  p = await newPage(); await p.clock.install({ time: new Date(UPD + 3 * 864e5) }); await start(p);
   check('waarschuwing bij data van 3 dagen oud', (await p.locator('.stale').count()) === 1 && /niet bijgewerkt/.test(await p.locator('.stale').innerText()));
+  await p.context().close();
+  // 4b. de tijd in data.json is Nederlandse tijd: ook in een andere tijdzone geldt 36 uur
+  for (const [tz, uren, verwacht] of [['Asia/Tokyo', 34, 0], ['Asia/Tokyo', 37, 1], ['America/New_York', 34, 0], ['America/New_York', 37, 1]]) {
+    p = await newPage({ timezoneId: tz }); await p.clock.install({ time: new Date(UPD + uren * 3600e3) }); await start(p);
+    check(`waarschuwing na ${uren} uur in ${tz}: ${verwacht ? 'ja' : 'nee'}`, (await p.locator('.stale').count()) === verwacht);
+    await p.context().close();
+  }
+  // 4c. 'nieuw sinds je laatste bezoek' werkt: ids uit pr_seen halen en herladen geeft de melding
+  p = await newPage(); await p.clock.install({ time: new Date(UPD + 3600e3) }); await start(p);
+  await p.evaluate(() => { const s = JSON.parse(localStorage.getItem('pr_seen')); localStorage.setItem('pr_seen', JSON.stringify(s.slice(5))); });
+  await p.click('nav.tabs [data-view="fav"]'); await p.waitForTimeout(100);
+  await p.reload(); await p.waitForSelector('.ev'); await p.click('nav.tabs [data-view="fav"]'); await p.waitForTimeout(200);
+  check('nieuw sinds je laatste bezoek: melding bij 5 onbekende shows', /5 nieuwe shows sinds je laatste bezoek/.test(await p.locator('#main').innerText()));
   await p.context().close();
 
   // 5. kapotte rijen en kwaadaardige velden: de app blijft werken en voert niets uit
@@ -88,6 +104,20 @@ const real = JSON.parse(fs.readFileSync(path.join(SITE, 'data.json'), 'utf8'));
   check('kapotte rijen: app toont toch kaarten', (await p.locator('#main .ev').count()) > 5, p.errs);
   check('kwaadaardige velden voeren niets uit', !(await p.evaluate(() => window.__x)) && (await p.locator('img[src="x"], svg[onload]').count()) === 0);
   await p.context().close(); dataOverride = null;
+
+  dataOverride = null; const slecht = [null, { updated: real.updated, venues: {}, events: 'geen lijst' }];
+  for (const x of slecht) { dataOverride = x === null ? { updated: null } : x; p = await newPage(); await p.goto(BASE + 'index.html'); await p.waitForTimeout(1200);
+    check('kapotte data.json: foutmelding in plaats van eeuwig laden', /kon niet (starten|laden|gelezen)/.test(await p.locator('#main').innerText()), await p.locator('#main').innerText()); await p.context().close(); }
+  dataOverride = null;
+
+  // 5c. offline na het eerste bezoek: de agenda komt uit de bewaarde kopie
+  p = await newPage(); await p.clock.install({ time: new Date(UPD + 3600e3) }); await start(p);
+  await p.evaluate(() => navigator.serviceWorker && navigator.serviceWorker.ready); 
+  for (let i = 0; i < 30 && !(await p.evaluate(async () => !!(await caches.match('data.json')))); i++) await p.waitForTimeout(200);
+  check('eerste bezoek: data.json staat in de offline-kopie', await p.evaluate(async () => !!(await caches.match('data.json'))));
+  await p.context().setOffline(true); await p.reload(); await p.waitForSelector('.ev', { timeout: 15000 }).catch(() => {});
+  check('offline na het eerste bezoek: agenda wordt getoond', (await p.locator('#main .ev').count()) > 5);
+  await p.context().close();
 
   // 6. kapotte opgeslagen gegevens
   p = await newPage();

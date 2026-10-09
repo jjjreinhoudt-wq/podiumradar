@@ -55,9 +55,11 @@ let BAD=0;
     dur:r.dur||null,kids:!!r.kids||isKids(r.title,r.genre),endD,endDate:r.end?new Date(...r.end.split("-").map((x,i)=>i===1?x-1:+x)):null,started,
     rawDate:r.date, price:priceOf(r.price), times:timesOf(r.times)});
 }catch(err){BAD++} });   // een rij die niet te lezen is wordt overgeslagen
+if(!EV.length){ document.querySelector("#main").innerHTML='<div class="empty"><strong>De agenda is leeg of kon niet gelezen worden</strong>Ververs de pagina. Blijft het zo, laat het weten aan degene die je de link gaf.</div>'; return }
 const SNAPSHOT=(()=>{try{const [dpart,t]=DATA.updated.split(" ");const [y,m,d]=dpart.split("-").map(Number);return d+" "+["januari","februari","maart","april","mei","juni","juli","augustus","september","oktober","november","december"][m-1]+" om "+t}catch{return "onbekend"}})();
 // Hoe oud is de agenda? (data.json: "JJJJ-MM-DD UU:MM", Nederlandse tijd) Na 36 uur staat er een waarschuwing boven de lijst
-const AGE_H=(()=>{const m=String(DATA.updated).match(/^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d)/);return m?(Date.now()-new Date(+m[1],m[2]-1,+m[3],+m[4],+m[5]))/36e5:0})();
+const nlMs=(y,mo,d,h,mi)=>{const g=Date.UTC(y,mo-1,d,h,mi); try{const p=Object.fromEntries(new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Amsterdam",hourCycle:"h23",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}).formatToParts(new Date(g)).map(x=>[x.type,x.value])); return g-(Date.UTC(+p.year,p.month-1,+p.day,+p.hour,+p.minute)-g)}catch{return new Date(y,mo-1,d,h,mi).getTime()}};   // klokkijd in Nederland -> echt tijdstip
+const AGE_H=(()=>{const m=String(DATA.updated).match(/^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d)/);return m?(Date.now()-nlMs(+m[1],+m[2],+m[3],+m[4],+m[5]))/36e5:0})();
 const staleBanner=()=>AGE_H>36?`<div class="stale" role="status"><strong>De agenda is niet bijgewerkt sinds ${SNAPSHOT}.</strong> Tijden kunnen verouderd zijn: kijk voor de zekerheid bij het podium.</div>`:"";
 const recent=e=>e.firstSeen&&(today-new Date(e.firstSeen))/864e5<=3;
 // Zoeken: zonder hoofdletters/accenten, alle woorden moeten voorkomen ("amity 013" vindt The Amity Affliction bij 013)
@@ -81,7 +83,7 @@ function travel(vid){const v=V[vid], h=S.homeXY; if(v.lat==null) return {car:nul
   return {car:Math.round(k*1.2/90*60+10), ov:Math.round(k*1.2/70*60+15), k}}
 
 /* ---------- STATE ---------- */
-const store={get(k,f){try{const v=localStorage.getItem(k);if(!v) return f;const p=JSON.parse(v);return p===null||typeof p!==typeof f||Array.isArray(p)!==Array.isArray(f)?f:p}catch{return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+const store={get(k,f){try{const v=localStorage.getItem(k);if(!v) return f;const p=JSON.parse(v);return p===null||(f!==null&&(typeof p!==typeof f||Array.isArray(p)!==Array.isArray(f)))?f:p}catch{return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 const S={type:"pop",view:"list",day:-1,month:"",calMonth:"",q:"",qAll:true,sort:"date",regio:new Set(),venue:"",genre:new Set(),time:"",maxTravel:0,onlyFav:false,
   fav:new Set(store.get("pr_fav2",[])), favV:new Set(store.get("pr_favv",[])), onlyFree:false, vmode:store.get("pr_vmode","list")==="map"?"map":"list", alarms:store.get("pr_alarms",[]), home:store.get("pr_home","Tilburg"), homeXY:null,
   // Uitgevinkte steden en podia (blijven bewaard): niets van tonen
@@ -1011,7 +1013,7 @@ let qt;$("#q").oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{S.q=e.target.valu
   try{history.replaceState(null,"",location.pathname+location.hash)}catch{}
 })();
 
-buildHome(); render();
+buildHome(); render(); document.body.dataset.ready="1";
 /* Gedeelde link (#id): meteen de details van dat item openen */
 function openFromHash(){
   let id=""; try{id=decodeURIComponent(location.hash.slice(1))}catch{} if(!id) return;
@@ -1021,4 +1023,4 @@ function openFromHash(){
 openFromHash(); window.addEventListener("hashchange",openFromHash);
 // Na middernacht opnieuw laden: een scherm van gisteren zou anders nog "Vandaag" van gisteren tonen
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&new Date().getDate()!==today.getDate()) location.reload() });
-})().catch(()=>{ const m=document.querySelector("#main"); if(m&&!m.children.length) m.innerHTML='<div class="empty"><strong>De app kon niet starten</strong>Ververs de pagina. Blijft het misgaan, laat het weten aan degene die je de link gaf.</div>'; });
+})().catch(()=>{ const m=document.querySelector("#main"); if(m&&!document.body.dataset.ready) m.innerHTML='<div class="empty"><strong>De app kon niet starten</strong>Ververs de pagina. Blijft het misgaan, laat het weten aan degene die je de link gaf.</div>'; });

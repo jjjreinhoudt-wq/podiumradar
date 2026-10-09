@@ -18,6 +18,9 @@ def check(naam, kreeg, verwacht):
     print(f"{'ok  ' if ok else 'FOUT'} {naam}: {kreeg!r}" + ("" if ok else f" (verwacht {verwacht!r})"))
 
 echt = json.loads((HIER.parent / "site/data.json").read_text(encoding="utf-8"))
+# 'Vandaag' = de dag van data.json, zodat de test niet kapot gaat als het bestand ouder wordt
+scrape.TODAY = sources.TODAY = dt.date.fromisoformat(echt["updated"][:10])
+scrape.HORIZON = scrape.TODAY + dt.timedelta(days=scrape.CFG["days_ahead"])
 TODAY = scrape.TODAY
 def bronnen(leeg=(), extra_kapot=False):
     """[(bron, events)] zoals sources.collect() ze zou geven, opgebouwd uit data.json."""

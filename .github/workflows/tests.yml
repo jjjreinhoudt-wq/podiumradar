@@ -31,6 +31,10 @@ jobs:
           python scraper/test_schoon.py
           python scraper/test_fetch.py
           python scraper/test_scrape_offline.py
+      - name: Persoonlijke gegevens
+        env:
+          VERBODEN: ${{ secrets.IDENTITEIT_VERBODEN }}
+        run: python tests/check_identiteit.py
       - name: JavaScript-syntaxis
         run: for f in site/app.js site/pwa.js site/sw.js tests/ui_smoke.js; do node --check "$f"; done
       - name: Rooktest van de app

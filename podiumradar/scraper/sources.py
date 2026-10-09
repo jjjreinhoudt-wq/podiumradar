@@ -24,7 +24,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 BRONNEN = ROOT / "scraper/bronnen.json"
 CACHE = ROOT / "scraper/detail_cache.json"
 REPORT = ROOT / "scraper/rapport.json"
-LOKAAL = ROOT / "scraper/lokaal.json"          # geschreven door scraper/lokaal.py op Jaspers computer
+LOKAAL = ROOT / "scraper/lokaal.json"          # geschreven door scraper/lokaal.py op de eigen computer van de eigenaar
 LOCAL_CACHE = ROOT / "scraper/lokaal_cache.json"  # aparte cache, zodat die niet botst met de cache van GitHub
 TODAY = dt.date.today()
 CACHE_V = 4  # ophogen als het uitlezen verandert, zodat gecachte pagina's opnieuw worden gelezen
@@ -720,7 +720,7 @@ def local_key(src):
 
 
 def load_local(log=print):
-    """Resultaten van de bronnen die alleen vanaf Jaspers computer werken (scraper/lokaal.py -> lokaal.json)."""
+    """Resultaten van de bronnen die alleen vanaf de eigen computer van de eigenaar werken (scraper/lokaal.py -> lokaal.json)."""
     if not LOKAAL.exists():
         return {}
     try:
@@ -739,7 +739,8 @@ def load_local(log=print):
         if not isinstance(name, str) or not isinstance(evs, list) or len(evs) > 5000:
             continue
         ok = [e for e in evs if isinstance(e, dict) and isinstance(e.get("title"), str) and isinstance(e.get("url"), str)
-              and isinstance(e.get("date"), str) and re.fullmatch(r"\d{4}-\d\d-\d\d", e["date"])]
+              and isinstance(e.get("date"), str) and re.fullmatch(r"\d{4}-\d\d-\d\d", e["date"])
+              and all(e.get(k) is None or isinstance(e[k], str) for k in ("time", "end", "doors", "start"))]
         out[name] = [e for e in ok if str(e.get("end") or e["date"]) >= t0]
     return out
 
@@ -747,7 +748,7 @@ def load_local(log=print):
 def collect(cfg, only=None, log=print, local=False):
     """Geeft [(bron, [events])] terug voor alle bronnen in bronnen.json.
     Bronnen met "local_only" blokkeren datacenters (GitHub): die haalt scraper/lokaal.py (local=True) op
-    vanaf Jaspers eigen computer; de gewone run neemt dan de items uit lokaal.json over."""
+    vanaf de eigen computer van de eigenaar; de gewone run neemt dan de items uit lokaal.json over."""
     if not BRONNEN.exists():
         return []
     allsrc = [s for s in json.loads(BRONNEN.read_text(encoding="utf-8"))
@@ -798,7 +799,7 @@ def collect(cfg, only=None, log=print, local=False):
         loc = load_local(log)
         for src in from_local:
             evs = loc.get(local_key(src))
-            log(f"  {src['name']}: {len(evs) if evs is not None else 'geen'} items van Jaspers computer (lokaal.json)")
+            log(f"  {src['name']}: {len(evs) if evs is not None else 'geen'} items van de eigen computer (lokaal.json)")
             results.append((src, evs))  # None = nog nooit lokaal opgehaald: vorige gegevens aanhouden
     if not only:
         # Rapport per bron: aantal items en de antwoorden van de site (403 = geblokkeerd, 404 = verkeerde link, ...)

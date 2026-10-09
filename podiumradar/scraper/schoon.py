@@ -80,7 +80,7 @@ def schoon_event(e):
             out[k] = e[k]
     if e.get("status") == "sold":
         out["status"] = "sold"
-    end = datum(e.get("end"))
+    end = datum(e.get("end"), laatst=(dt.date.today() + dt.timedelta(days=366 * 30)).isoformat())   # blijvende tentoonstellingen eindigen soms in 2032
     if end and end >= d:
         out["end"] = end
     sup = e.get("support")

@@ -319,6 +319,19 @@ def verwerk_item(src, ev, events, seen):
     e = dict(ev, venue=src["name"], city=src.get("city", ""), prov=src.get("prov", ""),
              vtype=src.get("type", "pop"), kind=src.get("type", "pop"))
     screening = e.pop("screening", False)
+    # Van buiten komt niet altijd wat het zou moeten zijn: datum, tijden en einddatum moeten tekst in het juiste formaat zijn
+    # (anders crasht later het sorteren of vergelijken, ook met items uit lokaal.json)
+    if not schoon.datum(e.get("date"), laatst="2100-01-01"):
+        raise ValueError("ongeldige datum")
+    for k in ("time", "doors", "start"):
+        if k in e:
+            e[k] = schoon.tijd(e[k])
+            if e[k] is None and k != "time":
+                del e[k]
+    if "end" in e:
+        e["end"] = schoon.datum(e["end"], laatst="2100-01-01")
+        if not e["end"]:
+            del e["end"]
     e["genre"] = "Film" if is_film(e["title"], e["url"], e["vtype"], screening) \
         else src.get("genre") or guess_genre(e["title"], e["vtype"])
     # Films draaien meerdere keren per dag: tijd hoort dan bij de id

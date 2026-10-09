@@ -1,6 +1,6 @@
 name: Bewaking agenda
 
-# Elke dag: is de agenda ouder dan 30 uur (de nachtelijke run is mislukt, vastgelopen of overgeslagen), dan komt er één melding
+# Elke dag: is de agenda ouder dan 36 uur (de nachtelijke run is mislukt, vastgelopen of overgeslagen), dan komt er één melding
 # "Agenda is verouderd" (GitHub mailt de eigenaar). Is de agenda weer vers, dan sluit die melding vanzelf.
 on:
   schedule:
@@ -29,7 +29,7 @@ jobs:
           uren = (dt.datetime.now(dt.timezone.utc) - t).total_seconds() / 3600
           print(f"agenda van {d['updated']}, {uren:.0f} uur oud")
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-              f.write(f"uren={uren:.0f}\nverouderd={'ja' if uren > 30 else 'nee'}\nupdated={d['updated']}\n")
+              f.write(f"uren={uren:.0f}\nverouderd={'ja' if uren > 36 else 'nee'}\nupdated={d['updated']}\n")
           EOF
       - name: Melding maken of sluiten
         env:

@@ -293,8 +293,7 @@ html:has(#scrim.open){overflow:hidden}
 .ai p{margin:6px 0}
 .note{font-size:12px;color:var(--muted);margin-top:18px}
 .stale{margin:10px 0 4px;padding:10px 12px;border:1px solid var(--warn);border-radius:12px;background:var(--card);color:var(--ink);font-size:13px;line-height:1.4}
-/* lange lijsten: kaarten buiten beeld worden pas getekend als ze in beeld komen */
-.ev{content-visibility:auto;contain-intrinsic-size:auto 86px}
+
 .note a{color:var(--acc)}
 /* Kleine gekleurde tekst iets naar de tekstkleur trekken: leesbaar (AA) in elke soortkleur, licht en donker */
 @supports (color:color-mix(in srgb,red 50%,blue)){
@@ -401,7 +400,7 @@ html:has(#scrim.open){overflow:hidden}
   <div class="home"><span>Vanaf</span><select id="homeSel" aria-label="Vertrekpunt"></select><button id="geoBtn">Mijn locatie</button></div>
   <div class="dates" id="dates" role="group" aria-label="Datum"></div>
 </header>
-<main id="main" aria-live="polite"><div class="empty">Agenda laden…</div></main>
+<main id="main"><div class="empty">Agenda laden…</div></main>
 <nav class="tabs" aria-label="Weergave">
   <button data-view="list" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Agenda</button>
   <button data-view="grid"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg>Blokkenschema</button>
