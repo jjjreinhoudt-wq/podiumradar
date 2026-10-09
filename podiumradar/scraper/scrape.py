@@ -5,16 +5,25 @@ Gebruik:
   python scraper/scrape.py --only noord-brabant --max-pages 2 --dry-run --dump /tmp/pr   # snelle test
 """
 import argparse, datetime as dt, hashlib, json, os, pathlib, re, sys, time, unicodedata
+from zoneinfo import ZoneInfo
 from html import unescape
 from urllib import robotparser
 import requests
 from bs4 import BeautifulSoup
-import sources
+import schoon, sources
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CFG = json.loads((ROOT / "scraper/config.json").read_text(encoding="utf-8"))
 OUT = ROOT / "site/data.json"
 VCACHE = ROOT / "scraper/venues_cache.json"
+STATUS = ROOT / "scraper/bronstatus.json"   # per bron: laatste gezonde dag en aantal (vangnet bij stille uitval)
+try:
+    BRONSTATUS = json.loads(STATUS.read_text(encoding="utf-8")) if STATUS.exists() else {}
+    if not isinstance(BRONSTATUS, dict):
+        BRONSTATUS = {}
+except (OSError, ValueError):
+    BRONSTATUS = {}
+VEROUDERD = {}   # podium-id -> laatste dag dat de bron nog werkte, voor bronnen waarvan we nu oude items tonen
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--max-pages", type=int, default=CFG["max_pages_per_list"])
@@ -300,12 +309,48 @@ def podiuminfo_events():
     return events
 
 
+def verwerk_item(src, ev, events, seen):
+    """Eén item van een bron verwerken (id, genre, opschonen). Gooit een fout bij een onbruikbaar item; own_events slaat dat over."""
+    # Zelfde voorstelling via twee bronnen (bv. dubbel in de lijst): één keer tonen
+    key = (ev["url"].split("?")[0].rstrip("/"), ev["date"], ev.get("time"))
+    if key in seen:
+        return
+    seen.add(key)
+    e = dict(ev, venue=src["name"], city=src.get("city", ""), prov=src.get("prov", ""),
+             vtype=src.get("type", "pop"), kind=src.get("type", "pop"))
+    screening = e.pop("screening", False)
+    e["genre"] = "Film" if is_film(e["title"], e["url"], e["vtype"], screening) \
+        else src.get("genre") or guess_genre(e["title"], e["vtype"])
+    # Films draaien meerdere keren per dag: tijd hoort dan bij de id
+    # Lopende tentoonstelling zonder bekende begindatum: id op de einddatum, anders is hij elke dag 'nieuw'
+    when = f"t/m {e['end']}" if e.pop("ongoing", False) and e.get("end") else e["date"]
+    idkey = f"{src['name']}|{when}|{e['title']}" + (f"|{e['time']}" if e["vtype"] == "film" else "")
+    e["id"] = "s" + hashlib.sha1(idkey.encode()).hexdigest()[:10]
+    if e["id"] in events and e.get("time") and events[e["id"]].get("time") != e["time"]:
+        # Zelfde voorstelling twee keer op één dag (middag en avond): de tweede krijgt de tijd in de id.
+        # De eerste houdt de oude id, zodat favorieten en 'nieuw' blijven kloppen.
+        e["id"] = "s" + hashlib.sha1(f"{idkey}|{e['time']}".encode()).hexdigest()[:10]
+    if tidy(e):  # na de id, zodat bestaande items hun id (favoriet, 'nieuw') houden
+        events[e["id"]] = e
+
+
 def own_events(prev_events=()):
     """Events van de eigen sites van podia, theaters, musea en festivals (scraper/bronnen.json)."""
     events, seen = {}, set()
     for src, evs in sources.collect(CFG, only=ARGS.source):
-        if evs is None:  # niet op tijd klaar: items van de vorige keer aanhouden
-            vid = slug(src["name"] + "-" + src.get("city", "")) + ("-film" if src.get("type") == "film" else "")
+        vid = slug(src["name"] + "-" + src.get("city", "")) + ("-film" if src.get("type") == "film" else "")
+        if evs is not None and not ARGS.source:
+            # Stille uitval (de site veranderde of is stuk): oude items maximaal een week aanhouden, en dat laten zien
+            prev_n = sum(1 for e in prev_events if e.get("v") == vid)
+            actie = schoon.vangnet(BRONSTATUS, src["name"] + "|" + src.get("type", ""), prev_n, len(evs), TODAY,
+                                   CFG.get("vangnet_min_items", 6), CFG.get("vangnet_dagen", 7))
+            if actie == "houd":
+                print(f"  {src['name']}: {len(evs)} items (vorige keer {prev_n}): oude items aangehouden, laatst gezond {BRONSTATUS[src['name'] + '|' + src.get('type', '')]['ok']}")
+                VEROUDERD[vid] = BRONSTATUS[src["name"] + "|" + src.get("type", "")]["ok"]
+                evs = None
+            elif actie == "vervallen":
+                print(f"  {src['name']}: al {CFG.get('vangnet_dagen', 7)} dagen of langer (bijna) leeg: oude items vervallen")
+        if evs is None:  # niet op tijd klaar of stil uitgevallen: items van de vorige keer aanhouden
             for e in prev_events:
                 if e.get("v") == vid:
                     e = {k: v for k, v in e.items() if k not in ("v", "first_seen")}
@@ -313,27 +358,14 @@ def own_events(prev_events=()):
                                            vtype=src.get("type", "pop"), kind=src.get("type", "pop"))
             continue
         for ev in evs:
-            # Zelfde voorstelling via twee bronnen (bv. dubbel in de lijst): één keer tonen
-            key = (ev["url"].split("?")[0].rstrip("/"), ev["date"], ev.get("time"))
-            if key in seen:
-                continue
-            seen.add(key)
-            e = dict(ev, venue=src["name"], city=src.get("city", ""), prov=src.get("prov", ""),
-                     vtype=src.get("type", "pop"), kind=src.get("type", "pop"))
-            screening = e.pop("screening", False)
-            e["genre"] = "Film" if is_film(e["title"], e["url"], e["vtype"], screening) \
-                else src.get("genre") or guess_genre(e["title"], e["vtype"])
-            # Films draaien meerdere keren per dag: tijd hoort dan bij de id
-            # Lopende tentoonstelling zonder bekende begindatum: id op de einddatum, anders is hij elke dag 'nieuw'
-            when = f"t/m {e['end']}" if e.pop("ongoing", False) and e.get("end") else e["date"]
-            idkey = f"{src['name']}|{when}|{e['title']}" + (f"|{e['time']}" if e["vtype"] == "film" else "")
-            e["id"] = "s" + hashlib.sha1(idkey.encode()).hexdigest()[:10]
-            if e["id"] in events and e.get("time") and events[e["id"]].get("time") != e["time"]:
-                # Zelfde voorstelling twee keer op één dag (middag en avond): de tweede krijgt de tijd in de id.
-                # De eerste houdt de oude id, zodat favorieten en 'nieuw' blijven kloppen.
-                e["id"] = "s" + hashlib.sha1(f"{idkey}|{e['time']}".encode()).hexdigest()[:10]
-            if tidy(e):  # na de id, zodat bestaande items hun id (favoriet, 'nieuw') houden
-                events[e["id"]] = e
+            # Eén kapot of rommelig item mag nooit de hele nachtrun laten crashen
+            try:
+                if not (isinstance(ev, dict) and isinstance(ev.get("title"), str) and ev["title"].strip()
+                        and isinstance(ev.get("date"), str) and isinstance(ev.get("url"), str)):
+                    raise ValueError("titel, datum of url ontbreekt")
+                verwerk_item(src, ev, events, seen)
+            except Exception as ex:
+                print(f"  {src['name']}: item overgeslagen ({ex.__class__.__name__}: {str(ex)[:80]})")
     fix_series_ends(events.values())
     return dedupe(relocate(events))
 
@@ -547,8 +579,18 @@ def main():
         for k in ("venue", "city", "prov", "kind", "vtype"):
             e.pop(k, None)
 
-    out = {"updated": dt.datetime.now().strftime("%Y-%m-%d %H:%M"), "venues": venues,
+    out = {"updated": dt.datetime.now(ZoneInfo("Europe/Amsterdam")).strftime("%Y-%m-%d %H:%M"), "venues": venues,
            "events": sorted(events.values(), key=lambda e: (e["date"], e["time"] or "99"))}
+    # Alles wat van buiten komt opschonen en begrenzen; is er veel dat niet deugt, dan publiceren we niets
+    out, st = schoon.schoon_alles(out)
+    if st["weg"]:
+        print(f"Opschonen: {st['weg']} van {st['in']} items weggelaten: {dict(st['redenen'])}")
+    if st["in"] and st["weg"] > st["in"] * CFG.get("max_weggelaten_ratio", 0.03) and not ARGS.dry_run:
+        print("Te veel items die niet deugen; waarschijnlijk is een bron veranderd. data.json NIET overschreven.")
+        sys.exit(2)
+    ver = {k: d for k, d in VEROUDERD.items() if k in out["venues"]}
+    if ver:
+        out["verouderd"] = ver
     n_prev, n_new = len(prev.get("events", [])), len(out["events"])
     print(f"Klaar: {n_new} items op {len(venues)} locaties (vorige keer {n_prev})")
     no_time = sum(1 for e in out["events"] if not e["time"])
@@ -572,6 +614,8 @@ def main():
         print("Veel minder shows dan vorige keer; mogelijk is de bronsite veranderd. data.json NIET overschreven.")
         sys.exit(2)
     OUT.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    if not ARGS.source:
+        STATUS.write_text(json.dumps(BRONSTATUS, ensure_ascii=False, indent=0, sort_keys=True), encoding="utf-8")
 
 
 if __name__ == "__main__":

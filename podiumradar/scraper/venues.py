@@ -380,7 +380,7 @@ def paradiso_api(site, F):
 def paradiso(src, F, cfg, log):
     """Paradiso: de site haalt zijn programma bij een GraphQL-dienst met een openbare sleutel die in de eigen
     JavaScript van paradiso.nl staat. We lezen adres en sleutel elke run opnieuw uit die JavaScript (niets vast
-    in de code), en doen daarna dezelfde aanvraag als de site. Met toestemming van Jasper (okt 2026).
+    in de code), en doen daarna dezelfde aanvraag als de site. Met toestemming van de eigenaar (okt 2026).
     location: alleen voorstellingen op deze locatie (de dienst geeft ook Tolhuistuin, Bitterzoet, ...)."""
     site = _site(src)
     endpoint, key = paradiso_api(site, F)

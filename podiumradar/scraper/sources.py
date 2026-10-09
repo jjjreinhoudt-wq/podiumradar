@@ -55,6 +55,7 @@ class Fetcher:
 
     def __init__(self, ua, delay):
         self.S = requests.Session()
+        self.S.max_redirects = 5
         self.S.headers.update({"User-Agent": ua, "Accept-Language": "nl,en;q=0.5"})
         self.ua, self.delay = ua, delay
         self.robots, self.last, self.locks, self.ip_locks, self.host_ip = {}, {}, {}, {}, {}
@@ -112,13 +113,35 @@ class Fetcher:
                 time.sleep(wait)
             self.last[ip] = time.time()
             try:
-                r = self.S.post(url, json=json_body, headers=headers, timeout=30) if json_body is not None \
-                    else self.S.get(url, params=params, timeout=30)
+                r = self.S.post(url, json=json_body, headers=headers, timeout=30, stream=True) if json_body is not None \
+                    else self.S.get(url, params=params, timeout=30, stream=True)
+                if not self._lees(r):   # te groot of te traag: niet meer verwerken
+                    self._note(host, "te groot of te traag")
+                    return None
             except requests.RequestException as e:
                 self._note(host, "timeout" if isinstance(e, requests.Timeout) else "verbindingsfout")
                 return None
         self._note(host, str(r.status_code))
         return r if r.status_code == 200 else None
+
+    MAX_BYTES = 25_000_000   # een agendapagina of API-antwoord groter dan dit lezen we niet
+    MAX_SECONDEN = 90        # en wat langer dan dit blijft druppelen ook niet
+
+    def _lees(self, r):
+        """Leest het antwoord (met een bovengrens voor grootte en tijd) en zet het in r.content; False als het niet lukt."""
+        try:
+            if int(r.headers.get("content-length") or 0) > self.MAX_BYTES:
+                r.close(); return False
+        except ValueError:
+            pass
+        t0, delen, n = time.time(), [], 0
+        for chunk in r.iter_content(65536):
+            n += len(chunk)
+            if n > self.MAX_BYTES or time.time() - t0 > self.MAX_SECONDEN:
+                r.close(); return False
+            delen.append(chunk)
+        r._content, r._content_consumed = b"".join(delen), True
+        return True
 
     def get(self, url):
         r = self._fetch(url)
@@ -698,13 +721,25 @@ def load_local(log=print):
     """Resultaten van de bronnen die alleen vanaf Jaspers computer werken (scraper/lokaal.py -> lokaal.json)."""
     if not LOKAAL.exists():
         return {}
-    data = json.loads(LOKAAL.read_text(encoding="utf-8"))
-    age = (TODAY - dt.date.fromisoformat(data.get("datum", "2000-01-01")[:10])).days
+    try:
+        data = json.loads(LOKAAL.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or not isinstance(data.get("bronnen"), dict):
+            raise ValueError("onverwachte opbouw")
+        age = (TODAY - dt.date.fromisoformat(str(data.get("datum", "2000-01-01"))[:10])).days
+    except (OSError, ValueError, TypeError) as e:   # een kapot bestand van de eigen computer mag de nachtrun niet laten crashen
+        log(f"  lokaal.json onleesbaar ({e.__class__.__name__}: {e}): niet gebruikt")
+        return {}
     if age > 21:
         log(f"  lokaal.json is {age} dagen oud: niet meer gebruikt")
         return {}
-    t0 = TODAY.isoformat()
-    return {name: [e for e in evs if (e.get("end") or e["date"]) >= t0] for name, evs in data.get("bronnen", {}).items()}
+    t0, out = TODAY.isoformat(), {}
+    for name, evs in data["bronnen"].items():
+        if not isinstance(name, str) or not isinstance(evs, list) or len(evs) > 5000:
+            continue
+        ok = [e for e in evs if isinstance(e, dict) and isinstance(e.get("title"), str) and isinstance(e.get("url"), str)
+              and isinstance(e.get("date"), str) and re.fullmatch(r"\d{4}-\d\d-\d\d", e["date"])]
+        out[name] = [e for e in ok if str(e.get("end") or e["date"]) >= t0]
+    return out
 
 
 def collect(cfg, only=None, log=print, local=False):

@@ -61,7 +61,11 @@ jobs:
         run: |
           git config user.name "podiumradar-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add -A site scraper
+          # Alleen de bestanden die deze run zelf maakt (nooit per ongeluk iets anders meenemen)
+          for f in site/data.json site/spotify.json scraper/detail_cache.json scraper/venues_cache.json scraper/rapport.json \
+                   scraper/spotify_cache.json scraper/bronstatus.json scraper/meldingen_verstuurd.json; do
+            [ -f "$f" ] && git add "$f"
+          done
           # Tijdens een lange run kan er intussen iets op main zijn gezet: eerst bijwerken, dan pushen
           git diff --cached --quiet || (git commit -m "Agenda bijgewerkt" && git pull --rebase -X theirs origin main && git push)
 
@@ -76,6 +80,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           ref: main
+          persist-credentials: false   # deze job hoeft nergens naartoe te pushen
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b  # v5.0.0
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa  # v3.0.1
         with:

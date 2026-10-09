@@ -13,7 +13,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 DATA = ROOT / "site/data.json"
 VOLGEN = ROOT / "scraper/volgen.json"
 SENT = ROOT / "scraper/meldingen_verstuurd.json"
-APP = "https://jjjreinhoudt-wq.github.io/podiumradar/"
+APP = "https://jjjreinhoudt-wq.github.io/agenda-nefmp54/"
 MAX_LOS = 8          # meer nieuwe treffers dan dit: één samenvattende melding
 DROOG = "--droog" in sys.argv
 

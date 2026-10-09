@@ -1,6 +1,6 @@
 {
   "base": "https://www.podiuminfo.nl",
-  "user_agent": "Podiumradar/1.0 (persoonlijke cultuuragenda; 1 verzoek per 1,5 sec; +https://jjjreinhoudt-wq.github.io/podiumradar/over.html)",
+  "user_agent": "Podiumradar/1.0 (persoonlijke cultuuragenda; 1 verzoek per 1,5 sec; +https://jjjreinhoudt-wq.github.io/agenda-nefmp54/over.html)",
   "delay_seconds": 1.5,
   "days_ahead": 240,
   "max_pages_per_list": 40,

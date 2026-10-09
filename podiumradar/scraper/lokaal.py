@@ -1,4 +1,4 @@
-"""Draait op Jaspers eigen computer (Windows-taak 'Podiumradar lokaal', dagelijks en na inloggen).
+"""Draait op de eigen computer van de eigenaar (Windows-taak 'Podiumradar lokaal', dagelijks en na inloggen).
 
 Haalt alleen de bronnen met "local_only": true op: sites die datacenters zoals GitHub weigeren (403), maar
 vanaf een gewone internetaansluiting gewoon werken (Pathé, Filmhuis Breda, Kriterion, ...).
@@ -22,7 +22,9 @@ def log(msg):
 
 
 def git(*args):
-    r = subprocess.run(["git", "-C", str(REPO), *args], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    # Altijd de neutrale identiteit van de bot, ook voor de commits die 'git pull --rebase' maakt: nooit het persoonlijke adres van deze pc
+    r = subprocess.run(["git", "-C", str(REPO), "-c", "user.name=podiumradar-bot", "-c", "user.email=actions@users.noreply.github.com", *args],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
     if r.returncode:
         log(f"git {' '.join(args)}: {r.stderr.strip()[:300]}")
     return r.returncode == 0
@@ -60,5 +62,5 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception as e:  # nooit een foutvenster op Jaspers scherm
+    except Exception as e:  # nooit een foutvenster op het scherm van de eigenaar
         log(f"fout: {e.__class__.__name__}: {e}")
