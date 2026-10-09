@@ -23,6 +23,14 @@ check("varianten reeks: artiest", sp.varianten("Techno Tuesday: Dexon"), ["Techn
 check("varianten datum/zaal weg", sp.varianten("Stereo MC's ✦ vr 7 mei ✦ Luxor Live")[-1], "Stereo MC's")
 check("varianten (18+) weg", sp.varianten("Hans Teeuwen (18+)"), ["Hans Teeuwen (18+)", "Hans Teeuwen"])
 check("geen splitsing op &", sp.varianten("Simon & Garfunkel"), ["Simon & Garfunkel"])
+check("'komt op 12 oktober' weg", sp.varianten("Khalid komt op 12 oktober"), ["Khalid komt op 12 oktober", "Khalid"])
+check("'op 10 oktober' weg", sp.varianten("Jill Scott op 10 oktober")[-1], "Jill Scott")
+check("'op woensdag' blijft (reeksnaam, geen datum)", sp.varianten("Muziek op Woensdag"), ["Muziek op Woensdag"])
+check("'solo' weg", sp.varianten("Jason Moran solo")[-1], "Jason Moran")
+check("'with Strings' weg", sp.varianten("Starsailor with Strings")[-1], "Starsailor")
+check("'luistersessie' weg", sp.varianten("Fontaines D.C. luistersessie")[-1], "Fontaines D.C.")
+check("'op' midden in de naam blijft", sp.varianten("Spoor op Zuid"), ["Spoor op Zuid"])
+check("'Live' als hele naam blijft", sp.varianten("Live"), ["Live"])
 check("te korte naam", sp.varianten("AB"), [])
 check("& = and", sp.zelfde_naam("Simon & Garfunkel", "Simon and Garfunkel"), True)
 check("The vooraan", sp.zelfde_naam("The Amity Affliction", "Amity Affliction"), True)
@@ -140,12 +148,15 @@ check("401: twee tokens opgehaald", s.posts, 2)
 s = Sessie([Antw(429, headers={"Retry-After": "3"}), Antw(200, {"artists": {"items": []}})])
 slapen.clear(); c = sp.Spotify("id", "geheim", s, slapen.append)
 check("429 kort: wacht en probeert opnieuw", (c.zoek("X"), slapen), ([], [4.0]))
-for code, js, hdr in [(429, {"reason": "QUOTA_EXCEEDED"}, {"Retry-After": "5"}), (429, {}, {"Retry-After": "7200"}), (403, {}, {})]:
+for code, js, hdr in [(429, {}, {"Retry-After": "85833"}), (429, {}, {"Retry-After": "901"}), (403, {}, {})]:
     try:
         sp.Spotify("id", "geheim", Sessie([Antw(code, js, hdr)]), slapen.append).zoek("X"); gestopt = False
     except sp.Gestopt:
         gestopt = True
     check(f"{code} {js or hdr}: Gestopt", gestopt, True)
+s = Sessie([Antw(429, headers={"Retry-After": "600"}), Antw(200, {"artists": {"items": []}})])
+slapen.clear(); c = sp.Spotify("id", "geheim", s, slapen.append)
+check("429 tot 15 min: wacht af (bijvoorbeeld net voor een nieuwe dag quotum)", (c.zoek("X"), slapen), ([], [601.0]))
 s = Sessie([Antw(503), Antw(200, {"artists": {"items": []}})])
 check("5xx: opnieuw", sp.Spotify("id", "geheim", s, lambda x: None).zoek("X"), [])
 
@@ -162,10 +173,44 @@ check("masterclass geen knop", sp.basis(ev("Masterclass", "Klassiek"), V["pop1"]
 # ---- 'Reeks: Artiest': beide kanten, alleen bij precies één treffer
 def kant(db): return sp.zoek_op(Nep(db), "Discover: Ronker", lambda x: None)
 check("dubbele punt: alleen artiest bestaat", kant({"Ronker": [{"id": ID1, "name": "Ronker"}]}), ID1)
-check("dubbele punt: alleen reeks bestaat", kant({"Discover": [{"id": ID2, "name": "Discover"}]}), ID2)
-check("dubbele punt: allebei bestaan -> grijs", kant({"Ronker": [{"id": ID1, "name": "Ronker"}], "Discover": [{"id": ID2, "name": "Discover"}]}), None)
+check("dubbele punt: alleen reeks bestaat (bekende naam)", kant({"Discover": [{"id": ID2, "name": "Discover", "popularity": 40}]}), ID2)
+check("dubbele punt: allebei bestaan -> grijs", kant({"Ronker": [{"id": ID1, "name": "Ronker"}], "Discover": [{"id": ID2, "name": "Discover", "popularity": 40}]}), None)
 nep = Nep({"Discover: Ronker": [{"id": ID3, "name": "Discover: Ronker"}], "Ronker": [{"id": ID1, "name": "Ronker"}]})
 check("hele naam wint van de delen", (sp.zoek_op(nep, "Discover: Ronker", lambda x: None), nep.vragen), (ID3, ["Discover: Ronker"]))
+
+# ---- de kant vóór de dubbele punt telt alleen bij een bekende artiest; de kant erna altijd
+def kant2(db, naam="Up Close: Ronker"): return sp.zoek_op(Nep(db), naam, lambda x: None)
+check("links: kleine artiest telt niet", kant2({"Up Close": [{"id": ID2, "name": "Up Close", "popularity": 3}]}), None)
+check("links: bekende artiest telt wel", kant2({"Up Close": [{"id": ID2, "name": "Up Close", "popularity": 60}]}), ID2)
+check("rechts: kleine artiest telt wel", kant2({"Ronker": [{"id": ID1, "name": "Ronker", "popularity": 1}]}), ID1)
+check("links klein en rechts klein: rechts wint", kant2({"Up Close": [{"id": ID2, "name": "Up Close", "popularity": 3}], "Ronker": [{"id": ID1, "name": "Ronker", "popularity": 2}]}), ID1)
+check("kies minpop", (sp.kies("Foo", [{"id": ID1, "name": "Foo", "popularity": 10}], 25), sp.kies("Foo", [{"id": ID1, "name": "Foo", "popularity": 30}], 25)), (None, ID1))
+
+# ---- logregels per artiest
+regels = []
+sp.zoek_op(Nep({"Ronker": [{"id": ID1, "name": "Ronker", "popularity": 7}]}), "Discover: Ronker", lambda x: None, regels.append)
+sp.zoek_op(Nep({"Band Z": [{"id": ID3, "name": "Band Zee", "popularity": 7}]}), "Band Z", lambda x: None, regels.append)
+check("logregels", regels, ["  gevonden (deel van naam): Discover: Ronker -> Ronker (populariteit 7)", "  niet gevonden: Band Z (bovenaan bij Spotify: Band Zee)"])
+
+# ---- nieuwe NOT_MUSIC-woorden
+check("social dance geen knop", sp.basis(ev("Social Dance: Swing", "Overig"), V["pop1"]), False)
+check("spelletjesavond geen knop", sp.basis(ev("Spelletjesavond", "Overig"), V["pop1"]), False)
+check("echte band met 'meeting' erin? (woordgrens)", sp.basis(ev("Meetings of Fools", "Overig"), V["pop1"]), True)
+
+# ---- gevonden door reviewers: achtervoegsels mogen de beveiliging bij 'Reeks: Artiest' niet omzeilen
+both = {"Ronker": [{"id": ID1, "name": "Ronker", "popularity": 5}], "Discover": [{"id": ID2, "name": "Discover", "popularity": 60}]}
+check("'Reeks: Artiest live', beide kanten artiest -> grijs", sp.zoek_op(Nep(both), "Discover: Ronker live", lambda x: None), None)
+check("'Reeks: Artiest in Concert', kleine artiest vóór de dubbele punt telt niet", sp.zoek_op(Nep({"Trobi Presents": [{"id": ID2, "name": "Trobi Presents", "popularity": 2}]}), "Trobi Presents: Kameleon in Concert", lambda x: None), None)
+check("kant vóór de dubbele punt blijft kritisch als de kant erna te kort is", sp.zoek_op(Nep({"Nieuwe Oogst": [{"id": ID2, "name": "Nieuwe Oogst", "popularity": 3}]}), "Nieuwe Oogst: ILA", lambda x: None), None)
+check("... en telt wel bij een bekende artiest", sp.zoek_op(Nep({"Nieuwe Oogst": [{"id": ID2, "name": "Nieuwe Oogst", "popularity": 50}]}), "Nieuwe Oogst: ILA", lambda x: None), ID2)
+check("'in Concert': kleine toevallige artiest telt niet", sp.zoek_op(Nep({"Twilight": [{"id": ID2, "name": "Twilight", "popularity": 5}]}), "Twilight in Concert", lambda x: None), None)
+check("'in Concert': bekende artiest telt wel", sp.zoek_op(Nep({"Twilight": [{"id": ID2, "name": "Twilight", "popularity": 45}]}), "Twilight in Concert", lambda x: None), ID2)
+check("'komt op 12 oktober': ook een kleine artiest telt (datum = zeker een artiest)", sp.zoek_op(Nep({"Tyla": [{"id": ID2, "name": "Tyla", "popularity": 4}]}), "Tyla komt op 13 oktober", lambda x: None), ID2)
+check("'staat op 6 november' weg", sp.varianten("Guus Meeuwis staat op 6 november")[-1], "Guus Meeuwis")
+check("'komen op 25 januari' weg", sp.varianten("Dan & Phil komen op 25 januari")[-1], "Dan & Phil")
+check("'Live in Concert' weg (twee achtervoegsels)", sp.varianten("Atif Aslam Live in Concert")[-1], "Atif Aslam")
+check("zoeknamen: floors", [(t, m) for t, m, d in sp.zoeknamen("Jason Moran solo")], [("Jason Moran solo", 0), ("Jason Moran", sp.SCHOON_MINPOP)])
+check("zoeknamen: datum zonder floor", [(t, m) for t, m, d in sp.zoeknamen("Khalid komt op 12 oktober")], [("Khalid komt op 12 oktober", 0), ("Khalid", 0)])
 
 # ---- programma-achtige namen worden nooit grijs
 D2 = {"venues": V, "events": [ev("Bill Stewart Trio ft. Larry Grenadier", "Overig", id_="s1"), ev("Gewone Band", "Overig", id_="s2")]}
