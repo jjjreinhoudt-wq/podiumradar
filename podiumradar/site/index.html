@@ -160,6 +160,13 @@ body.favview .searchrow{display:none}
 .calday.h2 small,.calday.h3 small,.calday.h4 small{color:var(--ink)}
 @media (min-width:700px){.calnav,.calgrid{max-width:480px;margin-inline:auto}}
 .btn.ghost svg{flex:0 0 auto}
+/* Merkknoppen: logo en kleuren van de dienst zelf (Spotify-groen met zwart, YouTube-rood met wit, Google Maps wit met de gekleurde pin) */
+.btn.brand{border:0;box-shadow:0 2px 8px rgba(0,0,0,.16)}
+.btn.brand svg{flex:0 0 auto}
+.btn.b-spotify{background:#1DB954;color:#000}
+.btn.b-youtube{background:#E60000;color:#fff}
+.btn.b-maps{background:#fff;color:#3c4043;border:1px solid #dadce0;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.travnote{margin:-2px 0 12px;font-size:12px;line-height:1.4}
 /* niet beschikbaar (bijvoorbeeld niet op Spotify gevonden): grijs en niet te tikken */
 .btn:disabled{opacity:.5;box-shadow:none;cursor:default;filter:grayscale(1)}
 .btn:disabled:active{transform:none}
