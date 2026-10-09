@@ -197,6 +197,21 @@ check("social dance geen knop", sp.basis(ev("Social Dance: Swing", "Overig"), V[
 check("spelletjesavond geen knop", sp.basis(ev("Spelletjesavond", "Overig"), V["pop1"]), False)
 check("echte band met 'meeting' erin? (woordgrens)", sp.basis(ev("Meetings of Fools", "Overig"), V["pop1"]), True)
 
+# ---- gevonden door reviewers: achtervoegsels mogen de beveiliging bij 'Reeks: Artiest' niet omzeilen
+both = {"Ronker": [{"id": ID1, "name": "Ronker", "popularity": 5}], "Discover": [{"id": ID2, "name": "Discover", "popularity": 60}]}
+check("'Reeks: Artiest live', beide kanten artiest -> grijs", sp.zoek_op(Nep(both), "Discover: Ronker live", lambda x: None), None)
+check("'Reeks: Artiest in Concert', kleine artiest vóór de dubbele punt telt niet", sp.zoek_op(Nep({"Trobi Presents": [{"id": ID2, "name": "Trobi Presents", "popularity": 2}]}), "Trobi Presents: Kameleon in Concert", lambda x: None), None)
+check("kant vóór de dubbele punt blijft kritisch als de kant erna te kort is", sp.zoek_op(Nep({"Nieuwe Oogst": [{"id": ID2, "name": "Nieuwe Oogst", "popularity": 3}]}), "Nieuwe Oogst: ILA", lambda x: None), None)
+check("... en telt wel bij een bekende artiest", sp.zoek_op(Nep({"Nieuwe Oogst": [{"id": ID2, "name": "Nieuwe Oogst", "popularity": 50}]}), "Nieuwe Oogst: ILA", lambda x: None), ID2)
+check("'in Concert': kleine toevallige artiest telt niet", sp.zoek_op(Nep({"Twilight": [{"id": ID2, "name": "Twilight", "popularity": 5}]}), "Twilight in Concert", lambda x: None), None)
+check("'in Concert': bekende artiest telt wel", sp.zoek_op(Nep({"Twilight": [{"id": ID2, "name": "Twilight", "popularity": 45}]}), "Twilight in Concert", lambda x: None), ID2)
+check("'komt op 12 oktober': ook een kleine artiest telt (datum = zeker een artiest)", sp.zoek_op(Nep({"Tyla": [{"id": ID2, "name": "Tyla", "popularity": 4}]}), "Tyla komt op 13 oktober", lambda x: None), ID2)
+check("'staat op 6 november' weg", sp.varianten("Guus Meeuwis staat op 6 november")[-1], "Guus Meeuwis")
+check("'komen op 25 januari' weg", sp.varianten("Dan & Phil komen op 25 januari")[-1], "Dan & Phil")
+check("'Live in Concert' weg (twee achtervoegsels)", sp.varianten("Atif Aslam Live in Concert")[-1], "Atif Aslam")
+check("zoeknamen: floors", [(t, m) for t, m, d in sp.zoeknamen("Jason Moran solo")], [("Jason Moran solo", 0), ("Jason Moran", sp.SCHOON_MINPOP)])
+check("zoeknamen: datum zonder floor", [(t, m) for t, m, d in sp.zoeknamen("Khalid komt op 12 oktober")], [("Khalid komt op 12 oktober", 0), ("Khalid", 0)])
+
 # ---- programma-achtige namen worden nooit grijs
 D2 = {"venues": V, "events": [ev("Bill Stewart Trio ft. Larry Grenadier", "Overig", id_="s1"), ev("Gewone Band", "Overig", id_="s2")]}
 pub, _ = nep_run(Nep(), D2)
