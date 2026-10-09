@@ -11,12 +11,81 @@
   "orientation": "portrait",
   "background_color": "#EDEFF4",
   "theme_color": "#2446F0",
-  "categories": ["entertainment", "music", "lifestyle", "events"],
+  "categories": [
+    "entertainment",
+    "music",
+    "lifestyle",
+    "events"
+  ],
   "icons": [
-    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml"},
-    {"src": "icon-180.png", "sizes": "180x180", "type": "image/png"},
-    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-    {"src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Vanavond in de buurt",
+      "short_name": "Vanavond",
+      "description": "Wat er vanavond bij jou in de buurt te doen is",
+      "url": "./?snel=vanavond",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Dit weekend",
+      "short_name": "Weekend",
+      "description": "Alles in de buurt dit weekend",
+      "url": "./?snel=weekend",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Mijn plannen",
+      "short_name": "Plannen",
+      "description": "Je plannen en gevolgde artiesten",
+      "url": "./?snel=plannen",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }
