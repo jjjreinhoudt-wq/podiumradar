@@ -69,9 +69,11 @@ const BYID=new Map(EV.map(e=>[e.id,e]));
 /* ---------- PLACES ---------- */
 const HOMES={"Tilburg":[51.5555,5.0913],"Breda":[51.5719,4.7683],"Eindhoven":[51.4416,5.4697],"Den Bosch":[51.6978,5.3037],"Helmond":[51.4793,5.6570],"Oss":[51.7650,5.5180],"Bergen op Zoom":[51.4949,4.2911],"Roosendaal":[51.5308,4.4653],"Amsterdam":[52.3676,4.9041],"Utrecht":[52.0907,5.1214],"Rotterdam":[51.9244,4.4777],"Den Haag":[52.0705,4.3007],"Nijmegen":[51.8126,5.8372],"Arnhem":[51.9851,5.8987],"Zwolle":[52.5168,6.0830],"Groningen":[53.2194,6.5665],"Maastricht":[50.8514,5.6910],"Venlo":[51.3704,6.1724]};
 function km(a,b,c,d){const R=6371,x=(c-a)*Math.PI/180,y=(d-b)*Math.PI/180;const h=Math.sin(x/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(y/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+// Schatting uit de afstand hemelsbreed, geen echte route: auto = 1,2 x omweg met 90 km/u + 10 min parkeren, OV = 1,2 x omweg met 70 km/u + 15 min lopen en overstappen
+// (ijkpunten vanuit Tilburg: Breda ±40, Eindhoven ±55, Utrecht ±70, Amsterdam ±105 min). Google Maps rekent vanaf je echte locatie met verkeer en dienstregeling.
 function travel(vid){const v=V[vid], h=S.homeXY; if(v.lat==null) return {car:null,ov:null,k:null}; const k=km(h[0],h[1],v.lat,v.lon);
   if(k<3) return {car:Math.round(k*4+5),ov:Math.round(k*6+8),k};
-  return {car:Math.round(k*1.2/90*60+10), ov:Math.round(k*1.35/65*60+20), k}}
+  return {car:Math.round(k*1.2/90*60+10), ov:Math.round(k*1.2/70*60+15), k}}
 
 /* ---------- STATE ---------- */
 const store={get(k,f){try{const v=localStorage.getItem(k);return v?JSON.parse(v):f}catch{return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
@@ -745,6 +747,11 @@ const ICO={pin:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stro
   dice:'<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="15" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/><circle cx="9" cy="15" r="1" fill="currentColor"/></svg>',
   cal:'<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
   spark:'<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM18 16l.8 2.2L21 19l-2.2.8L18 22l-.8-2.2L15 19l2.2-.8z"/></svg>'};
+/* Logo's van de diensten waar de knoppen naartoe linken (Simple Icons, CC0); kleuren staan in de CSS (.b-spotify, .b-youtube, .b-maps) */
+const LOGO={
+  spotify:'<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>',
+  youtube:'<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>',
+  maps:'<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#FBBC04" d="M19.527 4.799c1.212 2.608.937 5.678-.405 8.173-1.101 2.047-2.744 3.74-4.098 5.614-.619.858-1.244 1.75-1.669 2.727-.141.325-.263.658-.383.992-.121.333-.224.673-.34 1.008-.109.314-.236.684-.627.687h-.007c-.466-.001-.579-.53-.695-.887-.284-.874-.581-1.713-1.019-2.525-.51-.944-1.145-1.817-1.79-2.671L19.527 4.799z"/><path fill="#34A853" d="M8.545 7.705l-3.959 4.707c.724 1.54 1.821 2.863 2.871 4.18.247.31.494.622.737.936l4.984-5.925-.029.01c-1.741.601-3.691-.291-4.392-1.987a3.377 3.377 0 0 1-.209-.716c-.063-.437-.077-.761-.004-1.198l.001-.007z"/><path fill="#1A73E8" d="M5.492 3.149l-.003.004c-1.947 2.466-2.281 5.88-1.117 8.77l4.785-5.689-.058-.05-3.607-3.035z"/><path fill="#4285F4" d="M14.661.436l-3.838 4.563a.295.295 0 0 1 .027-.01c1.6-.551 3.403.15 4.22 1.626.176.319.323.683.377 1.045.068.446.085.773.012 1.22l-.003.016 3.836-4.561A8.382 8.382 0 0 0 14.67.439l-.009-.003z"/><path fill="#EA4335" d="M9.466 5.868L14.162.285l-.047-.012A8.31 8.31 0 0 0 11.986 0a8.439 8.439 0 0 0-6.169 2.766l-.016.018 3.665 3.084z"/></svg>'};
 const mapUrl=v=>v.lat!=null&&v.lon!=null?`https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lon}`:"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(v.name+", "+v.city);
 const NOT_MUSIC=/workshop|lezing|cursus|quiz|bingo|borrel|lunch|diner|rondleiding|open dag|proefles|clinic|filmavond|tentoonstelling|expositie|vergadering|netwerk|markt|\wbeurs\b|yoga|game night|jam ?sessi(e|on)|open (mic|podium|stage)|proeverij|proefavond|springkussen|boekenclub|(hedon|nacht) academy|publieke tribune|masterclass|^(ajax|vitesse)\s+-\s|social dance|spelletjes|vaccinatie|science caf|subsidie|boekpresentatie|podcast|business club|\bmeeting\b|protestborden|woonprotest|stadssafari|crafternoon|design week|\bddw\b|cultuurnacht|museumnacht/i;
 /* Spotify: scraper/spotify.py zoekt 's nachts per artiest op of die op Spotify staat (site/spotify.json:
@@ -761,7 +768,7 @@ let SPOT=null, lastDetail=null;
 const SPOT_ID=/^[A-Za-z0-9]{22}$/;
 // Zoeknaam voor de links: zonder 'datum ✦ zaal'-ruis en backslashes; bij 'Voorstelling - Artiest' de hele titel
 const linkName=e=>String(showFirst(e)?e.title:e.artist).split(" ✦ ")[0].replace(/\\/g,"").trim();
-const linkRow=e=>`<a class="btn ghost" href="${esc(mapUrl(V[e.v]))}" target="_blank" rel="noopener noreferrer">${ICO.pin}Route</a>${spotBtn(e)}${ytBtn(e)}`;
+const linkRow=e=>`<a class="btn brand b-maps" href="${esc(mapUrl(V[e.v]))}" target="_blank" rel="noopener noreferrer">${LOGO.maps}Route</a>${spotBtn(e)}${ytBtn(e)}`;
 fetch("spotify.json",{cache:"no-cache"}).then(r=>r.ok?r.json():null).then(j=>{
   if(!j||j.v!==1||!j.found||typeof j.found!=="object") return;
   SPOT={found:new Map(Object.entries(j.found).filter(([,v])=>typeof v==="string"&&SPOT_ID.test(v))),none:new Set(Array.isArray(j.none)?j.none:[]),skip:new Set(Array.isArray(j.skip)?j.skip:[])};
@@ -782,15 +789,15 @@ function spotState(e){
 function spotBtn(e){
   const st=spotState(e);
   if(st.k==="skip") return "";
-  if(st.k==="link") return `<a class="btn ghost" href="https://open.spotify.com/artist/${st.id}" target="_blank" rel="noopener noreferrer">${ICO.play}Spotify</a>`;
-  if(st.k==="none") return `<button class="btn ghost" type="button" disabled aria-label="Spotify: ${esc(e.artist)} is niet gevonden op Spotify">${ICO.play}<span>Spotify<small>niet gevonden</small></span></button>`;
-  return `<a class="btn ghost" href="https://open.spotify.com/search/${encodeURIComponent(linkName(e))}" target="_blank" rel="noopener noreferrer">${ICO.play}Spotify</a>`;
+  if(st.k==="link") return `<a class="btn brand b-spotify" href="https://open.spotify.com/artist/${st.id}" target="_blank" rel="noopener noreferrer">${LOGO.spotify}Spotify</a>`;
+  if(st.k==="none") return `<button class="btn ghost" type="button" disabled aria-label="Spotify: ${esc(e.artist)} is niet gevonden op Spotify">${LOGO.spotify}<span>Spotify<small>niet gevonden</small></span></button>`;
+  return `<a class="btn brand b-spotify" href="https://open.spotify.com/search/${encodeURIComponent(linkName(e))}" target="_blank" rel="noopener noreferrer">${LOGO.spotify}Spotify</a>`;
 }
 // YouTube kan niet vooraf gecontroleerd worden: altijd een zoeklink (bij films: de trailer)
 function ytBtn(e){
-  if(e.type==="film") return `<a class="btn ghost" href="https://www.youtube.com/results?search_query=${encodeURIComponent(e.title+" trailer")}" target="_blank" rel="noopener noreferrer">${ICO.play}Trailer</a>`;
+  if(e.type==="film") return `<a class="btn brand b-youtube" href="https://www.youtube.com/results?search_query=${encodeURIComponent(e.title+" trailer")}" target="_blank" rel="noopener noreferrer">${LOGO.youtube}Trailer</a>`;
   if(spotState(e).k==="skip") return "";
-  return `<a class="btn ghost" href="https://www.youtube.com/results?search_query=${encodeURIComponent(linkName(e))}" target="_blank" rel="noopener noreferrer">${ICO.play}YouTube</a>`;
+  return `<a class="btn brand b-youtube" href="https://www.youtube.com/results?search_query=${encodeURIComponent(linkName(e))}" target="_blank" rel="noopener noreferrer">${LOGO.youtube}YouTube</a>`;
 }
 function openDetail(id,o={}){
   lastDetail={id,o};
@@ -806,6 +813,7 @@ function openDetail(id,o={}){
      <div class="dsub">${esc(v.name)}, ${esc(v.city)} · <button class="linkbtn" data-openvenue="${esc(vgOf(e.v))}">Alles bij dit podium</button></div></div>
      <button class="star" data-fav="${e.ak}" data-name="${esc(e.artist)}" aria-pressed="${S.fav.has(e.ak)}" aria-label="Volg ${esc(e.artist)}" style="font-size:30px">★</button></div>
    <div class="facts"><div><small>Genre</small><b>${esc(e.genre)}</b></div>${tr.car!=null?`<div><small>Auto</small><b>± ${tr.car} min</b></div><div><small>OV</small><b>± ${tr.ov} min</b></div>`:""}${e.price!=null?`<div><small>${e.price===0?"Entree":"Prijs vanaf"}</small><b>${priceTxt(e.price)}</b></div>`:""}${e.status==="sold"?`<div><small>Kaarten</small><b style="color:var(--warn)">Uitverkocht</b></div>`:""}</div>
+   ${tr.car!=null?`<p class="s travnote">Reistijd is een schatting vanaf ${S.home==="__geo"?"je opgeslagen locatie":esc(S.home)} (afstand hemelsbreed). Google Maps rekent vanaf waar je nu bent, met verkeer en dienstregeling.</p>`:""}
    <div class="timeline">${tl}</div>
    <div class="row2"><a class="btn" href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">Info en kaarten bij ${esc(V[e.v].name)}</a></div>
    <div class="row2" style="margin-top:10px"><button class="btn ghost go" id="goBtn" type="button" aria-pressed="${going}">${going?"✓ Ik ga":"Ik ga"}</button>${o.surprise?`<button class="btn ghost" id="surpBtn" type="button">${ICO.dice}Nog een verrassing</button>`:""}</div>
