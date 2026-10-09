@@ -22,6 +22,12 @@ if("serviceWorker" in navigator && !inFrame && (location.protocol==="https:"||lo
     navigator.serviceWorker.register("sw.js",{scope:"./"}).then(reg=>{
       document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible") reg.update().catch(()=>{})});
     }).catch(()=>{});
+    // Eerste bezoek: de pagina haalde data.json op voordat de service worker meekeek. Laat hem er één keer langs lopen
+    // (een bijwerkvraag, geen nieuwe download) zodat de agenda ook offline werkt.
+    navigator.serviceWorker.ready.then(()=>{
+      const warm=()=>caches.match("data.json").then(hit=>{ if(!hit) ["data.json","spotify.json"].forEach(u=>fetch(u,{cache:"no-cache"}).catch(()=>{})) }).catch(()=>{});
+      if(navigator.serviceWorker.controller) warm(); else navigator.serviceWorker.addEventListener("controllerchange",()=>setTimeout(warm,0),{once:true});
+    }).catch(()=>{});
   });
 }
 

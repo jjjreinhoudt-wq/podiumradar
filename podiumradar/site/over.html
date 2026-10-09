@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'none'">
 <title>Over Podiumradar</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -25,33 +26,33 @@ a{color:var(--acc)} .back{display:inline-block;margin-bottom:8px;text-decoration
 <main>
 <a class="back" href="./">← Terug naar Podiumradar</a>
 <h1>Over Podiumradar</h1>
-<p class="s">Een persoonlijke, gratis cultuuragenda. Niet gelieerd aan de podia, theaters, musea, festivals of bioscopen die erin staan.</p>
+<p class="s">Een persoonlijk, gratis project dat met vrienden wordt gedeeld en niet bedoeld is voor een groot publiek (zoekmachines nemen de pagina's niet op). Niet gelieerd aan de podia, theaters, musea, festivals of bioscopen die erin staan.</p>
 
 <h2>Wat het is</h2>
 <p>Podiumradar zet de agenda's van podia, theaters, musea, festivals en bioscopen in Nederland op één plek. De gegevens komen <strong>rechtstreeks van de eigen sites</strong> van die organisaties, niet van andere agendasites.</p>
-<p>We nemen alleen de kerngegevens over: titel, datum, tijd, locatie en of een voorstelling uitverkocht is. Geen beschrijvingen, foto's, logo's of prijzen. Bij elke voorstelling staat een link naar de pagina van het podium zelf; daar koop je ook je kaarten.</p>
+<p>We nemen alleen de kerngegevens over: titel, datum, tijd, locatie, of een voorstelling uitverkocht is en, als het podium die zelf op zijn site toont, de laagste ticketprijs. Geen beschrijvingen, foto's of logo's. Bij elke voorstelling staat een link naar de pagina van het podium zelf; daar koop je ook je kaarten.</p>
 
 <h2>Klopt het altijd?</h2>
-<p>We doen ons best, maar de agenda wordt één keer per dag bijgewerkt en een site kan intussen iets wijzigen. <strong>De site van het podium is altijd leidend</strong> voor tijden, prijzen, beschikbaarheid en afgelaste voorstellingen. Podiumradar is niet aansprakelijk voor fouten in de overgenomen gegevens.</p>
+<p>We doen ons best, maar de agenda wordt één keer per dag bijgewerkt en een site kan intussen iets wijzigen. <strong>De site van het podium is altijd leidend</strong> voor tijden, prijzen, beschikbaarheid en afgelaste voorstellingen. Podiumradar is niet aansprakelijk voor fouten in de overgenomen gegevens. Niet alle podia lukt het elke nacht uit te lezen; ontbreekt er een, kijk dan op hun eigen site. Is de agenda meer dan anderhalve dag oud, dan zie je boven de lijst een waarschuwing. De reistijden (auto en OV) zijn een schatting vanaf de gekozen plaats, geen echte route.</p>
 
 <h2>Voor podia en organisatoren</h2>
 <div class="card">
-<p style="margin-top:0">Liever niet in Podiumradar, of klopt er iets niet? Laat het weten via <a href="https://github.com/jjjreinhoudt-wq/podiumradar/issues" rel="noopener noreferrer">de meldingenpagina van Podiumradar</a>. We halen een podium binnen 7 dagen uit de agenda als het daarom vraagt.</p>
-<p style="margin-bottom:0">Zo halen we de gegevens op: we volgen robots.txt, doen hoogstens één verzoek per 1,5 seconde per server (of trager als robots.txt daarom vraagt), en melden ons als <code>Podiumradar/1.0</code> met een link naar deze pagina. Heeft u een feed of API die we beter kunnen gebruiken? Dan horen we dat graag.</p>
+<p style="margin-top:0">Liever niet in Podiumradar, of klopt er iets niet? Laat het weten via <a href="https://github.com/jjjreinhoudt-wq/agenda-nefmp54/issues" rel="noopener noreferrer">de meldingenpagina</a>. We halen een podium binnen 7 dagen uit de agenda als het daarom vraagt.</p>
+<p style="margin-bottom:0">Zo halen we de gegevens op: we volgen robots.txt, doen hoogstens één verzoek per 1,5 seconde per server (of trager als robots.txt daarom vraagt), en melden ons als <code>Podiumradar/1.0</code>. Wilt u niet dat we uw site uitlezen? Zet dan een regel voor <code>Podiumradar</code> in uw robots.txt, of laat het weten via de meldingenpagina hieronder. Heeft u een feed of API die we beter kunnen gebruiken? Dan horen we dat graag.</p>
 </div>
 
 <h2>Privacy</h2>
 <ul>
 <li><strong>Geen account, geen tracking, geen cookies van derden, geen statistieken.</strong></li>
-<li>Je favorieten, alarmen, filters, vertrekpunt en verborgen steden worden alleen <strong>in je eigen browser</strong> bewaard (localStorage). Ze gaan nergens naartoe. Wissen doe je door de sitegegevens van deze site in je browser te wissen.</li>
-<li>Kies je "Mijn locatie", dan gebruikt je browser je locatie alleen om reistijden te berekenen, op je eigen apparaat. Die wordt niet verstuurd.</li>
-<li>De site staat op GitHub Pages (GitHub Inc., VS). Zoals bij elke website ziet de hosting je IP-adres en houdt die technische logbestanden bij; zie de <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" rel="noopener noreferrer">privacyverklaring van GitHub</a>. Het lettertype staat op deze site zelf, dus er gaat niets naar Google Fonts.</li>
-<li>Kies je "Google Agenda", dan ga je naar Google; daar geldt het privacybeleid van Google.</li>
-<li>De agenda bevat namen van artiesten zoals de podia die zelf publiceren. Wil je als artiest dat iets wordt aangepast of verwijderd? Meld het via de meldingenpagina.</li>
+<li>Je favorieten, plannen ("Ik ga"), alarmen, filters, vertrekplaats en verborgen steden worden alleen <strong>in je eigen browser</strong> bewaard (localStorage) en gaan nergens naartoe. Kies je "Mijn locatie", dan wordt ook je plaats (coördinaten) alleen op je eigen apparaat bewaard om reistijden te berekenen. Wissen doe je door de sitegegevens van deze site in je browser te wissen.</li>
+<li>De site staat op GitHub Pages (GitHub Inc., VS). Zoals bij elke website ziet de hosting je IP-adres en houdt die technische logbestanden bij; zie de <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" rel="noopener noreferrer">privacyverklaring van GitHub</a>. Het lettertype staat op deze site zelf.</li>
+<li>De knoppen <strong>Route</strong> (Google Maps), <strong>Spotify</strong>, <strong>YouTube/Trailer</strong> en <strong>Google Agenda</strong> openen die diensten pas als je erop tikt. Daarbij gaan de plaats van het podium of de naam van de artiest mee in de link; daarna geldt het privacybeleid van die dienst.</li>
+<li><strong>Zet in agenda</strong> maakt een bestand op je eigen apparaat. <strong>Delen</strong> en <strong>Klopt niet?</strong> gebruiken het deelmenu van je telefoon of kopiëren een tekst; de app verstuurt zelf niets.</li>
+<li>Het uitlezen van de podia gebeurt los van je bezoek: de gegevens worden 's nachts opgehaald en als bestanden op de site gezet.</li>
 </ul>
 
 <h2>Contact</h2>
-<p><a href="https://github.com/jjjreinhoudt-wq/podiumradar/issues" rel="noopener noreferrer">github.com/jjjreinhoudt-wq/podiumradar/issues</a></p>
+<p>Heb je de link van iemand gekregen? Stuur je opmerking naar die persoon. Podia en organisatoren: via <a href="https://github.com/jjjreinhoudt-wq/agenda-nefmp54/issues" rel="noopener noreferrer">de meldingenpagina</a>.</p>
 <p class="s">Laatst bijgewerkt: oktober 2026.</p>
 </main>
 </body>

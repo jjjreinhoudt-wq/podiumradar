@@ -1,0 +1,44 @@
+name: Tests
+
+# Draait bij elke pull request en elke wijziging op een andere branch dan main: Python-tests, syntaxcontrole en de rooktest van de app.
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: podiumradar
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: "3.12"
+      - run: pip install -r scraper/requirements.txt
+      - name: Python-tests
+        run: |
+          python scraper/test_spotify.py
+          python scraper/test_prijzen.py
+          python scraper/test_schoon.py
+          python scraper/test_fetch.py
+          python scraper/test_scrape_offline.py
+      - name: Persoonlijke gegevens
+        env:
+          VERBODEN: ${{ secrets.IDENTITEIT_VERBODEN }}
+        run: python tests/check_identiteit.py
+      - name: JavaScript-syntaxis
+        run: for f in site/app.js site/pwa.js site/sw.js tests/ui_smoke.js; do node --check "$f"; done
+      - name: Rooktest van de app
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+          PWPATH="$PWD/node_modules/playwright" node tests/ui_smoke.js

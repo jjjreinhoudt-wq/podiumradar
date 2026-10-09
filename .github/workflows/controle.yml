@@ -1,7 +1,7 @@
 name: Wekelijkse controle
 
 # Elke maandagochtend: kijkt of bronnen stuk lijken (0 items, sterke daling, 403/404, vreemde datums/tijden ...)
-# en zet het rapport in één vast issue "Wekelijkse controle Podiumradar". GitHub stuurt Jasper daarvan een mail.
+# en zet het rapport in één vast issue "Wekelijkse controle Podiumradar". GitHub stuurt de eigenaar daarvan een mail.
 on:
   schedule:
     - cron: "17 6 * * 1"  # maandag 06:17 UTC; niet op een heel of half uur

@@ -1,0 +1,48 @@
+name: Bewaking agenda
+
+# Elke dag: is de agenda ouder dan 36 uur (de nachtelijke run is mislukt, vastgelopen of overgeslagen), dan komt er één melding
+# "Agenda is verouderd" (GitHub mailt de eigenaar). Is de agenda weer vers, dan sluit die melding vanzelf.
+on:
+  schedule:
+    - cron: "23 12 * * *"  # 12:23 UTC; niet op een heel of half uur
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  bewaken:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false
+      - id: leeftijd
+        run: |
+          python3 - <<'EOF'
+          import json, os, datetime as dt
+          from zoneinfo import ZoneInfo
+          d = json.load(open("podiumradar/site/data.json", encoding="utf-8"))
+          t = dt.datetime.strptime(d["updated"], "%Y-%m-%d %H:%M").replace(tzinfo=ZoneInfo("Europe/Amsterdam"))
+          uren = (dt.datetime.now(dt.timezone.utc) - t).total_seconds() / 3600
+          print(f"agenda van {d['updated']}, {uren:.0f} uur oud")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"uren={uren:.0f}\nverouderd={'ja' if uren > 36 else 'nee'}\nupdated={d['updated']}\n")
+          EOF
+      - name: Melding maken of sluiten
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VEROUDERD: ${{ steps.leeftijd.outputs.verouderd }}
+          UREN: ${{ steps.leeftijd.outputs.uren }}
+          UPDATED: ${{ steps.leeftijd.outputs.updated }}
+        run: |
+          gh label create bewaking --color B60205 --description "Automatische bewaking" --force || true
+          nr=$(gh issue list --state open --label bewaking --json number --jq '.[0].number // empty')
+          if [ "$VEROUDERD" = "ja" ] && [ -z "$nr" ]; then
+            gh issue create --label bewaking --title "Agenda is verouderd" --body "De agenda is voor het laatst bijgewerkt op $UPDATED ($UREN uur geleden). De nachtelijke run is waarschijnlijk mislukt of vastgelopen: kijk bij Actions > Agenda bijwerken. Deze melding sluit vanzelf zodra de agenda weer vers is."
+          elif [ "$VEROUDERD" = "nee" ] && [ -n "$nr" ]; then
+            gh issue close "$nr" --comment "De agenda is weer bijgewerkt ($UPDATED)."
+          fi

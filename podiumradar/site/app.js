@@ -28,9 +28,11 @@ function timesOf(t){
     let s=(+m[1])*60+(+m[2]); if(out.length&&s<out[0].s-6*60) s+=1440; out.push({a:x.a.trim(),s}) });
   return out.length?out.sort((a,b)=>a.s-b.s):null;
 }
-Object.entries(DATA.venues).forEach(([id,v])=>V[id]={id,...v});
+Object.entries(DATA.venues||{}).forEach(([id,v])=>{ if(/^[\w-]{1,80}$/.test(id)&&v&&typeof v==="object"&&typeof v.name==="string"&&typeof v.city==="string") V[id]={id,...v} });
 const filmSeen=new Set();
-DATA.events.forEach(r=>{
+let BAD=0;
+(DATA.events||[]).forEach(r=>{ try{
+  if(!/^[\w-]{1,40}$/.test(r.id)||!/^[\w-]{1,80}$/.test(r.v)) throw 0;
   const [y,m,dd]=r.date.split("-").map(Number);
   const endD=r.end?dayNr(r.end):null;
   let d=dayNr(r.date); if((endD??d)<0) return;
@@ -45,15 +47,20 @@ DATA.events.forEach(r=>{
   let head=r.title.replace(/\s*\((festival|festival, dag \d)\)$/i,"").split(" - ")[0].trim();
   let acts=head.replace(/^Popronde:\s*/,"").split(/\s\+\s/).map(s=>s.trim());
   const im=r.title.match(/Instore:\s*(.+)$/); if(im) acts=[im[1]];
-  const support=(r.support&&r.support.length)?r.support:acts.slice(1);
+  const support=Array.isArray(r.support)&&r.support.length?r.support.map(String):acts.slice(1);
   EV.push({id:r.id,title:r.title,artist:acts[0],support,v:r.v,genre:r.genre,type,date,d,
     time:toMin(r.time)??toMin(r.start)??toMin(r.doors), doors:toMin(r.doors), start:toMin(r.start),
     // alleen echte webadressen als link (geen javascript:-links uit een bron)
-    url:/^https?:\/\//i.test(r.url||"")?r.url:"#",isFest:r.id[0]==="f"||type==="fest",status:r.status||null,firstSeen:r.first_seen,
+    url:/^https?:\/\/[^\s<>"]+$/i.test(String(r.url||"").trim().replace(/ /g,"%20"))?String(r.url).trim().replace(/ /g,"%20"):"#",isFest:r.id[0]==="f"||type==="fest",status:r.status||null,firstSeen:r.first_seen,
     dur:r.dur||null,kids:!!r.kids||isKids(r.title,r.genre),endD,endDate:r.end?new Date(...r.end.split("-").map((x,i)=>i===1?x-1:+x)):null,started,
     rawDate:r.date, price:priceOf(r.price), times:timesOf(r.times)});
-});
-const SNAPSHOT=(()=>{const [dpart,t]=DATA.updated.split(" ");const [y,m,d]=dpart.split("-").map(Number);return d+" "+["januari","februari","maart","april","mei","juni","juli","augustus","september","oktober","november","december"][m-1]+" om "+t})();
+}catch(err){BAD++} });   // een rij die niet te lezen is wordt overgeslagen
+if(!EV.length){ document.querySelector("#main").innerHTML='<div class="empty"><strong>De agenda is leeg of kon niet gelezen worden</strong>Ververs de pagina. Blijft het zo, laat het weten aan degene die je de link gaf.</div>'; return }
+const SNAPSHOT=(()=>{try{const [dpart,t]=DATA.updated.split(" ");const [y,m,d]=dpart.split("-").map(Number);return d+" "+["januari","februari","maart","april","mei","juni","juli","augustus","september","oktober","november","december"][m-1]+" om "+t}catch{return "onbekend"}})();
+// Hoe oud is de agenda? (data.json: "JJJJ-MM-DD UU:MM", Nederlandse tijd) Na 36 uur staat er een waarschuwing boven de lijst
+const nlMs=(y,mo,d,h,mi)=>{const g=Date.UTC(y,mo-1,d,h,mi); try{const p=Object.fromEntries(new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Amsterdam",hourCycle:"h23",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}).formatToParts(new Date(g)).map(x=>[x.type,x.value])); return g-(Date.UTC(+p.year,p.month-1,+p.day,+p.hour,+p.minute)-g)}catch{return new Date(y,mo-1,d,h,mi).getTime()}};   // klokkijd in Nederland -> echt tijdstip
+const AGE_H=(()=>{const m=String(DATA.updated).match(/^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d)/);return m?(Date.now()-nlMs(+m[1],+m[2],+m[3],+m[4],+m[5]))/36e5:0})();
+const staleBanner=()=>AGE_H>36?`<div class="stale" role="status"><strong>De agenda is niet bijgewerkt sinds ${SNAPSHOT}.</strong> Tijden kunnen verouderd zijn: kijk voor de zekerheid bij het podium.</div>`:"";
 const recent=e=>e.firstSeen&&(today-new Date(e.firstSeen))/864e5<=3;
 // Zoeken: zonder hoofdletters/accenten, alle woorden moeten voorkomen ("amity 013" vindt The Amity Affliction bij 013)
 const FOLD={"ø":"o","đ":"d","ł":"l","ı":"i","æ":"ae","œ":"oe","ß":"ss","ð":"d","þ":"th"};
@@ -76,7 +83,7 @@ function travel(vid){const v=V[vid], h=S.homeXY; if(v.lat==null) return {car:nul
   return {car:Math.round(k*1.2/90*60+10), ov:Math.round(k*1.2/70*60+15), k}}
 
 /* ---------- STATE ---------- */
-const store={get(k,f){try{const v=localStorage.getItem(k);return v?JSON.parse(v):f}catch{return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+const store={get(k,f){try{const v=localStorage.getItem(k);if(!v) return f;const p=JSON.parse(v);return p===null||(f!==null&&(typeof p!==typeof f||Array.isArray(p)!==Array.isArray(f)))?f:p}catch{return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 const S={type:"pop",view:"list",day:-1,month:"",calMonth:"",q:"",qAll:true,sort:"date",regio:new Set(),venue:"",genre:new Set(),time:"",maxTravel:0,onlyFav:false,
   fav:new Set(store.get("pr_fav2",[])), favV:new Set(store.get("pr_favv",[])), onlyFree:false, vmode:store.get("pr_vmode","list")==="map"?"map":"list", alarms:store.get("pr_alarms",[]), home:store.get("pr_home","Tilburg"), homeXY:null,
   // Uitgevinkte steden en podia (blijven bewaard): niets van tonen
@@ -509,8 +516,6 @@ function viewFav(){
   const seenA=new Set(favs);
   const recs=EV.filter(e=>inTab(e)&&favGenres[e.genre]&&!seenA.has(e.ak)&&(seenA.add(e.ak),true)).sort((a,b)=>(travel(a.v).car??999)-(travel(b.v).car??999)||a.d-b.d).slice(0,6);
   h+=`<h2 class="dh">Zelfde genre, dichtbij</h2>`+(recs.length?recs.map(e=>evRow(e,{showDate:true,reason:e.genre+", net als "+favGenres[e.genre]})).join(""):`<p class="s">Volg nog iemand om tips te krijgen.</p>`);
-  h+=meldBox();
-  h+=`<div class="ai" id="aiBox"><strong>Persoonlijk advies van Claude</strong><p>Claude kent de artiesten en kijkt naar wie je volgt. Daarna kiest het uit de hele agenda wat echt bij je past, met uitleg.</p><button class="btn" id="askAI">Vraag advies</button><div id="aiOut"></div></div>`;
   return h;
 }
 /* ---------- PODIA ---------- */
@@ -653,7 +658,7 @@ function render(){
   document.body.classList.toggle("favview",S.view==="fav");
   $("#dates").style.display=["fav","venues","tonight","cal","new"].includes(S.view)?"none":"flex";
   renderDates();
-  $("#main").innerHTML=S.view==="list"?viewList():S.view==="grid"?viewGrid():S.view==="venues"?viewVenues():S.view==="tonight"?viewTonight():S.view==="cal"?viewCal():S.view==="new"?viewNew():viewFav();
+  $("#main").innerHTML=staleBanner()+(S.view==="list"?viewList():S.view==="grid"?viewGrid():S.view==="venues"?viewVenues():S.view==="tonight"?viewTonight():S.view==="cal"?viewCal():S.view==="new"?viewNew():viewFav());
   if(S.view==="fav") setupFav();
   if(S.view==="venues"&&!S.venuePage&&S.vmode==="map") drawMap();
   const mb=$(".months"), mo=mb&&mb.querySelector('[aria-pressed="true"]'); if(mo) mb.scrollLeft=mo.offsetLeft-(mb.clientWidth-mo.offsetWidth)/2;
@@ -819,62 +824,57 @@ function openDetail(id,o={}){
    <div class="row2" style="margin-top:10px"><button class="btn ghost go" id="goBtn" type="button" aria-pressed="${going}">${going?"✓ Ik ga":"Ik ga"}</button>${o.surprise?`<button class="btn ghost" id="surpBtn" type="button">${ICO.dice}Nog een verrassing</button>`:""}</div>
    <div class="row2 wrapr" id="linkRow" style="margin-top:10px">${linkRow(e)}</div>
    <div class="row2" style="margin-top:10px">${e.time!=null?`<button class="btn ghost" id="icsBtn">Zet in agenda</button><a class="btn ghost" id="gcal" target="_blank" rel="noopener">Google Agenda</a>`:`<p class="s">Agenda-knop verschijnt zodra de tijd bekend is.</p>`}</div>
-   <div class="row2" style="margin-top:10px"><button class="btn ghost" id="shareBtn" type="button">Delen</button><a class="btn ghost" href="${esc(issueUrl(e))}" target="_blank" rel="noopener noreferrer">Klopt niet?</a></div>
-   <p class="note">Gegevens van ${SNAPSHOT}, overgenomen van de site van ${esc(V[e.v].name)}. Tijden, prijzen en beschikbaarheid kunnen veranderen: kijk altijd op die site voordat je gaat of kaarten koopt.</p>
+   <div class="row2" style="margin-top:10px"><button class="btn ghost" id="shareBtn" type="button">Delen</button><button class="btn ghost" id="wrongBtn" type="button">Klopt niet?</button></div>
+   <p class="note">Gegevens van ${SNAPSHOT}, overgenomen van de site van ${esc(V[e.v].name)}. Tijden, prijzen en beschikbaarheid kunnen veranderen: kijk altijd op die site voordat je gaat of kaarten koopt.${DATA.verouderd&&/^\d{4}-\d\d-\d\d$/.test(DATA.verouderd[e.v]||"")?` <strong>Let op: de site van dit podium was de laatste dagen niet uit te lezen; deze gegevens zijn van ${dm(new Date(DATA.verouderd[e.v]+"T12:00"))} of eerder.</strong>`:""}</p>
    <h3>Vergelijkbaar en dichtbij</h3>
-   <div class="simlist">${sims.length?sims.map(o=>`<div class="ev" role="button" tabindex="0" data-ev="${o.id}"><div><div class="a">${esc(o.artist)}</div><div class="v">${short(o)}, ${esc(V[o.v].name)} ${travel(o.v).car!=null?"(± "+travel(o.v).car+" min)":""}</div></div><button class="star" data-fav="${o.ak}" data-name="${esc(o.artist)}" aria-pressed="${S.fav.has(o.ak)}" aria-label="Volg ${esc(o.artist)}">★</button></div>`).join(""):'<p class="s">Geen genre-match in de huidige agenda.</p>'}</div>
-   <div class="ai" id="simAI" hidden><strong>Wie lijkt hierop?</strong><p>Claude noemt vergelijkbare artiesten en checkt of die in de agenda staan.</p><button class="btn" id="askSim">Vraag Claude</button><div id="simOut"></div></div>`;
+   <div class="simlist">${sims.length?sims.map(o=>`<div class="ev" role="button" tabindex="0" data-ev="${o.id}"><div><div class="a">${esc(o.artist)}</div><div class="v">${short(o)}, ${esc(V[o.v].name)} ${travel(o.v).car!=null?"(± "+travel(o.v).car+" min)":""}</div></div><button class="star" data-fav="${o.ak}" data-name="${esc(o.artist)}" aria-pressed="${S.fav.has(o.ak)}" aria-label="Volg ${esc(o.artist)}">★</button></div>`).join(""):'<p class="s">Geen genre-match in de huidige agenda.</p>'}</div>`;
   if(e.time!=null){ $("#gcal").href=gcalUrl(e); $("#icsBtn").onclick=()=>saveIcs(e); }
   lastDetail.row=linkRow(e);
   $("#shareBtn").onclick=()=>share(e);
+  $("#wrongBtn").onclick=()=>reportWrong(e);
   $("#goBtn").onclick=ev=>{toggleGoing(e); const on=!!GO[e.id], b=ev.currentTarget; b.setAttribute("aria-pressed",on); b.textContent=on?"✓ Ik ga":"Ik ga"};
   if(o.surprise) $("#surpBtn").onclick=()=>surprise(true);
-  if(sample){ $("#simAI").hidden=false; $("#askSim").onclick=()=>askSimilar(e); }
   openSheet("#detailSheet"); $("#detailSheet").scrollTop=0;
 }
-/* Melding "Klopt niet?": vooringevuld GitHub-issue (alles URL-gecodeerd) */
-const ISSUES="https://github.com/jjjreinhoudt-wq/podiumradar/issues/new";
+/* "Klopt niet?": een kant-en-klaar bericht (deelmenu of kopiëren) voor degene die je de link gaf; er wordt niets gepubliceerd */
 const whenTxt=e=>e.endDate?(e.started?"nu":short(e))+" t/m "+dm(e.endDate):short(e)+(e.date.getFullYear()!==today.getFullYear()?" "+e.date.getFullYear():"");
-function issueUrl(e){
+function reportText(e){
   const v=V[e.v];
-  const title=`Klopt niet: ${e.title} (${v.name}, ${e.rawDate})`;
-  const body=[`Datum: ${e.rawDate}${e.endDate?" t/m "+e.endDate.getFullYear()+"-"+String(e.endDate.getMonth()+1).padStart(2,"0")+"-"+String(e.endDate.getDate()).padStart(2,"0"):""} (${whenTxt(e)})`,
-    `Tijd: ${e.time!=null?hm(e.time):"onbekend"}`,`Podium: ${v.name}, ${v.city}`,`Bron: ${e.url!=="#"?e.url:"geen link"}`,`Id: ${e.id}`,"","Wat klopt er niet?",""].join("\n");
-  return ISSUES+"?labels=melding&title="+encodeURIComponent(title)+"&body="+encodeURIComponent(body);
+  return ["Klopt niet in Podiumradar: "+e.title+" ("+v.name+", "+e.rawDate+")",
+    "Datum: "+e.rawDate+(e.endDate?" t/m "+e.endDate.getFullYear()+"-"+String(e.endDate.getMonth()+1).padStart(2,"0")+"-"+String(e.endDate.getDate()).padStart(2,"0"):"")+" ("+whenTxt(e)+")",
+    "Tijd: "+(e.time!=null?hm(e.time):"onbekend"),"Podium: "+v.name+", "+v.city,"Bron: "+(e.url!=="#"?e.url:"geen link"),"","Wat klopt er niet? "].join("\n");
 }
 /* Delen: deelmenu van het toestel, anders kopiëren. De link opent de app met dit item (#id). */
 const appLink=e=>location.origin+location.pathname+"#"+encodeURIComponent(e.id);
 function shareText(e){const v=V[e.v];
   const wd=e.endDate?whenTxt(e):WDL[e.date.getDay()]+" "+dm(e.date)+(e.time!=null?" "+hm(e.time):"");
   return `${e.artist} — ${wd}, ${v.name} ${v.city}`+(e.url!=="#"?"\n"+e.url:"")}
-async function share(e){
-  const text=shareText(e), url=appLink(e);
-  if(navigator.share){ try{ await navigator.share({title:e.artist,text,url}); return }catch(err){ if(err&&err.name==="AbortError") return } }
+async function sendOut(title,text,url,okMsg){
+  if(navigator.share){ try{ await navigator.share({title,text,url}); return }catch(err){ if(err&&err.name==="AbortError") return } }
   const all=text+"\n"+url;
-  try{ await navigator.clipboard.writeText(all); toast("Gekopieerd: plak het in een bericht"); return }catch{}
+  try{ await navigator.clipboard.writeText(all); toast(okMsg); return }catch{}
   try{ const ta=document.createElement("textarea"); ta.value=all; ta.setAttribute("readonly",""); ta.style.cssText="position:fixed;opacity:0;top:0"; document.body.appendChild(ta); ta.select();
-    const ok=document.execCommand("copy"); ta.remove(); if(ok){toast("Gekopieerd: plak het in een bericht");return} }catch{}
+    const ok=document.execCommand("copy"); ta.remove(); if(ok){toast(okMsg);return} }catch{}
   toast("Delen lukt hier niet. Kopieer de link uit de adresbalk.");
 }
+const share=e=>sendOut(e.artist,shareText(e),appLink(e),"Gekopieerd: plak het in een bericht");
+const reportWrong=e=>sendOut("Klopt niet",reportText(e),appLink(e),"Gekopieerd: plak het in een bericht aan degene die je de link gaf");
 function dt(e,min){const x=new Date(e.date);x.setMinutes(min);return x}
 const utc=x=>x.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
 const descr=e=>slots(e).map(s=>hm(s.s)+" "+(s.a||s.l)+(s.est?" (geschat)":"")).join("\n")+"\n\n"+e.url;
 function gcalUrl(e){const v=V[e.v];return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent(e.artist+" @ "+v.name)+"&dates="+utc(dt(e,e.time))+"/"+utc(dt(e,endOf(e)))+"&location="+encodeURIComponent(v.name+", "+v.city)+"&details="+encodeURIComponent(descr(e))}
-let downloads=null, sample=null;
 const icsEsc=t=>String(t).replace(/\\/g,"\\\\").replace(/[;,]/g,"\\$&").replace(/\n/g,"\\n");
 function vevent(e){const v=V[e.v], tr=travel(e.v);
   return ["BEGIN:VEVENT","UID:"+e.id+"@podiumradar","DTSTAMP:"+utc(new Date()),"DTSTART:"+utc(dt(e,e.time)),"DTEND:"+utc(dt(e,endOf(e))),
     "SUMMARY:"+icsEsc(e.artist+" @ "+v.name),"LOCATION:"+icsEsc(v.name+", "+v.city),...(e.url!=="#"?["URL:"+e.url]:[]),"DESCRIPTION:"+icsEsc(descr(e)),
     "BEGIN:VALARM","TRIGGER:-PT"+((tr.car||30)+30)+"M","ACTION:DISPLAY","DESCRIPTION:"+icsEsc("Vertrekken naar "+e.artist),"END:VALARM","END:VEVENT"]}
 const icsDoc=evs=>["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Podiumradar//NL",...evs.flatMap(vevent),"END:VCALENDAR"].join("\r\n");
-// Bestand aanbieden: via het toestel (downloads) of als gewone download; geeft false als het niet lukt
-async function deliverIcs(ics,name,msgDownloaded,msgSaved){
-  if(!downloads){const url=URL.createObjectURL(new Blob([ics],{type:"text/calendar"})), a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);toast(msgDownloaded);return true}
-  try{await downloads.save({filename:name,data:new Blob([ics],{type:"text/calendar"})});toast(msgSaved);return true}
-  catch(err){const c=err&&err.code; if(c==="unavailable") downloads=null; return c==="declined"||c==="rate_limited"?null:false}
+// Bestand aanbieden als gewone download; geeft true als het is aangeboden
+async function deliverIcs(ics,name,msgDownloaded){
+  const url=URL.createObjectURL(new Blob([ics],{type:"text/calendar"})), a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);toast(msgDownloaded);return true;
 }
 async function saveIcs(e){
-  const ok=await deliverIcs(icsDoc([e]),e.artist.replace(/[^\w\- ]/g,"")+".ics","Agendabestand gedownload, met vertrekherinnering","Agendabestand klaar, met vertrekherinnering");
+  const ok=await deliverIcs(icsDoc([e]),e.artist.replace(/[^\w\- ]/g,"")+".ics","Agendabestand gedownload, met vertrekherinnering");
   if(ok===false) window.open(gcalUrl(e),"_blank","noopener");
 }
 async function saveIcsAll(list){
@@ -884,49 +884,11 @@ async function saveIcsAll(list){
   if(ok===false) toast("Downloaden lukt hier niet. Zet ze één voor één in je agenda.");
 }
 
-/* ---------- CLAUDE ---------- */
-const errCopy=c=>c==="rate_limited"?"Even te veel verzoeken. Probeer het over een minuut opnieuw.":"Het advies lukte niet. Probeer het nog eens.";
-async function askSimilar(e){
-  const out=$("#simOut"), btn=$("#askSim"); btn.disabled=true; out.innerHTML="<p>Bezig met nadenken…</p>";
-  const names=[...new Set(EV.filter(x=>x.type===e.type).map(x=>x.artist))];
-  try{
-    const r=await sample.json(`Artiest: "${e.artist}" (${e.genre}). Noem 6 artiesten die hierop lijken. Geef ook aan welke namen uit deze agenda-lijst erop lijken: ${JSON.stringify(names)}. Antwoord in het Nederlands met alleen JSON: {"lijkt_op":[{"naam":"","waarom":"korte zin"}],"in_agenda":["exacte naam uit de lijst"]}`,{modelTier:"quick"});
-    const inAg=(r.in_agenda||[]).map(n=>EV.filter(x=>x.artist===n&&x.type===e.type).sort((a,b)=>a.d-b.d)[0]).filter(Boolean);
-    out.innerHTML=(r.lijkt_op||[]).map(x=>`<p><strong>${esc(x.naam)}</strong>: ${esc(x.waarom)}</p>`).join("")+(inAg.length?`<p><strong>Staat in de agenda:</strong></p>`+inAg.map(x=>evRow(x,{showDate:true})).join(""):"");
-  }catch(err){ if(err&&err.code==="not_granted"){ $("#simAI").hidden=true; sample=null } else out.innerHTML=`<p>${errCopy(err&&err.code)}</p>` }
-  finally{ btn.disabled=false }
-}
-/* Pushmeldingen via ntfy: de volglijst staat op dit toestel; met deze knop gaat hij als GitHub-melding naar de
-   repository, waar workflow volglijst.yml hem overneemt (alleen van de eigenaar). Zie scraper/meldingen.py. */
-function meldBox(){
-  const lijst={artiesten:[...S.fav].map(favName),podia:[...S.favV],alarmen:S.alarms};
-  const n=lijst.artiesten.length+lijst.podia.length+lijst.alarmen.length;
-  const body="Volglijst vanuit de app (niet aanpassen, alleen op 'Submit new issue' tikken).\n\n```json\n"+JSON.stringify(lijst,null,1)+"\n```\n";
-  const url="https://github.com/jjjreinhoudt-wq/podiumradar/issues/new?title="+encodeURIComponent("Volglijst Podiumradar")+"&body="+encodeURIComponent(body);
-  return `<div class="ai meld"><strong>Meldingen op je telefoon</strong><p>Krijg een melding in de app <b>ntfy</b> zodra er een nieuwe show is van een artiest of podium dat je volgt, of die past bij een alarm. Na het volgen of ontvolgen: stuur je lijst opnieuw.</p>
-    ${n?`<a class="btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Stuur mijn volglijst (${n})</a>`:`<p class="s">Volg eerst een artiest of podium, of zet een alarm.</p>`}</div>`;
-}
 function setupFav(){
   const add=()=>{const v=$("#alarmIn").value.trim(); if(!v) return; if(!S.alarms.includes(v)) S.alarms.push(v); store.set("pr_alarms",S.alarms); toast("Alarm gezet voor "+v); render();};
   $("#alarmAdd").onclick=add; $("#alarmIn").onkeydown=e=>{if(e.key==="Enter") add()};
   const ms=$("#markSeen"); if(ms) ms.onclick=markSeen;
   const ia=$("#icsAll"); if(ia) ia.onclick=()=>saveIcsAll(Object.keys(GO).map(id=>BYID.get(id)).filter(e=>e&&e.time!=null&&e.endD==null).sort((a,b)=>a.d-b.d||a.time-b.time));
-  const box=$("#aiBox"); if(!box) return;
-  if(!sample){box.style.display="none";return}
-  $("#askAI").onclick=async()=>{
-    const out=$("#aiOut"), btn=$("#askAI"); btn.disabled=true; out.innerHTML="<p>Bezig met nadenken…</p>";
-    const favs=[...S.fav].map(favName);
-    const pool=EV.filter(e=>inTab(e)&&!isFav(e)).slice(0,250).map(e=>({id:e.id,t:e.title,g:e.genre,p:V[e.v].name,dag:short(e),auto_min:travel(e.v).car}));
-    try{
-      const res=await sample.json(`Je bent een Nederlandse muziek- en theaterkenner en geeft persoonlijk uitgaansadvies.
-De gebruiker volgt: ${JSON.stringify(favs)}. Alarmen: ${JSON.stringify(S.alarms)}.
-Agenda: ${JSON.stringify(pool)}
-Kies de 5 shows die het best passen bij deze smaak (gebruik je kennis van de artiesten, niet alleen het genre). Houd rekening met reistijd. Antwoord met alleen JSON: [{"id":"p123","waarom":"één korte zin"}]`,{modelTier:"default"});
-      const picks=(Array.isArray(res)?res:[]).map(p=>({e:EV.find(x=>x.id===p.id),w:p.waarom})).filter(p=>p.e);
-      out.innerHTML=picks.length?picks.map(p=>evRow(p.e,{showDate:true,reason:p.w})).join(""):"<p>Geen duidelijke match. Volg nog een artiest.</p>";
-    }catch(err){ if(err&&err.code==="not_granted"){box.style.display="none";sample=null} else out.innerHTML=`<p>${errCopy(err&&err.code)}</p>` }
-    finally{btn.disabled=false}
-  };
 }
 
 /* ---------- EVENTS ---------- */
@@ -1051,7 +1013,7 @@ let qt;$("#q").oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{S.q=e.target.valu
   try{history.replaceState(null,"",location.pathname+location.hash)}catch{}
 })();
 
-buildHome(); render();
+buildHome(); render(); document.body.dataset.ready="1";
 /* Gedeelde link (#id): meteen de details van dat item openen */
 function openFromHash(){
   let id=""; try{id=decodeURIComponent(location.hash.slice(1))}catch{} if(!id) return;
@@ -1059,8 +1021,6 @@ function openFromHash(){
   else if(/^[a-z][\w-]{3,40}$/i.test(id)) toast("Dit item staat niet (meer) in de agenda");
 }
 openFromHash(); window.addEventListener("hashchange",openFromHash);
-if(window.claude&&claude.use){
-  claude.use("sample").then(s=>{sample=s;if(S.view==="fav")render()}).catch(()=>{});
-  claude.use("downloads").then(d=>{downloads=d}).catch(()=>{});
-}
-})();
+// Na middernacht opnieuw laden: een scherm van gisteren zou anders nog "Vandaag" van gisteren tonen
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&new Date().getDate()!==today.getDate()) location.reload() });
+})().catch(()=>{ const m=document.querySelector("#main"); if(m&&!document.body.dataset.ready) m.innerHTML='<div class="empty"><strong>De app kon niet starten</strong>Ververs de pagina. Blijft het misgaan, laat het weten aan degene die je de link gaf.</div>'; });

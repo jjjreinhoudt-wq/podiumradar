@@ -24,7 +24,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 BRONNEN = ROOT / "scraper/bronnen.json"
 CACHE = ROOT / "scraper/detail_cache.json"
 REPORT = ROOT / "scraper/rapport.json"
-LOKAAL = ROOT / "scraper/lokaal.json"          # geschreven door scraper/lokaal.py op Jaspers computer
+LOKAAL = ROOT / "scraper/lokaal.json"          # geschreven door scraper/lokaal.py op de eigen computer van de eigenaar
 LOCAL_CACHE = ROOT / "scraper/lokaal_cache.json"  # aparte cache, zodat die niet botst met de cache van GitHub
 TODAY = dt.date.today()
 CACHE_V = 4  # ophogen als het uitlezen verandert, zodat gecachte pagina's opnieuw worden gelezen
@@ -55,6 +55,7 @@ class Fetcher:
 
     def __init__(self, ua, delay):
         self.S = requests.Session()
+        self.S.max_redirects = 5
         self.S.headers.update({"User-Agent": ua, "Accept-Language": "nl,en;q=0.5"})
         self.ua, self.delay = ua, delay
         self.robots, self.last, self.locks, self.ip_locks, self.host_ip = {}, {}, {}, {}, {}
@@ -112,13 +113,35 @@ class Fetcher:
                 time.sleep(wait)
             self.last[ip] = time.time()
             try:
-                r = self.S.post(url, json=json_body, headers=headers, timeout=30) if json_body is not None \
-                    else self.S.get(url, params=params, timeout=30)
+                r = self.S.post(url, json=json_body, headers=headers, timeout=30, stream=True) if json_body is not None \
+                    else self.S.get(url, params=params, timeout=30, stream=True)
+                if not self._lees(r):   # te groot of te traag: niet meer verwerken
+                    self._note(host, "te groot of te traag")
+                    return None
             except requests.RequestException as e:
                 self._note(host, "timeout" if isinstance(e, requests.Timeout) else "verbindingsfout")
                 return None
         self._note(host, str(r.status_code))
         return r if r.status_code == 200 else None
+
+    MAX_BYTES = 25_000_000   # een agendapagina of API-antwoord groter dan dit lezen we niet
+    MAX_SECONDEN = 90        # en wat langer dan dit blijft druppelen ook niet
+
+    def _lees(self, r):
+        """Leest het antwoord (met een bovengrens voor grootte en tijd) en zet het in r.content; False als het niet lukt."""
+        try:
+            if int(r.headers.get("content-length") or 0) > self.MAX_BYTES:
+                r.close(); return False
+        except ValueError:
+            pass
+        t0, delen, n = time.time(), [], 0
+        for chunk in r.iter_content(65536):
+            n += len(chunk)
+            if n > self.MAX_BYTES or time.time() - t0 > self.MAX_SECONDEN:
+                r.close(); return False
+            delen.append(chunk)
+        r._content, r._content_consumed = b"".join(delen), True
+        return True
 
     def get(self, url):
         r = self._fetch(url)
@@ -214,9 +237,11 @@ def from_jsonld(o, page_url):
     d, t = _iso(o.get("startDate"))
     if not d or d.year < 2000:  # kapotte JSON-LD (bv. 1970-01-01): dan liever de tekst lezen
         return None
-    end, end_t = _iso(o.get("endDate"))
-    if end and end_t and end_t < "08:00" and (end - d).days == 1:
-        end = None  # nachtprogramma, geen meerdaags evenement
+    raw_end = o.get("endDate")
+    end, end_t = _iso(raw_end)
+    midnden = isinstance(raw_end, str) and "T00:00" in raw_end   # 'T00:00' = einde van de dag ervoor (_iso geeft dan geen tijd terug)
+    if end and ((end_t and end_t < "08:00") or (midnden and t)) and (end - d).days == 1:
+        end = None  # nachtprogramma of tot middernacht (Here's The Thing, 013): één dag, geen meerdaags evenement
     # Bij een filmvoorstelling (ScreeningEvent) is de film de titel, niet "Voorstelling 20:15"
     wp, nm = _name(o.get("workPresented")), _name(o.get("name"))
     title = unescape(wp if wp and not re.fullmatch(r"[\d\s#-]+", wp) else nm or wp or "").strip()
@@ -695,22 +720,35 @@ def local_key(src):
 
 
 def load_local(log=print):
-    """Resultaten van de bronnen die alleen vanaf Jaspers computer werken (scraper/lokaal.py -> lokaal.json)."""
+    """Resultaten van de bronnen die alleen vanaf de eigen computer van de eigenaar werken (scraper/lokaal.py -> lokaal.json)."""
     if not LOKAAL.exists():
         return {}
-    data = json.loads(LOKAAL.read_text(encoding="utf-8"))
-    age = (TODAY - dt.date.fromisoformat(data.get("datum", "2000-01-01")[:10])).days
+    try:
+        data = json.loads(LOKAAL.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or not isinstance(data.get("bronnen"), dict):
+            raise ValueError("onverwachte opbouw")
+        age = (TODAY - dt.date.fromisoformat(str(data.get("datum", "2000-01-01"))[:10])).days
+    except (OSError, ValueError, TypeError) as e:   # een kapot bestand van de eigen computer mag de nachtrun niet laten crashen
+        log(f"  lokaal.json onleesbaar ({e.__class__.__name__}: {e}): niet gebruikt")
+        return {}
     if age > 21:
         log(f"  lokaal.json is {age} dagen oud: niet meer gebruikt")
         return {}
-    t0 = TODAY.isoformat()
-    return {name: [e for e in evs if (e.get("end") or e["date"]) >= t0] for name, evs in data.get("bronnen", {}).items()}
+    t0, out = TODAY.isoformat(), {}
+    for name, evs in data["bronnen"].items():
+        if not isinstance(name, str) or not isinstance(evs, list) or len(evs) > 5000:
+            continue
+        ok = [e for e in evs if isinstance(e, dict) and isinstance(e.get("title"), str) and isinstance(e.get("url"), str)
+              and isinstance(e.get("date"), str) and re.fullmatch(r"\d{4}-\d\d-\d\d", e["date"])
+              and all(e.get(k) is None or isinstance(e[k], str) for k in ("time", "end", "doors", "start"))]
+        out[name] = [e for e in ok if str(e.get("end") or e["date"]) >= t0]
+    return out
 
 
 def collect(cfg, only=None, log=print, local=False):
     """Geeft [(bron, [events])] terug voor alle bronnen in bronnen.json.
     Bronnen met "local_only" blokkeren datacenters (GitHub): die haalt scraper/lokaal.py (local=True) op
-    vanaf Jaspers eigen computer; de gewone run neemt dan de items uit lokaal.json over."""
+    vanaf de eigen computer van de eigenaar; de gewone run neemt dan de items uit lokaal.json over."""
     if not BRONNEN.exists():
         return []
     allsrc = [s for s in json.loads(BRONNEN.read_text(encoding="utf-8"))
@@ -761,7 +799,7 @@ def collect(cfg, only=None, log=print, local=False):
         loc = load_local(log)
         for src in from_local:
             evs = loc.get(local_key(src))
-            log(f"  {src['name']}: {len(evs) if evs is not None else 'geen'} items van Jaspers computer (lokaal.json)")
+            log(f"  {src['name']}: {len(evs) if evs is not None else 'geen'} items van de eigen computer (lokaal.json)")
             results.append((src, evs))  # None = nog nooit lokaal opgehaald: vorige gegevens aanhouden
     if not only:
         # Rapport per bron: aantal items en de antwoorden van de site (403 = geblokkeerd, 404 = verkeerde link, ...)
