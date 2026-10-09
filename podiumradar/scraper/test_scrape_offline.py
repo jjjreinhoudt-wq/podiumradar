@@ -94,4 +94,31 @@ code, res, st = run(echt)
 check("de helft onbruikbaar: niet gepubliceerd (exit 2)", code, 2)
 bronnen = backup
 
+# 6. relocate(): show bij het juiste podium (Here's The Thing, 10 okt 2026)
+def ev6(venue, title, loc, date="2026-10-10", vtype="pop"):
+    return {"venue": venue, "city": "Tilburg", "prov": "Noord-Brabant", "vtype": vtype, "kind": vtype, "date": date, "title": title, "loc": loc, "time": "15:00", "url": "https://x.nl/" + title}
+def reloc(*evs):
+    r = scrape.relocate({f"s{i}": e for i, e in enumerate(evs)})
+    return sorted((e["venue"], e["title"]) for e in r.values())
+check("losse plaatsnaam als locatie verhuist niets (Cul de Sac -> Schouwburg was fout)",
+      reloc(ev6("Cul de Sac", "Here's The Thing", "Tilburg")), [("Cul de Sac", "Here's The Thing")])
+check("meerdere plekken met 013 als hoofdlocatie: blijft bij 013, kopie bij Cul de Sac weg",
+      reloc(ev6("013", "Here's The Thing", "Poppodium 013 - Next + Basement + Cul de Sac"), ev6("Cul de Sac", "Here's The Thing", "Tilburg")), [("013", "Here's The Thing")])
+check("... ook als Cul de Sac geen eigen kopie heeft",
+      reloc(ev6("013", "Here's The Thing", "Poppodium 013 - Next + Basement + Cul de Sac")), [("013", "Here's The Thing")])
+check("'Locatie | Hall of Fame' bij 013 verhuist nog steeds naar Hall of Fame",
+      reloc(ev6("013", "Show X", "Hall of Fame")), [("Hall of Fame", "Show X")])
+check("... en de kopie weg als Hall of Fame hem zelf al heeft",
+      reloc(ev6("013", "Show X", "Hall of Fame"), ev6("Hall of Fame", "Show X", "")), [("Hall of Fame", "Show X")])
+check("onbekende locatie verhuist niets", reloc(ev6("013", "Show Y", "Ergens anders in de stad")), [("013", "Show Y")])
+check("naam van een ander podium in de locatietekst, zonder eigen podium, verhuist wel",
+      reloc(ev6("Cul de Sac", "Show Z", "Schouwburg & Concertzaal")), [("Schouwburg & Concertzaal Tilburg", "Show Z")])
+
+# 7. einddatum uit JSON-LD: tot middernacht is één dag, een periode zonder tijd blijft een periode
+jl = lambda **kw: sources.from_jsonld({"@type": "Event", "name": "X", **kw}, "https://x.nl/a")
+check("tot middernacht (T00:00 de dag erna) is één dag", "end" in jl(startDate="2026-10-10T15:00:00+02:00", endDate="2026-10-11T00:00:00+02:00"), False)
+check("nachtprogramma tot 02:00 is één dag", "end" in jl(startDate="2026-10-10T22:00:00+02:00", endDate="2026-10-11T02:00:00+02:00"), False)
+check("twee dagen (tot middernacht de dag daarna) blijft een periode", jl(startDate="2026-11-28T15:00:00+01:00", endDate="2026-11-30T00:00:00+01:00").get("end"), "2026-11-30")
+check("tentoonstelling met alleen datums blijft een periode", jl(startDate="2026-10-10", endDate="2026-10-11").get("end"), "2026-10-11")
+
 print("\n" + ("ALLES GOED" if not fouten else f"{fouten} FOUT(EN)")); sys.exit(1 if fouten else 0)

@@ -373,30 +373,44 @@ def own_events(prev_events=()):
 def relocate(events):
     """Een podium zet ook shows van andere podia in zijn agenda (013: 'Locatie | Hall of Fame').
     Staat die andere locatie als eigen bron in dezelfde stad, dan hoort de show daar: heeft dat podium hem zelf
-    ook, dan gaat de kopie weg; anders verhuist hij naar dat podium."""
+    ook, dan gaat de kopie weg; anders verhuist hij naar dat podium.
+    Twee uitzonderingen (Here's The Thing, 10 okt 2026):
+    - Een losse plaatsnaam als locatie ('Tilburg', zoals Cul de Sac die in zijn JSON-LD zet) zegt niets over het podium: de plaatsnaam
+      telt niet mee bij het vergelijken, anders verhuist alles naar het eerste podium met 'Tilburg' in de naam.
+    - Noemt de locatie ook het eigen podium ('Poppodium 013 - Next + Basement + Cul de Sac'), dan is het een evenement op meer plekken
+      met dit podium als hoofdlocatie: het blijft hier en de kopieën bij de andere genoemde podia (die er een eigen item van maken) gaan weg."""
     key = lambda s: re.sub(r"[^a-z0-9]", "", unescape(s).lower())
     by_city = {}
     for s in json.loads(sources.BRONNEN.read_text(encoding="utf-8")):
         if s.get("enabled", True) and s.get("type") != "film":
             by_city.setdefault(key(s.get("city", "")), []).append(s)
     own = {(e["venue"], e["date"], norm(e["title"])) for e in events.values()}
-    out = {}
+    out, weg = {}, set()
     for k, e in events.items():
         loc = key(e.pop("loc", "") or "")
-        if len(loc) >= 4 and e.get("vtype") not in ("film", "festival"):
-            for s in by_city.get(key(e.get("city", "")), []):
+        stad = key(e.get("city", ""))
+        core = loc.replace(stad, "") if stad else loc          # de locatie zonder de plaatsnaam
+        if len(core) >= 4 and e.get("vtype") not in ("film", "festival"):
+            thuis = key(e["venue"])
+            kandidaten = []
+            for s in by_city.get(stad, []):
                 name = re.sub(r"\(.*?\)", "", s["name"])  # "Willem Twee Poppodium (W2)" -> "Willem Twee Poppodium"
-                nk = key(name)
-                if s["name"] == e["venue"] or len(nk) < 4 or not (nk in loc or loc in nk):
+                nk = key(name).replace(stad, "") if stad else key(name)   # 'Schouwburg & Concertzaal Tilburg' -> 'schouwburgconcertzaal'
+                if s["name"] == e["venue"] or len(nk) < 4 or not (nk in core or core in nk):
                     continue
+                kandidaten.append(s)
+            if thuis and thuis in loc:
+                for s in kandidaten:                            # meerdere plekken, dit podium is de hoofdlocatie
+                    weg.add((s["name"], e["date"], norm(e["title"])))
+            elif kandidaten:
+                s = kandidaten[0]
                 if (s["name"], e["date"], norm(e["title"])) in own:
                     e = None  # dat podium heeft de show zelf al
                 else:
                     e.update(venue=s["name"], prov=s.get("prov", e["prov"]), vtype=s.get("type", e["vtype"]))
-                break
         if e is not None:
             out[k] = e
-    return out
+    return {k: e for k, e in out.items() if (e["venue"], e["date"], norm(e["title"])) not in weg}
 
 
 # ---------------------------------------------------------------- opschonen (zie ook --reclassify)

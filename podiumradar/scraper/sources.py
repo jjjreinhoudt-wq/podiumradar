@@ -237,9 +237,11 @@ def from_jsonld(o, page_url):
     d, t = _iso(o.get("startDate"))
     if not d or d.year < 2000:  # kapotte JSON-LD (bv. 1970-01-01): dan liever de tekst lezen
         return None
-    end, end_t = _iso(o.get("endDate"))
-    if end and end_t and end_t < "08:00" and (end - d).days == 1:
-        end = None  # nachtprogramma, geen meerdaags evenement
+    raw_end = o.get("endDate")
+    end, end_t = _iso(raw_end)
+    midnden = isinstance(raw_end, str) and "T00:00" in raw_end   # 'T00:00' = einde van de dag ervoor (_iso geeft dan geen tijd terug)
+    if end and ((end_t and end_t < "08:00") or (midnden and t)) and (end - d).days == 1:
+        end = None  # nachtprogramma of tot middernacht (Here's The Thing, 013): één dag, geen meerdaags evenement
     # Bij een filmvoorstelling (ScreeningEvent) is de film de titel, niet "Voorstelling 20:15"
     wp, nm = _name(o.get("workPresented")), _name(o.get("name"))
     title = unescape(wp if wp and not re.fullmatch(r"[\d\s#-]+", wp) else nm or wp or "").strip()
