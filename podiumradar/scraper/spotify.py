@@ -47,6 +47,8 @@ BEWAAR_DAGEN = 400           # oude cache-items die nergens meer voorkomen worde
 PAUZE = 0.4                  # seconden tussen zoekopdrachten
 MAX_WACHT = 900              # langer dan dit (seconden) wachten op Spotify we niet af: stoppen, morgen verder
 SCHOON_MINPOP = 20           # treffer op de naam zonder 'solo'/'live'/'in concert' e.d. achteraan telt pas bij deze populariteit
+SPLIT_MINPOP = 10            # 'Artiest & Plaat/Band': de naam vóór de '&' (twee of meer woorden) telt vanaf deze populariteit...
+SPLIT_MINPOP_1 = 40          # ...en een enkel woord pas vanaf deze (anders vindt 'Joep & Rob' een toevallige 'Joep')
 LINKS_MINPOP = 25            # 'Artiest: Show': de artiest vóór de dubbele punt telt pas bij deze populariteit (voorkomt dat
                              # een reeksnaam als 'Up Close' of 'Next Stage' een toevallige kleine artiest oplevert)
 
@@ -135,13 +137,20 @@ DATUM_ACHTER = re.compile(r"\s+(?:(?:komt|komen|staat|staan)\s+)?op\s+\d{1,2}\s+
 RUIS_ACHTER = re.compile(r"\s+(?:solo|live|in concert|unplugged|acoustic|akoestisch|with strings|with orchestra|luistersessie|listening session)\s*$", re.I)
 
 
+SPLIT_EN = re.compile(r"\s+(?:&|\+|en|and)\s+", re.I)
+
+
 def zoeknamen(naam):
     """Wat er voor deze naam bij Spotify gezocht wordt, van volledig naar vooral de artiest zelf, als lijst
-    (zoeknaam, minimale populariteit van de treffer, deel): de hele naam; zonder (NL)/(18+) achteraan; het deel voor
-    ' ✦ ', ' • ', ' | ' of ' / '; zonder 'komt op 12 oktober'; zonder 'solo', 'live', 'with strings' e.d. (treffer pas vanaf
-    SCHOON_MINPOP). 'deel' = kant van 'Reeks: Artiest' / 'Artiest: Show' (van de schoongemaakte naam): die tellen pas als
-    precies een van de twee een artiest is, en de kant vóór de dubbele punt pas vanaf LINKS_MINPOP.
-    Nooit gesplitst op '&' of ',': dat zijn vaak duo's of groepsnamen. Alleen een exacte treffer telt toch."""
+    (zoeknaam, minimale populariteit van de treffer, deel, onbekend_ok): de hele naam; zonder (NL)/(18+) achteraan; het deel
+    voor ' ✦ ', ' • ', ' | ' of ' / '; zonder 'komt op 12 oktober'; zonder 'solo', 'live', 'with strings' e.d. (treffer pas
+    vanaf SCHOON_MINPOP); bij 'Artiest & Plaat' (precies één '&', '+', 'en' of 'and', zonder komma links) alleen het deel
+    ervoor (vanaf SPLIT_MINPOP bij meerdere woorden, anders SPLIT_MINPOP_1: 'Susanne Alt & Dark Horse' is Susanne Alt met haar
+    plaat Dark Horse). 'deel' = kant van 'Reeks: Artiest' / 'Artiest: Show' (van de schoongemaakte naam): die tellen pas als
+    precies een van de twee een artiest is, en de kant vóór de dubbele punt pas vanaf LINKS_MINPOP. onbekend_ok: de drempel
+    geldt niet als Spotify geen populariteit meldt.
+    Nooit zomaar gesplitst op '&' of ',': dat zijn vaak duo's of groepsnamen (de hele naam wordt altijd eerst geprobeerd).
+    Alleen een exacte treffer telt toch."""
     n = naam.strip()
     zonder = re.sub(r"\s*\([^)]*\)\s*$", "", n).strip()
     eerste = SCHEIDERS.split(zonder)[0].strip()
@@ -152,25 +161,32 @@ def zoeknamen(naam):
         if korter == schoon:
             break
         schoon = korter
-    kandidaten = [(n, 3, 0, False), (zonder, 3, 0, False), (eerste, 4, 0, False), (zonder_datum, 4, 0, False), (schoon, 4, SCHOON_MINPOP, False)]
-    if ":" in schoon:
+    kandidaten = [(n, 3, 0, False, False), (zonder, 3, 0, False, False), (eerste, 4, 0, False, False),
+                  (zonder_datum, 4, 0, False, False), (schoon, 4, SCHOON_MINPOP, False, False)]
+    if ":" not in schoon:
+        stukken = SPLIT_EN.split(schoon)
+        if len(stukken) == 2 and "," not in stukken[0] and not PROGRAMMA.search(stukken[0]):
+            links = stukken[0].strip()
+            veel = len(links.split()) >= 2
+            kandidaten.append((links, 4, SPLIT_MINPOP if veel else SPLIT_MINPOP_1, False, veel))
+    else:
         voor, na = schoon.split(":", 1)
-        kandidaten += [(voor.strip(), 4, LINKS_MINPOP, True), (na.strip(), 4, 0, True)]
+        kandidaten += [(voor.strip(), 4, LINKS_MINPOP, True, False), (na.strip(), 4, 0, True, False)]
     uniek = []
-    for tekst, minimaal, minpop, deel in kandidaten:
+    for tekst, minimaal, minpop, deel, onbekend_ok in kandidaten:
         if len(key(tekst)) >= minimaal and tekst not in [u[0] for u in uniek]:
-            uniek.append((tekst, minpop, deel))
+            uniek.append((tekst, minpop, deel, onbekend_ok))
     return uniek
 
 
 def varianten(naam):
     """Alleen de zoeknamen (zie zoeknamen)."""
-    return [t for t, _, _ in zoeknamen(naam)]
+    return [t[0] for t in zoeknamen(naam)]
 
 
 def colon_delen(naam):
     """Beide kanten van 'Reeks: Artiest' / 'Artiest: Show' (van de schoongemaakte naam)."""
-    return [t for t, _, deel in zoeknamen(naam) if deel]
+    return [t[0] for t in zoeknamen(naam) if t[2]]
 
 
 def vergelijk(s):
@@ -186,16 +202,17 @@ def zelfde_naam(gevraagd, gevonden):
     return bool(a) and a == vergelijk(gevonden)
 
 
-def kies_kandidaat(naam, kandidaten, minpop=0):
-    """Beste exacte treffer (populairste, minstens minpop), of None."""
+def kies_kandidaat(naam, kandidaten, minpop=0, onbekend_ok=False):
+    """Beste exacte treffer (populairste, minstens minpop), of None. Meldt Spotify geen populariteit en is onbekend_ok gezet,
+    dan telt de drempel niet (anders zou een ontbrekend veld alles afkeuren)."""
     goed = [c for c in kandidaten if c and ID_RE.match(str(c.get("id", ""))) and zelfde_naam(naam, c.get("name", ""))
-            and (c.get("popularity") or 0) >= minpop]
+            and ((c.get("popularity") or 0) >= minpop or (onbekend_ok and c.get("popularity") is None))]
     return max(goed, key=lambda c: c.get("popularity") or 0) if goed else None
 
 
-def kies(naam, kandidaten, minpop=0):
+def kies(naam, kandidaten, minpop=0, onbekend_ok=False):
     """Id van de beste exacte treffer (populairste), of None."""
-    c = kies_kandidaat(naam, kandidaten, minpop)
+    c = kies_kandidaat(naam, kandidaten, minpop, onbekend_ok)
     return c["id"] if c else None
 
 
@@ -289,27 +306,27 @@ def zoek_op(client, naam, slaap=time.sleep, log=lambda t: None):
     plan = zoeknamen(naam)
     pauze = False
     top = ""
-    for v, minpop, deel in plan:
+    for v, minpop, deel, onbekend_ok in plan:
         if deel:
             continue
         if pauze:
             slaap(PAUZE)
         pauze = True
         lijst = client.zoek(v)
-        c = kies_kandidaat(v, lijst, minpop)
+        c = kies_kandidaat(v, lijst, minpop, onbekend_ok)
         if c:
             log(f"  gevonden: {naam} -> {c.get('name')} (populariteit {c.get('popularity')}, gezocht op '{v}')")
             return c["id"]
         top = ", ".join(str(x.get("name")) for x in lijst[:3])
     treffers = []
-    for v, minpop, deel in plan:
+    for v, minpop, deel, onbekend_ok in plan:
         if not deel:
             continue
         if pauze:
             slaap(PAUZE)
         pauze = True
         lijst = client.zoek(v)
-        c = kies_kandidaat(v, lijst, minpop)
+        c = kies_kandidaat(v, lijst, minpop, onbekend_ok)
         if c:
             treffers.append(c)
         top = ", ".join(str(x.get("name")) for x in lijst[:3]) or top

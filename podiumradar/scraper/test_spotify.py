@@ -22,7 +22,7 @@ VANDAAG = dt.date(2026, 10, 9)
 check("varianten reeks: artiest", sp.varianten("Techno Tuesday: Dexon"), ["Techno Tuesday: Dexon", "Techno Tuesday", "Dexon"])
 check("varianten datum/zaal weg", sp.varianten("Stereo MC's ✦ vr 7 mei ✦ Luxor Live")[-1], "Stereo MC's")
 check("varianten (18+) weg", sp.varianten("Hans Teeuwen (18+)"), ["Hans Teeuwen (18+)", "Hans Teeuwen"])
-check("geen splitsing op &", sp.varianten("Simon & Garfunkel"), ["Simon & Garfunkel"])
+check("hele naam eerst, het deel voor de & alleen als laatste kans", sp.varianten("Simon & Garfunkel"), ["Simon & Garfunkel", "Simon"])
 check("'komt op 12 oktober' weg", sp.varianten("Khalid komt op 12 oktober"), ["Khalid komt op 12 oktober", "Khalid"])
 check("'op 10 oktober' weg", sp.varianten("Jill Scott op 10 oktober")[-1], "Jill Scott")
 check("'op woensdag' blijft (reeksnaam, geen datum)", sp.varianten("Muziek op Woensdag"), ["Muziek op Woensdag"])
@@ -209,8 +209,23 @@ check("'komt op 12 oktober': ook een kleine artiest telt (datum = zeker een arti
 check("'staat op 6 november' weg", sp.varianten("Guus Meeuwis staat op 6 november")[-1], "Guus Meeuwis")
 check("'komen op 25 januari' weg", sp.varianten("Dan & Phil komen op 25 januari")[-1], "Dan & Phil")
 check("'Live in Concert' weg (twee achtervoegsels)", sp.varianten("Atif Aslam Live in Concert")[-1], "Atif Aslam")
-check("zoeknamen: floors", [(t, m) for t, m, d in sp.zoeknamen("Jason Moran solo")], [("Jason Moran solo", 0), ("Jason Moran", sp.SCHOON_MINPOP)])
-check("zoeknamen: datum zonder floor", [(t, m) for t, m, d in sp.zoeknamen("Khalid komt op 12 oktober")], [("Khalid komt op 12 oktober", 0), ("Khalid", 0)])
+check("zoeknamen: floors", [(t[0], t[1]) for t in sp.zoeknamen("Jason Moran solo")], [("Jason Moran solo", 0), ("Jason Moran", sp.SCHOON_MINPOP)])
+check("zoeknamen: datum zonder floor", [(t[0], t[1]) for t in sp.zoeknamen("Khalid komt op 12 oktober")], [("Khalid komt op 12 oktober", 0), ("Khalid", 0)])
+
+# ---- 'Artiest & Plaat' (Susanne Alt & Dark Horse): alleen het deel vóór de '&', met drempel
+check("zoeknamen: Artiest & Plaat", sp.zoeknamen("Susanne Alt & Dark Horse"), [("Susanne Alt & Dark Horse", 0, False, False), ("Susanne Alt", sp.SPLIT_MINPOP, False, True)])
+check("zoeknamen: één woord links, hogere drempel", sp.zoeknamen("Spinvis en Saartje Van Camp")[-1], ("Spinvis", sp.SPLIT_MINPOP_1, False, False))
+check("zoeknamen: geen splitsing bij drie delen", len(sp.zoeknamen("Bill Stewart, Larry & Co")), 1)
+check("zoeknamen: geen splitsing bij 'ft.' of 'speelt' links", (len(sp.zoeknamen("Eric Vloeimans ft. Licks & Brains")), len(sp.zoeknamen("Yuja Wang speelt Brahms 1 en 2"))), (1, 1))
+check("zoeknamen: geen splitsing bij dubbele punt", [t[0] for t in sp.zoeknamen("Discover: Foo & Bar")], ["Discover: Foo & Bar", "Discover", "Foo & Bar"])
+SA = {"Susanne Alt": [{"id": ID1, "name": "Susanne Alt", "popularity": 18}]}
+check("Susanne Alt & Dark Horse -> Susanne Alt", sp.zoek_op(Nep(SA), "Susanne Alt & Dark Horse", lambda x: None), ID1)
+check("... ook als Spotify geen populariteit meldt", sp.zoek_op(Nep({"Susanne Alt": [{"id": ID1, "name": "Susanne Alt"}]}), "Susanne Alt & Dark Horse", lambda x: None), ID1)
+check("... maar niet bij een heel kleine toevallige artiest", sp.zoek_op(Nep({"Susanne Alt": [{"id": ID1, "name": "Susanne Alt", "popularity": 2}]}), "Susanne Alt & Dark Horse", lambda x: None), None)
+check("Joep & Rob: één woord, kleine artiest telt niet", sp.zoek_op(Nep({"Joep": [{"id": ID2, "name": "Joep", "popularity": 20}]}), "Joep & Rob", lambda x: None), None)
+check("Spinvis en Saartje Van Camp: bekende artiest telt wel", sp.zoek_op(Nep({"Spinvis": [{"id": ID2, "name": "Spinvis", "popularity": 45}]}), "Spinvis en Saartje Van Camp", lambda x: None), ID2)
+nep = Nep({"Simon & Garfunkel": [{"id": ID3, "name": "Simon & Garfunkel", "popularity": 80}], "Simon": [{"id": ID2, "name": "Simon", "popularity": 90}]})
+check("hele naam wint: duo wordt niet gesplitst", (sp.zoek_op(nep, "Simon & Garfunkel", lambda x: None), nep.vragen), (ID3, ["Simon & Garfunkel"]))
 
 # ---- programma-achtige namen worden nooit grijs
 D2 = {"venues": V, "events": [ev("Bill Stewart Trio ft. Larry Grenadier", "Overig", id_="s1"), ev("Gewone Band", "Overig", id_="s2")]}
