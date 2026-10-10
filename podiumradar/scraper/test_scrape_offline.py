@@ -142,4 +142,17 @@ check("verborgen 'Geannuleerd' (w-condition-invisible): niet afgelast", ft('<div
 check("verborgen met hidden of display:none: niet afgelast", ft('<p hidden>Afgelast</p><span style="display: none">Geannuleerd</span>'), None)
 check("zichtbaar 'Geannuleerd': wel afgelast", ft('<div class="event-details_content">Geannuleerd</div>'), "cancelled")
 
+# 10. festival: datums alleen in de broncode (ADE: window.__CONFIG__ ... "dayOne" ... "dayFive")
+class _F:
+    def __init__(self, html): self.html = html
+    def get(self, url): return self.html
+ade = {"name": "ADE", "type": "festival", "month": "oktober", "agenda_url": "https://x.nl/",
+       "date_regex": "\"dayOne\":\"(\\d{4}-\\d{2}-\\d{2})\".*?\"dayFive\":\"(\\d{4}-\\d{2}-\\d{2})\""}
+jaar = sources.TODAY.year + 1
+html = f'<html><body><p>Nieuws: Thursday, 01 October 2020</p><script>window.__CONFIG__ = {{"edition":{{"dayOne":"{jaar}-10-21","dayTwo":"x","dayFive":"{jaar}-10-25"}}}}</script></body></html>'
+evs = sources.festival_event(ade, _F(html), lambda *a: None)
+check("date_regex: periode uit de broncode", [(e["date"], e.get("end")) for e in evs], [(f"{jaar}-10-21", f"{jaar}-10-25")])
+oud = html.replace(str(jaar), "2020")
+check("date_regex: voorbije editie geeft niets", sources.festival_event(ade, _F(oud), lambda *a: None), [])
+
 print("\n" + ("ALLES GOED" if not fouten else f"{fouten} FOUT(EN)")); sys.exit(1 if fouten else 0)

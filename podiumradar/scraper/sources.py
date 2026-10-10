@@ -492,6 +492,15 @@ def festival_event(src, F, log):
     usual = MONTHS.get(str(src.get("month", "")).lower()[:3])
     if usual:
         evs = [e for e in evs if e.get("end") or min((int(e["date"][5:7]) - usual) % 12, (usual - int(e["date"][5:7])) % 12) <= 1]
+    # "date_regex" in bronnen.json: datums die alleen in de broncode staan (ADE: "dayOne":"2026-10-21" ... "dayFive":"2026-10-25"
+    # in een script). Groep 1 = begin, groep 2 (optioneel) = eind, als JJJJ-MM-DD.
+    if not evs and src.get("date_regex"):
+        m = re.search(src["date_regex"], html, re.S)
+        if m and re.fullmatch(r"\d{4}-\d\d-\d\d", m.group(1)):
+            a = m.group(1)
+            b = m.group(2) if (m.lastindex or 0) >= 2 and re.fullmatch(r"\d{4}-\d\d-\d\d", m.group(2) or "") else a
+            if b >= TODAY.isoformat() and a <= b:
+                evs = [{"date": a, "end": b if b != a else None}]
     if evs:
         d0, d1 = evs[0]["date"], max(e.get("end") or e["date"] for e in evs)
     else:
