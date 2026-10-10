@@ -206,4 +206,16 @@ html = "<astro-island props='" + json.dumps(props).replace("'", "&#39;") + "'></
 check("tricket: productions naast data, UTC naar NL-tijd", [(e["date"], e["time"], e["title"]) for e in film.tricket({"agenda_url": "https://x.nl/films/"}, _FB(html), {}, print)],
       [(f"{j}-10-14", "11:00", "Mémoire de fille")])
 
+# 14. sitemap: index -> sitemaps -> voorstellingslinks (nieuwste eerst), alleen eigen site en passend patroon
+class _FS:
+    pages = {"https://t.nl/sitemap.xml": '<sitemapindex><sitemap><loc>https://t.nl/sm-shows.xml</loc></sitemap><sitemap><loc>https://t.nl/sm-pages.xml</loc></sitemap></sitemapindex>',
+             "https://t.nl/sm-shows.xml": '<urlset><url><loc>https://t.nl/voorstelling/oud</loc><lastmod>2025-01-01</lastmod></url>'
+                                          '<url><loc>https://www.t.nl/voorstelling/nieuw</loc><lastmod>2026-09-01</lastmod></url>'
+                                          '<url><loc>https://ander.nl/voorstelling/x</loc></url></urlset>',
+             "https://t.nl/sm-pages.xml": '<urlset><url><loc>https://t.nl/contact</loc></url></urlset>'}
+    def get_text(self, url): return self.pages.get(url)
+check("sitemap_links: index, eigen site, patroon, nieuwste eerst",
+      sources.sitemap_links(_FS(), "https://t.nl/sitemap.xml", "^/voorstelling/", "https://www.t.nl/agenda"),
+      ["https://www.t.nl/voorstelling/nieuw", "https://t.nl/voorstelling/oud"])
+
 print("\n" + ("ALLES GOED" if not fouten else f"{fouten} FOUT(EN)")); sys.exit(1 if fouten else 0)

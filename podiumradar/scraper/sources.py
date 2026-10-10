@@ -466,6 +466,34 @@ def detail_links(soup, page_url, pattern=None, attrs=()):
     return seen
 
 
+def sitemap_links(F, url, pattern, site_url, max_maps=25):
+    """Links uit een sitemap (of sitemap-index, ook geneste), alleen van dezelfde site en passend bij pattern; nieuwste eerst."""
+    host = urlparse(site_url).netloc.removeprefix("www.")
+    rx = re.compile(pattern, re.I) if pattern else DETAIL_RE
+    todo, gezien, found = [url], set(), {}
+    while todo and len(gezien) < max_maps:
+        sm = todo.pop(0)
+        if sm in gezien:
+            continue
+        gezien.add(sm)
+        xml = F.get_text(sm) or ""
+        for blok in re.findall(r"<sitemap\b.*?</sitemap>", xml, re.S | re.I):
+            loc = re.search(r"<loc>\s*(.*?)\s*</loc>", blok, re.S | re.I)
+            if loc and not loc.group(1).endswith(".gz"):
+                todo.append(unescape(loc.group(1)))
+        for blok in re.findall(r"<url\b.*?</url>", xml, re.S | re.I):
+            loc = re.search(r"<loc>\s*(.*?)\s*</loc>", blok, re.S | re.I)
+            if not loc:
+                continue
+            u = unescape(loc.group(1)).split("#")[0]
+            p = urlparse(u)
+            if p.netloc.removeprefix("www.") != host or not rx.search(p.path + ("?" + p.query if p.query else "")):
+                continue
+            mod = re.search(r"<lastmod>\s*(.*?)\s*</lastmod>", blok, re.S | re.I)
+            found.setdefault(u, mod.group(1) if mod else "")
+    return sorted(found, key=lambda u: found[u], reverse=True)
+
+
 def next_pages(soup, page_url, html):
     out = []
     ln = soup.find("link", rel="next") or soup.find("a", rel="next")
@@ -685,6 +713,15 @@ def scrape_source(src, F, cache, cfg, log):
                     links.append(v)
             if "{page}" not in lj["url"]:
                 break
+
+    # "sitemap": voorstellingslinks uit de sitemap van de site zelf (als de agenda met JavaScript wordt gebouwd en de
+    # API in robots.txt verboden is, Amstelveen/Lievekamp/Zwolle/Atlas). {"url": ".../sitemap.xml", "pattern": "^/voorstelling/"}
+    # (zonder pattern: link_pattern). Nieuwste eerst (lastmod), zodat max_details naar de komende voorstellingen gaat.
+    sm = src.get("sitemap")
+    if sm:
+        for u in sitemap_links(F, sm["url"], sm.get("pattern") or src.get("link_pattern"), src["agenda_url"]):
+            if u not in links:
+                links.append(u)
 
     known = {e["url"] for e in events.values()}
     fresh = (TODAY - dt.timedelta(days=cfg.get("detail_refresh_days", 7))).isoformat()
