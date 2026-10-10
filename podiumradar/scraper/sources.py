@@ -265,7 +265,9 @@ def from_jsonld(o, page_url):
     status = json.dumps([o.get("eventStatus"), o.get("offers")]).lower()
     if "soldout" in status or "uitverkocht" in status:
         ev["status"] = "sold"
-    elif "cancel" in status or "postponed" in status:
+    # Afgelast alleen op eventStatus: in offers staat vaak iets als 'cancellationPolicy' of een annuleerlink,
+    # en dan verdween de hele agenda (Neushoorn, okt 2026)
+    elif re.search(r"cancel|postponed", str(o.get("eventStatus") or ""), re.I):
         ev["status"] = "cancelled"
     return ev
 
@@ -365,6 +367,12 @@ def from_text(soup, url):
     # of 'uitverkocht' (PaRaDoX: rij 'more-events' met de eerstvolgende concerten)
     for bad in main.find_all(class_=OTHER_EVENTS_RE):
         if not bad.find("h1"):
+            bad.decompose()
+    # Verborgen tekst telt niet: Webflow (Neushoorn) zet 'Geannuleerd' op élke pagina, verborgen met
+    # w-condition-invisible; anders gold elke show als afgelast (okt 2026)
+    for bad in main.find_all(lambda t: "w-condition-invisible" in (t.get("class") or []) or t.has_attr("hidden")
+                             or re.search(r"display\s*:\s*none", t.get("style") or "", re.I)):
+        if not bad.decomposed:
             bad.decompose()
     txt = main.get_text("\n", strip=True)[:6000]
     title = pick_title(soup, url)
@@ -714,6 +722,9 @@ def scrape_source(src, F, cache, cfg, log):
     return out
 
 
+ANTWOORDEN = {}  # antwoordcodes per site van de laatste collect()
+
+
 def local_key(src):
     """Sleutel in lokaal.json: naam + soort (Gigant staat er als poppodium én als filmhuis in)."""
     return f"{src['name']}|{src.get('type', '')}"
@@ -788,6 +799,7 @@ def collect(cfg, only=None, log=print, local=False):
             log(f"  {src['name']}: niet op tijd klaar, vorige gegevens blijven staan")
             results.append((src, None))
     pool.shutdown(wait=False, cancel_futures=True)
+    ANTWOORDEN.clear(); ANTWOORDEN.update(F.stats)   # lokaal.py zet dit in lokaal.json (403? 404?)
     with lock:
         cache = dict(cache)
     horizon = (TODAY - dt.timedelta(days=cfg.get("cache_keep_days", 30))).isoformat()

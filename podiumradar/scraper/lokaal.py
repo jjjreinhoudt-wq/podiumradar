@@ -14,7 +14,12 @@ REPO = ROOT.parent                                              # git-map
 LOG = ROOT / "scraper/lokaal.log"
 
 
+REGELS = []  # logregels van deze run: gaan mee in lokaal.json, zodat van afstand te zien is wat er misging
+
+
 def log(msg):
+    if str(msg).startswith("  "):   # alleen regels per bron (geen git-meldingen: daar kan een pad met een gebruikersnaam in staan)
+        REGELS.append(str(msg)[:400])
     line = f"{dt.datetime.now():%Y-%m-%d %H:%M:%S} {msg}"
     print(line, flush=True)
     with LOG.open("a", encoding="utf-8") as f:
@@ -43,7 +48,9 @@ def main():
         log("geen lokale bronnen in bronnen.json")
         return
     data = {"datum": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "bronnen": {sources.local_key(src): evs for src, evs in results if evs is not None}}
+            "bronnen": {sources.local_key(src): evs for src, evs in results if evs is not None},
+            # Antwoordcodes per site en het logboek van deze run: zo is ook zonder deze pc te zien waarom een bron 0 gaf
+            "antwoorden": sources.ANTWOORDEN, "log": REGELS[-300:]}
     n = sum(len(v) for v in data["bronnen"].values())
     if n == 0:
         log("niets opgehaald (geen internet?): lokaal.json niet aangepast")
