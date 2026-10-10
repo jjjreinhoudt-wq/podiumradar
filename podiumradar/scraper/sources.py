@@ -722,6 +722,9 @@ def scrape_source(src, F, cache, cfg, log):
     return out
 
 
+ANTWOORDEN = {}  # antwoordcodes per site van de laatste collect()
+
+
 def local_key(src):
     """Sleutel in lokaal.json: naam + soort (Gigant staat er als poppodium én als filmhuis in)."""
     return f"{src['name']}|{src.get('type', '')}"
@@ -796,6 +799,7 @@ def collect(cfg, only=None, log=print, local=False):
             log(f"  {src['name']}: niet op tijd klaar, vorige gegevens blijven staan")
             results.append((src, None))
     pool.shutdown(wait=False, cancel_futures=True)
+    ANTWOORDEN.clear(); ANTWOORDEN.update(F.stats)   # lokaal.py zet dit in lokaal.json (403? 404?)
     with lock:
         cache = dict(cache)
     horizon = (TODAY - dt.timedelta(days=cfg.get("cache_keep_days", 30))).isoformat()

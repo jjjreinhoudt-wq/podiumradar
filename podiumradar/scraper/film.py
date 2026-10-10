@@ -29,11 +29,22 @@ def pathe(src, F, cfg, log):
     slug = src["agenda_url"].rstrip("/").split("/")[-1]
     base = "https://www.pathe.nl/api"
     data = F.get_json(f"{base}/cinema/{slug}/shows")
-    if not data:
+    if not isinstance(data, dict):
+        # Uitleg in het logboek (en via lokaal.py in lokaal.json): zo is van afstand te zien wat Pathé antwoordde
+        log(f"  {src['name']}: geen lijst van Pathé (antwoorden: {F.stats.get('pathe.nl', {})}, gekregen: {type(data).__name__})")
         return []
     days = {d.isoformat() for d in _days(cfg)}
-    out = []
-    for show, info in (data.get("shows") or {}).items():
+    shows = data.get("shows")
+    if not isinstance(shows, dict) or not shows:
+        log(f"  {src['name']}: Pathé-lijst zonder 'shows' (sleutels: {list(data)[:8]})")
+        return []
+    if not any(d in days for info in shows.values() if isinstance(info, dict) for d in (info.get("days") or {})):
+        voorbeeld = next(iter(shows.items()))
+        log(f"  {src['name']}: {len(shows)} films, maar geen speeldag in de komende dagen (voorbeeld: {str(voorbeeld)[:300]})")
+    out, gezien = [], []
+    for show, info in shows.items():
+        if not isinstance(info, dict):
+            continue
         want = sorted(d for d in (info.get("days") or {}) if d in days)
         if not want:
             continue
@@ -41,8 +52,15 @@ def pathe(src, F, cfg, log):
         title = meta.get("title") or show.rsplit("-", 1)[0].replace("-", " ").title()
         url = f"https://www.pathe.nl/nl/films/{show}"
         for d in want:
-            for st in F.get_json(f"{base}/show/{show}/showtimes/{slug}/{d}") or []:
-                m = re.match(r"(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})", st.get("time", ""))
+            times = F.get_json(f"{base}/show/{show}/showtimes/{slug}/{d}") or []
+            if not isinstance(times, list):
+                log(f"  {src['name']}: onverwachte draaitijden voor {show} op {d}: {str(times)[:200]}")
+                continue
+            for st in times:
+                if not isinstance(st, dict):
+                    continue
+                gezien.append(st)
+                m = re.match(r"(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})", str(st.get("time", "")))
                 if not m:
                     continue
                 dur = None
@@ -54,6 +72,8 @@ def pathe(src, F, cfg, log):
                 if st.get("status") in ("full", "soldout", "sold_out"):
                     ev["status"] = "sold"
                 out.append(ev)
+    if gezien and not out:  # wel draaitijden, maar in een vorm die we niet (meer) herkennen
+        log(f"  {src['name']}: draaitijden niet herkend (voorbeeld: {str(gezien[0])[:300]})")
     return out
 
 
