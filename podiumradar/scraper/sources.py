@@ -10,7 +10,7 @@ Elke site krijgt hoogstens één verzoek per `delay_seconds`; verschillende site
 """
 import datetime as dt, json, pathlib, re, socket, threading, time
 from concurrent.futures import ThreadPoolExecutor, wait
-from html import unescape
+from html import escape, unescape
 from urllib import robotparser
 from urllib.parse import urljoin, urlparse
 import requests
@@ -44,6 +44,9 @@ TXT_DATE_RE = re.compile(
     r"aug(?:ustus|ust)?|sep(?:t(?:ember)?)?|okt(?:ober)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\b"
     # jaartal: "3 okt 12:40" en "3 okt 19 uur" zijn geen jaartal; "12 november , 2026" wel
     r"(?:\s*,?\s+'?(\d{4}|\d{2})(?![:.]\d)(?!\s*u(?:ur)?\b))?\b", re.I)
+# Engels met de maand vóór de dag: "Thursday - October 15th", "October 15, 2026" (Fontys). 'May' alleen met hoofdletter.
+EN_DATE_RE = re.compile(r"\b((?-i:May)|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|"
+                        r"oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b(?![:.]\d)(?:,?\s+(20\d\d))?", re.I)
 NUM_DATE_RE = re.compile(r"\b(\d{1,2})[-/.](\d{1,2})[-/.](20\d{2})\b")
 TIME_RE = re.compile(r"\b([01]?\d|2[0-3])[:.]([0-5]\d)(?![.\-/]\d)\s*(?:uur|u\b)?", re.I)  # "03.10.2026" is geen 03:10
 
@@ -301,6 +304,18 @@ def _txt_date(txt):
             d = d.replace(year=y + 1)
         best = (m.start(), d)
         break
+    for m in EN_DATE_RE.finditer(txt):
+        if best and m.start() > best[0]:
+            break
+        mon, yy = MONTHS[m.group(1).lower()[:3]], m.group(3)
+        try:
+            d = dt.date(int(yy) if yy else TODAY.year, mon, int(m.group(2)))
+        except ValueError:
+            continue
+        if not yy and d < TODAY - dt.timedelta(days=60):
+            d = d.replace(year=d.year + 1)
+        best = (m.start(), d)
+        break
     if not best:
         # "Datum 16-10" zonder jaartal (alleen direct na het woord datum, anders te veel valse treffers)
         m = re.search(r"(?:\bdatum\s*:?\s*|^\x00)(?:[a-z]{2,9}\.?\s+)?(\d{1,2})[-/.](\d{1,2})(?![-/.]?\d)", txt, re.I)
@@ -421,7 +436,7 @@ def from_text(soup, url):
     price = prijzen.from_text(txt)  # laagste prijs in euro's, 0 = gratis; weg als onbekend
     if price is not None:
         ev["price"] = price
-    if re.search(r"\buitverkocht\b|\bsold ?out\b", txt, re.I):
+    if re.search(r"\buitverkocht\b|\bvolgeboekt\b|\bsold ?out\b", txt, re.I):
         ev["status"] = "sold"
     # Afgelast bovenaan de pagina (niet ergens in de tekst over een ander concert)
     if re.search(r"\b(afgelast|geannuleerd|gaat niet door|cancelled|canceled)\b", txt[:800], re.I):
@@ -616,6 +631,26 @@ def scrape_source(src, F, cache, cfg, log):
         if not html:
             continue
         soup = BeautifulSoup(html, "html.parser")
+        # "blocks": hele agenda op één pagina in blokken zonder eigen pagina (uitklapblokken bij De Ketel, Ons Koningsoord).
+        # {"selector": "div.accordion", "title": ".accordion__title"}: elk blok is één voorstelling; titel = dat element
+        # of anders de eerste regel. Datum, tijd, prijs en uitverkocht/afgelast zoals bij een voorstellingspagina.
+        bl = src.get("blocks")
+        if bl:
+            for el in soup.select(bl["selector"]):
+                t_el = el.select_one(bl["title"]) if bl.get("title") else None
+                regels = el.get_text("\n", strip=True).split("\n")
+                titel = (t_el.get_text(" ", strip=True) if t_el else regels[0] if regels else "")
+                titel = re.split(r"\s+\|\s+", titel)[0].strip(" |-–")   # "Workshop Tegeltjespracht | zaterdag 10 oktober ..."
+                if len(titel) < 3:
+                    continue
+                if t_el:
+                    t_el.decompose()
+                mini = BeautifulSoup(f"<html><body><main><h1>{escape(titel)}</h1>{el}</main></body></html>", "html.parser")
+                ev = from_text(mini, url.split("#")[0] + "#" + re.sub(r"[^a-z0-9]+", "-", titel.lower()).strip("-")[:60])
+                if ev and ev.get("date"):
+                    ev["title"] = titel
+                    events.setdefault(k(ev), ev)
+            continue
         # "listing_jsonld": false = de JSON-LD van het overzicht klopt niet (Paard: wintertijd een uur mis),
         # dan alleen de voorstellingspagina's zelf lezen
         for o in (jsonld_events(soup) if src.get("listing_jsonld", True) else []):

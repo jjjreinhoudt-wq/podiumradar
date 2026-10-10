@@ -155,4 +155,31 @@ check("date_regex: periode uit de broncode", [(e["date"], e.get("end")) for e in
 oud = html.replace(str(jaar), "2020")
 check("date_regex: voorbije editie geeft niets", sources.festival_event(ade, _F(oud), lambda *a: None), [])
 
+# 11. Engelse datum met de maand vooraan (Fontys: "Thursday - October 15th")
+j = sources.TODAY.year + 1
+check("Engels 'October 15th, <jaar>'", sources._txt_date(f"Thursday - October 15th, {j} Address | Tilburg"), sources.dt.date(j, 10, 15))
+check("'may' als werkwoord is geen datum", sources._txt_date("you may 2 tickets kopen"), None)
+check("Nederlandse datum blijft voorgaan", sources._txt_date(f"15 oktober {j}, daarna October 20th"), sources.dt.date(j, 10, 15))
+
+# 12. blokken: hele agenda op één pagina (Ons Koningsoord, De Ketel)
+class _FB:
+    def __init__(self, html): self.html = html
+    def get(self, url): return self.html
+    def get_json(self, url, params=None): return None
+blokhtml = f"""<html><body><main>
+<div class="accordion"><div class="accordion__item accordion__title">LA PRIMAVERA TRIO - EEN LACH EN EEN TRAAN</div>
+<div class="accordion__item">ZONDAG 11 OKTOBER {j} | om 14:00 uur | Entree €15</div><div class="accordion__item">info</div></div>
+<div class="accordion"><div class="accordion__item accordion__title">BOHEME BERLIJN</div>
+<div class="accordion__item">VRIJDAG 13 NOVEMBER {j} | 20:15 uur | VOLGEBOEKT</div></div>
+</main></body></html>"""
+src = {"name": "Ons Koningsoord", "type": "thea", "agenda_url": "https://x.nl/", "blocks": {"selector": "div.accordion", "title": ".accordion__title"}}
+evs = sorted(sources.scrape_source(src, _FB(blokhtml), {}, {}, lambda *a: None), key=lambda e: e["date"])
+check("blokken: twee voorstellingen met titel, datum en tijd",
+      [(e["title"], e["date"], e["time"]) for e in evs], [("LA PRIMAVERA TRIO - EEN LACH EN EEN TRAAN", f"{j}-10-11", "14:00"), ("BOHEME BERLIJN", f"{j}-11-13", "20:15")])
+check("blokken: VOLGEBOEKT is uitverkocht", evs[1].get("status"), "sold")
+check("blokken: prijs en eigen link per blok", (evs[0].get("price"), evs[0]["url"]), (15, "https://x.nl/#la-primavera-trio-een-lach-en-een-traan"))
+ketel = f'<html><body><div class="hl-faq-child">Workshop Tegeltjespracht | zaterdag 1o oktober {j} - 10:30u | Zaterdag 10 oktober {j}</div></body></html>'
+evs = sources.scrape_source(dict(src, blocks={"selector": "div.hl-faq-child"}), _FB(ketel), {}, {}, lambda *a: None)
+check("blokken zonder titel-element: eerste deel van de eerste regel", [(e["title"], e["date"]) for e in evs], [("Workshop Tegeltjespracht", f"{j}-10-10")])
+
 print("\n" + ("ALLES GOED" if not fouten else f"{fouten} FOUT(EN)")); sys.exit(1 if fouten else 0)
