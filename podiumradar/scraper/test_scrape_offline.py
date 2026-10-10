@@ -196,4 +196,6 @@ check("links_json template + podiumnaam eraf", [(e["title"], e["url"]) for e in 
 check("link_pattern ziet ook de vraag (Vera)", sources.detail_links(sources.BeautifulSoup(_FJ().get(""), "html.parser"), "https://v.nl/programma/", r"[?&]post_type=events&p=\d+"),
       ["https://v.nl/?post_type=events&p=12&lang=nl"])
 
+check("title_strip en geen_prijs", [(e["title"], "price" in e) for e in sources.scrape_source(dict(src, title_strip=r"\s+Pell$", geen_prijs=True), _FJ(), {}, {}, lambda *a: None)], [("Axel Rudi", False)])
+
 print("\n" + ("ALLES GOED" if not fouten else f"{fouten} FOUT(EN)")); sys.exit(1 if fouten else 0)

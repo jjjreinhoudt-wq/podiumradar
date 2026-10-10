@@ -739,6 +739,13 @@ def scrape_source(src, F, cache, cfg, log):
         kaal = re.sub(r"\s+[-–]\s+" + re.escape(re.sub(r"\s*\(.*?\)", "", src["name"])) + r"\s*$", "", e["title"], flags=re.I)
         if len(kaal) >= 3:
             e["title"] = kaal
+        # "title_strip": regex die van de titel af moet (Vera: " 2026" achteraan); "geen_prijs": prijs op de pagina klopt niet
+        if src.get("title_strip"):
+            kaal = re.sub(src["title_strip"], "", e["title"], flags=re.I).strip()
+            if len(kaal) >= 3:
+                e["title"] = kaal
+        if src.get("geen_prijs"):
+            e.pop("price", None)
         # "Donderdag 8 oktober v.v. EIGEN WIJS" / "9 t/m 11 oktober Biergarten": datum vooraan eraf
         stripped = re.sub(r"^(?:(?:ma|di|wo|do|vr|za|zo)[a-z]*\.?\s+)?\d{1,2}(?:\s*(?:t/m|-|–)\s*\d{1,2})?\s+(?:jan|feb|mrt|maa|apr|mei|jun|jul|aug|sep|okt|nov|dec)[a-z]*\.?"
                           r"(?:\s+20\d\d)?\s*(?:v\.v\.|:|-|–)?\s*", "", e["title"], flags=re.I)
