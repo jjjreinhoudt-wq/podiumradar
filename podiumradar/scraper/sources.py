@@ -771,14 +771,9 @@ def scrape_source(src, F, cache, cfg, log):
                     # Sommige sites zetten een nummer of kopje als naam in de JSON-LD; neem dan de paginatitel
                     if re.fullmatch(r"[\d\s#-]+", e["title"]) or GENERIC_TITLE.match(e["title"]):
                         e["title"] = pick_title(soup, u)
-                if not evs:
-                    evs = vue_shows(soup, u)
-                # Past voorstelling bij een Vue-blok 'shows' (Zwolse Theaters): lege lijst = al geweest, dan niet in de tekst zoeken
-                if not evs and not soup.find("component", attrs={"is": "shows"}):
-                    e = text_reader(soup, u)
-                    evs = [e] if e else []
                 # "detail_date_selector": datum, tijd en prijs alleen uit dat ene blok (Atlas: elders op de pagina staan
-                # datums van andere voorstellingen en kortingen). Geen blok = geen voorstellingspagina.
+                # datums van andere voorstellingen en kortingen). Geen blok = geen voorstellingspagina. Vóór de gewone
+                # tekstuitlezer, want die haalt kop- en sliderblokken uit de pagina weg.
                 if src.get("detail_date_selector"):
                     el = soup.select_one(src["detail_date_selector"])
                     blok = el.get_text(" ", strip=True) if el else ""
@@ -794,6 +789,13 @@ def scrape_source(src, F, cache, cfg, log):
                         if re.search(r"\buitverkocht\b|\bvolgeboekt\b|\bsold ?out\b", blok, re.I):
                             e["status"] = "sold"
                         evs = [e]
+                else:
+                    if not evs:
+                        evs = vue_shows(soup, u)
+                    # Past voorstelling bij een Vue-blok 'shows' (Zwolse Theaters): lege lijst = al geweest, dan niet in de tekst zoeken
+                    if not evs and not soup.find("component", attrs={"is": "shows"}):
+                        e = text_reader(soup, u)
+                        evs = [e] if e else []
                 if src.get("timetable") and len(evs) == 1 and not evs[0].get("end"):  # settijden (013, Tivoli); niet bij meerdaags
                     evs[0].update(venues.detail_times(soup, evs[0]["title"]))
                     if any("<" in x for x in evs[0].get("support") or []):  # HTML-rommel uit de JSON-LD (Tivoli)

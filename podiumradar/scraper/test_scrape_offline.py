@@ -247,8 +247,8 @@ pages = {"https://z.nl/agenda": '<a href="/programma/a">a</a><a href="/programma
 evs = sources.scrape_source(src, _FD(pages), {}, {}, lambda *a: None)
 check("vue_shows: datum, tijd, prijs, wachtlijst = uitverkocht; al geweest = niets",
       [(e["title"], e["date"], e["time"], e.get("price"), e.get("status")) for e in evs], [("Merijn Scholten", f"{j}-10-10", "20:00", 14, "sold")])
-atlas = (f"<html><body><main><h1>The Bodyguard</h1><span class='perf-date perf-page'> WO 07 APR {j} <div> 20:00 uur Grote Zaal <span>vanaf € 67,00</span></div></span>"
-         f"<p>Speelt t/m 11 april {j}. Vrienden € 10,00 korting. Ook 1 feb {j} 15:00 andere show</p></main></body></html>")
+atlas = (f"<html><body><header><h1>The Bodyguard</h1><span class='perf-date perf-page'> WO 07 APR {j} <div> 20:00 uur Grote Zaal <span>vanaf € 67,00</span></div></span></header>"
+         f"<p>Speelt t/m 11 april {j}. Vrienden € 10,00 korting. Ook 1 feb {j} 15:00 andere show</p></body></html>")
 src = {"name": "Atlas Theater", "type": "thea", "agenda_url": "https://a.nl/sitemap-pagina/", "link_pattern": "^/voorstellingen/", "detail_date_selector": "span.perf-date.perf-page"}
 pages = {"https://a.nl/sitemap-pagina/": '<a href="/voorstellingen/bg-07-apr/">x</a><a href="/voorstellingen/info/">y</a>', "https://a.nl/voorstellingen/bg-07-apr/": atlas,
          "https://a.nl/voorstellingen/info/": f"<html><body><main><h1>Info</h1><p>3 mei {j} 20:00</p></main></body></html>"}
