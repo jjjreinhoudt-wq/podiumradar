@@ -218,4 +218,20 @@ check("sitemap_links: index, eigen site, patroon, nieuwste eerst",
       sources.sitemap_links(_FS(), "https://t.nl/sitemap.xml", "^/voorstelling/", "https://www.t.nl/agenda"),
       ["https://www.t.nl/voorstelling/nieuw", "https://t.nl/voorstelling/oud"])
 
+# 15. wp_shows (Leiden, Kunstmin): alle speeldata uit acf.events, status, laagste prijs, geen verleden
+import venues
+class _FW:
+    def __init__(self, pages): self.pages = pages
+    def get_json(self, url, params=None): return self.pages.get(params["page"])
+wp = [{"link": "https://l.nl/v/blauw/", "title": {"rendered": "Buddy Vedder &#038; Shelley Bos &#8211; Blauw"},
+       "acf": {"prices": [{"price": "42.5"}, {"price": "37.5"}, {"price": "0"}],
+               "events": [{"start_date": f"{j}0925", "start_time": "20:15:00", "status": ""}, {"start_date": f"{j}0926", "start_time": "14:30:00", "status": "Uitverkocht"},
+                          {"start_date": "20200101", "start_time": "20:00:00", "status": ""}]}},
+      {"link": "https://l.nl/v/leeg/", "title": {"rendered": "Leeg"}, "acf": []}]
+evs = venues.wp_shows({"agenda_url": "https://l.nl/agenda/"}, _FW({1: wp}), {}, print)
+check("wp_shows: twee speeldata, uitverkocht, prijs 37.5, titel zonder entities",
+      [(e["date"], e["time"], e.get("status"), e.get("price"), e["title"]) for e in evs],
+      [(f"{j}-09-25", "20:15", None, 37.5, "Buddy Vedder & Shelley Bos – Blauw"), (f"{j}-09-26", "14:30", "sold", 37.5, "Buddy Vedder & Shelley Bos – Blauw")])
+check("wp_shows: geen lijst -> None (terug naar de gewone uitlezer)", venues.wp_shows({"agenda_url": "https://l.nl/"}, _FW({}), {}, print), None)
+
 print("\n" + ("ALLES GOED" if not fouten else f"{fouten} FOUT(EN)")); sys.exit(1 if fouten else 0)

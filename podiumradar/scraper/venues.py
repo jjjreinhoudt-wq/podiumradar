@@ -6,6 +6,7 @@ Elke uitlezer geeft events {"date", "time", "title", "url", optioneel "doors", "
 import datetime as dt, json, re
 from zoneinfo import ZoneInfo
 from bs4 import BeautifulSoup
+from html import unescape
 import prijzen
 
 NL = ZoneInfo("Europe/Amsterdam")
@@ -525,9 +526,64 @@ def peppered(src, F, cfg, log):
     return out if cards else None
 
 
+def _wp_prijs(acf):
+    """Laagste prijs uit ACF: Leiden 'prices' [{"price": "42.5"}], Kunstmin 'ranks' [{"price": "44,00"}]. Alleen bedragen > 0."""
+    bedragen = []
+    for k in ("prices", "ranks"):
+        for r in acf.get(k) or []:
+            try:
+                x = float(str((r or {}).get("price") or "").replace(",", "."))
+            except ValueError:
+                continue
+            if 0 < x < 1000:
+                bedragen.append(x)
+    return min(bedragen) if bedragen else None
+
+
+def wp_shows(src, F, cfg, log):
+    """WordPress met ACF-voorstellingen (Leidse Schouwburg & Stadsgehoorzaal, Kunstmin): /wp-json/wp/v2/show geeft per
+    voorstelling acf.events[] met start_date "20270925", start_time "20:15:00" en een status. Alle speeldata in een
+    paar verzoeken, zonder honderden voorstellingspagina's."""
+    api = src.get("wp_api") or _site(src) + "/wp-json/wp/v2/show"
+    out, vandaag = [], TODAY.strftime("%Y%m%d")
+    for page in range(1, 11):
+        data = F.get_json(api, {"per_page": 100, "page": page, "_fields": "id,link,title,acf"})
+        if not isinstance(data, list) or not data:
+            if page == 1:
+                return None   # site herkent dit niet (meer): de gewone uitlezer (links_json) neemt het over
+            break
+        for show in data:
+            acf = show.get("acf") if isinstance(show, dict) else None
+            if not isinstance(acf, dict) or not isinstance(show.get("link"), str):
+                continue
+            titel = re.sub(r"<[^>]+>", "", unescape(unescape(str((show.get("title") or {}).get("rendered") or "")))).strip()
+            if not titel:
+                continue
+            prijs = _wp_prijs(acf)
+            for ev in acf.get("events") or []:
+                if not isinstance(ev, dict):
+                    continue
+                d, t = str(ev.get("start_date") or ""), str(ev.get("start_time") or "")
+                if not re.fullmatch(r"20\d{6}", d) or d < vandaag:
+                    continue
+                e = {"date": f"{d[:4]}-{d[4:6]}-{d[6:]}", "time": t[:5] if re.match(r"\d\d:\d\d", t) else None,
+                     "title": titel, "url": show["link"]}
+                status = str(ev.get("status") or "").lower()
+                if re.search(r"uitverkocht|sold|wait_?list|wachtlijst", status):
+                    e["status"] = "sold"
+                elif re.search(r"geannuleerd|afgelast|cancel", status):
+                    e["status"] = "cancelled"
+                if prijs is not None:
+                    e["price"] = prijs
+                out.append(e)
+        if len(data) < 100:
+            break
+    return out
+
+
 PLATFORMS = {"paradiso": paradiso, "ziggodome": ziggodome, "melkweg": melkweg, "tolhuistuin": tolhuistuin, "musis": musis,
              "cre8ion": cre8ion, "render_api": render_api, "umbraco_agenda": umbraco_agenda,
-             "umbraco_getshows": umbraco_getshows, "itix": itix, "peppered": peppered}
+             "umbraco_getshows": umbraco_getshows, "itix": itix, "peppered": peppered, "wp_shows": wp_shows}
 
 
 def scrape(src, F, cfg, log):
