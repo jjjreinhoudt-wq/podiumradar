@@ -2,9 +2,13 @@ name: Bron testen
 
 # Handmatig: één bron (of één pagina) ophalen en laten zien wat de scraper ervan maakt.
 # Handig als een podium verkeerde datums of titels geeft; de pagina's zelf staan dan in het logboek.
+run-name: Bron testen ${{ inputs.label }}
 on:
   workflow_dispatch:
     inputs:
+      label:
+        description: "Optioneel kenmerk in de naam van de run (om parallelle tests uit elkaar te houden)"
+        required: false
       bron:
         description: "Naam (of deel van de naam) van de bron in bronnen.json"
         required: false
