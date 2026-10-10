@@ -8,6 +8,7 @@ Meerdere adressen met een spatie ertussen. Voorvoegsels voor één adres:
   seltxt<N>:<css>@<url> tekst, links en attributen van de eerste N (15) elementen
   sel:<css>@<url>      de HTML van de eerste 5 elementen die bij de CSS-selector passen (zonder plaatjes, max 8000 tekens per stuk)
   platform=<p>:<bron>  bron uit bronnen.json met dit platform uitlezen (aantallen, tijd, voorbeelden)
+  bron:{json}          bron uitproberen met andere instellingen (op naam + wijzigingen, of een nieuwe bron); spaties als \u0020
   jsonkeys:<regex>@<url> sleutels in JSON (of __NEXT_DATA__) die op de regex lijken
   gql:<query>          vraag aan de Paradiso-programmadienst
   links:<url>          alle links op de pagina (gegroepeerd), scripts, formulieren en data-attributen
@@ -146,6 +147,24 @@ for arg in " ".join(sys.argv[1:]).split():
                   f"{n1 - n0} verzoeken, {time.time() - t0:.0f} s")
             for e in evs[:6] + evs[len(evs) // 2:len(evs) // 2 + 3]:
                 print("   ", json.dumps(e, ensure_ascii=False))
+        continue
+    m = re.match(r"bron:(\{.+\})$", arg)
+    if m:  # bron uitproberen met andere instellingen, zonder bronnen.json te wijzigen. Geen spaties: schrijf ze als  .
+        # bron:{"name":"Little Devil","link_pattern":"/agenda/.+","max_details":20}  (bestaande bron op naam + wijzigingen)
+        # bron:{"name":"Nieuw","city":"Tilburg","type":"pop","agenda_url":"https://..."}  (nieuwe bron)
+        import time
+        over = json.loads(m.group(1))
+        src = next((dict(b) for b in json.loads(sources.BRONNEN.read_text(encoding="utf-8")) if b["name"] == over.get("name")), {})
+        src.update(over)
+        t0 = time.time()
+        evs = sources.scrape_source(src, F, {}, CFG, print) or []
+        weg = [e for e in evs if e.get("status") == "cancelled"]
+        evs = [e for e in evs if e.get("status") != "cancelled"]
+        print(f"== {src.get('name')}: {len(evs)} items (+{len(weg)} afgelast), {sum(1 for e in evs if e.get('time'))} met tijd, "
+              f"{min((e['date'] for e in evs), default='-')} t/m {max((e['date'] for e in evs), default='-')}, {time.time() - t0:.0f} s, "
+              f"antwoorden {F.stats}")
+        for e in sorted(evs, key=lambda e: e["date"])[:40]:
+            print("   ", json.dumps(e, ensure_ascii=False)[:300])
         continue
     m = re.match(r"jsonkeys:(.+?)@(https?://.+)$", arg)
     if m:  # JSON (los antwoord of __NEXT_DATA__/application/json in de pagina): sleutels die op de regex lijken
