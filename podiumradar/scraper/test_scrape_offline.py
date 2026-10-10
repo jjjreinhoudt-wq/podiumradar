@@ -198,4 +198,12 @@ check("link_pattern ziet ook de vraag (Vera)", sources.detail_links(sources.Beau
 
 check("title_strip en geen_prijs", [(e["title"], "price" in e) for e in sources.scrape_source(dict(src, title_strip=r"\s+Pell$", geen_prijs=True), _FJ(), {}, {}, lambda *a: None)], [("Axel Rudi", False)])
 
+check("<base href> telt bij relatieve links", sources.detail_links(sources.BeautifulSoup('<base href="https://b.nl"><a href="contact/">c</a><a href="programma/x/">x</a>', "html.parser"), "https://b.nl/programma/", r"^/programma/[^/]+/?$"), ["https://b.nl/programma/x/"])
+import film
+props = {"data": [0, {"categories": [1, []]}], "productions": [1, [[0, {"title": [0, "Mémoire de fille"], "durationInMinutes": [0, 117],
+         "screenings": [1, [[0, {"id": [0, "a"], "startAtUtc": [3, f"{j}-10-14T09:00:00.000Z"], "url": [0, "https://kassa.x.nl/#/checkout/a"]}]]]}]]]}
+html = "<astro-island props='" + json.dumps(props).replace("'", "&#39;") + "'></astro-island>"
+check("tricket: productions naast data, UTC naar NL-tijd", [(e["date"], e["time"], e["title"]) for e in film.tricket({"agenda_url": "https://x.nl/films/"}, _FB(html), {}, print)],
+      [(f"{j}-10-14", "11:00", "Mémoire de fille")])
+
 print("\n" + ("ALLES GOED" if not fouten else f"{fouten} FOUT(EN)")); sys.exit(1 if fouten else 0)

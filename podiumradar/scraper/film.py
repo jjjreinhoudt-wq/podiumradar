@@ -221,8 +221,21 @@ def _astro(v):
     return v
 
 
+def _productions(x):
+    """Alle producties (dicts met een lijst 'screenings'), waar ze ook staan in de props."""
+    if isinstance(x, dict):
+        if isinstance(x.get("screenings"), list):
+            yield x
+        for v in x.values():
+            yield from _productions(v)
+    elif isinstance(x, list):
+        for v in x:
+            yield from _productions(v)
+
+
 def tricket(src, F, cfg, log):
-    """Tricket op een Astro-site (Cinecenter): films en voorstellingen staan in de props van <astro-island> op /films/."""
+    """Tricket op een Astro-site (Cinecenter): films en voorstellingen staan in de props van <astro-island> op /films/
+    ('productions' naast 'data'; we zoeken ze overal, zodat een verschuiving in de opbouw niet meteen alles breekt)."""
     html = F.get(src["agenda_url"])
     if not html:
         return []
@@ -232,11 +245,8 @@ def tricket(src, F, cfg, log):
             p = _astro(json.loads(isl["props"]))
         except ValueError:
             continue
-        data = p.get("data") if isinstance(p, dict) else None
-        for prod in (data.get("productions") or []) if isinstance(data, dict) else []:
-            if not isinstance(prod, dict):
-                continue
-            for sc in prod.get("screenings") or []:
+        for prod in _productions(p):
+            for sc in prod["screenings"]:
                 if not isinstance(sc, dict) or not isinstance(sc.get("startAtUtc"), str) or (sc.get("id"), sc["startAtUtc"]) in seen:
                     continue
                 seen.add((sc.get("id"), sc["startAtUtc"]))
@@ -248,6 +258,7 @@ def tricket(src, F, cfg, log):
                 out.append(_ev(x.date(), x.strftime("%H:%M"), str(prod.get("title") or ""), sc.get("url") or src["agenda_url"],
                                dur if isinstance(dur, int) else None))
     return [e for e in out if e["title"]]
+
 
 PLATFORMS = {"pathe": pathe, "cinecitta": cinecitta, "tribe": tribe, "ticketlab": ticketlab,
              "cinelink": cinelink, "wpgraphql": wpgraphql, "fraterhuis": fraterhuis, "tricket": tricket}

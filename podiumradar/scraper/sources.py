@@ -453,8 +453,10 @@ def detail_links(soup, page_url, pattern=None, attrs=()):
     hrefs = [a["href"] for a in soup.find_all("a", href=True)]
     for at in attrs:
         hrefs += [x[at] for x in soup.find_all(attrs={at: True})]
+    # <base href="..."> bepaalt waar relatieve links naartoe wijzen (Boerderij: 'contact/' is /contact/, niet /programma/contact/)
+    basis = urljoin(page_url, (soup.find("base", href=True) or {}).get("href") or page_url)
     for href in hrefs:
-        u = urljoin(page_url, href).split("#")[0]
+        u = urljoin(basis, href).split("#")[0]
         p = urlparse(u)
         if p.netloc.removeprefix("www.") != host or u.rstrip("/") == base or SKIP_RE.search(u):
             continue
