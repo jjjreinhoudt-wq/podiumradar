@@ -265,7 +265,9 @@ def from_jsonld(o, page_url):
     status = json.dumps([o.get("eventStatus"), o.get("offers")]).lower()
     if "soldout" in status or "uitverkocht" in status:
         ev["status"] = "sold"
-    elif "cancel" in status or "postponed" in status:
+    # Afgelast alleen op eventStatus: in offers staat vaak iets als 'cancellationPolicy' of een annuleerlink,
+    # en dan verdween de hele agenda (Neushoorn, okt 2026)
+    elif re.search(r"cancel|postponed", str(o.get("eventStatus") or ""), re.I):
         ev["status"] = "cancelled"
     return ev
 

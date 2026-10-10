@@ -124,4 +124,12 @@ check("nachtprogramma tot 02:00 is één dag", "end" in jl(startDate="2026-10-10
 check("twee dagen (tot middernacht de dag daarna) blijft een periode", jl(startDate="2026-11-28T15:00:00+01:00", endDate="2026-11-30T00:00:00+01:00").get("end"), "2026-11-30")
 check("tentoonstelling met alleen datums blijft een periode", jl(startDate="2026-10-10", endDate="2026-10-11").get("end"), "2026-10-11")
 
+# 8. afgelast alleen op eventStatus; 'cancel' in de ticketgegevens is geen afgelaste show (Neushoorn, okt 2026)
+st = lambda **kw: jl(startDate="2026-10-10T20:00:00+02:00", **kw).get("status")
+check("cancellationPolicy in offers: niet afgelast",
+      st(offers={"@type": "Offer", "price": "20", "url": "https://x.nl/tickets?cancel_url=/terug", "cancellationPolicy": "geen restitutie"}), None)
+check("eventStatus EventCancelled: afgelast", st(eventStatus="https://schema.org/EventCancelled"), "cancelled")
+check("eventStatus EventPostponed: afgelast", st(eventStatus="EventPostponed"), "cancelled")
+check("uitverkocht in offers blijft uitverkocht", st(offers={"availability": "https://schema.org/SoldOut"}), "sold")
+
 print("\n" + ("ALLES GOED" if not fouten else f"{fouten} FOUT(EN)")); sys.exit(1 if fouten else 0)
