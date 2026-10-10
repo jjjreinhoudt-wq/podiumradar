@@ -234,4 +234,26 @@ check("wp_shows: twee speeldata, uitverkocht, prijs 37.5, titel zonder entities"
       [(f"{j}-09-25", "20:15", None, 37.5, "Buddy Vedder & Shelley Bos – Blauw"), (f"{j}-09-26", "14:30", "sold", 37.5, "Buddy Vedder & Shelley Bos – Blauw")])
 check("wp_shows: geen lijst -> None (terug naar de gewone uitlezer)", venues.wp_shows({"agenda_url": "https://l.nl/"}, _FW({}), {}, print), None)
 
+# 16. Vue-blok 'shows' (Zwolse Theaters) en detail_date_selector (Atlas)
+model = {"items": [{"information": {"date": f"za 10 okt '{str(j)[2:]}", "time": "20.00 uur", "price": "Van € 14,- tot € 27,50"}, "link": {"name": "Wachtlijst"}}]}
+zw = "<html><body><main><h1>Merijn Scholten</h1><component is=\"shows\" :model='" + json.dumps(model).replace("'", "&#39;") + f"'></component><p>Ook 3 nov {j} 21:15 iets anders</p></main></body></html>"
+geweest = "<html><body><main><h1>Oud</h1><component is=\"shows\" :model='{\"items\": []}'></component><p>Ook 3 nov " + str(j) + " 21:15 iets anders</p></main></body></html>"
+class _FD:
+    def __init__(self, pages): self.pages = pages
+    def get(self, url): return self.pages.get(url)
+    def get_json(self, url, params=None): return None
+src = {"name": "Zwolse Theaters", "type": "thea", "agenda_url": "https://z.nl/agenda", "link_pattern": "^/programma/"}
+pages = {"https://z.nl/agenda": '<a href="/programma/a">a</a><a href="/programma/b">b</a>', "https://z.nl/programma/a": zw, "https://z.nl/programma/b": geweest}
+evs = sources.scrape_source(src, _FD(pages), {}, {}, lambda *a: None)
+check("vue_shows: datum, tijd, prijs, wachtlijst = uitverkocht; al geweest = niets",
+      [(e["title"], e["date"], e["time"], e.get("price"), e.get("status")) for e in evs], [("Merijn Scholten", f"{j}-10-10", "20:00", 14, "sold")])
+atlas = (f"<html><body><main><h1>The Bodyguard</h1><span class='perf-date perf-page'> WO 07 APR {j} <div> 20:00 uur Grote Zaal <span>vanaf € 67,00</span></div></span>"
+         f"<p>Speelt t/m 11 april {j}. Vrienden € 10,00 korting. Ook 1 feb {j} 15:00 andere show</p></main></body></html>")
+src = {"name": "Atlas Theater", "type": "thea", "agenda_url": "https://a.nl/sitemap-pagina/", "link_pattern": "^/voorstellingen/", "detail_date_selector": "span.perf-date.perf-page"}
+pages = {"https://a.nl/sitemap-pagina/": '<a href="/voorstellingen/bg-07-apr/">x</a><a href="/voorstellingen/info/">y</a>', "https://a.nl/voorstellingen/bg-07-apr/": atlas,
+         "https://a.nl/voorstellingen/info/": f"<html><body><main><h1>Info</h1><p>3 mei {j} 20:00</p></main></body></html>"}
+evs = sources.scrape_source(src, _FD(pages), {}, {}, lambda *a: None)
+check("detail_date_selector: alleen het blok telt (geen eind, geen korting), pagina zonder blok = niets",
+      [(e["date"], e["time"], e.get("price"), e.get("end")) for e in evs], [(f"{j}-04-07", "20:00", 67, None)])
+
 print("\n" + ("ALLES GOED" if not fouten else f"{fouten} FOUT(EN)")); sys.exit(1 if fouten else 0)

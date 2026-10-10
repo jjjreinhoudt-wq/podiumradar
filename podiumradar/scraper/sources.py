@@ -444,6 +444,32 @@ def from_text(soup, url):
     return ev
 
 
+def vue_shows(soup, url):
+    """Speeldata uit een Vue-blok <component is="shows" :model='{"items": [{"information": {"date": "za 10 okt '26",
+    "time": "20.00 uur", "price": "Van € 14,- tot € 27,50"}, "link": {"name": "Wachtlijst"}}]}'> (Zwolse Theaters)."""
+    out = []
+    for c in soup.find_all("component", attrs={"is": "shows"}):
+        try:
+            model = json.loads(c.get(":model") or "")
+        except ValueError:
+            continue
+        for it in (model.get("items") or []) if isinstance(model, dict) else []:
+            inf = (it.get("information") or {}) if isinstance(it, dict) else {}
+            d = _txt_date(str(inf.get("date") or ""))
+            if not d:
+                continue
+            tm = TIME_RE.search(str(inf.get("time") or ""))
+            ev = {"date": d.isoformat(), "time": f"{int(tm.group(1)):02d}:{tm.group(2)}" if tm else None,
+                  "title": pick_title(soup, url), "url": url}
+            prijs = prijzen.from_text("Prijs: " + str(inf.get("price") or "")) if inf.get("price") else None
+            if prijs is not None:
+                ev["price"] = prijs
+            if re.search(r"wachtlijst|uitverkocht", str((it.get("link") or {}).get("name") or ""), re.I):
+                ev["status"] = "sold"
+            out.append(ev)
+    return out
+
+
 def detail_links(soup, page_url, pattern=None, attrs=()):
     """Links naar voorstellingspagina's. attrs: extra attributen met een link (bv. data-target bij Grenswerk)."""
     host = urlparse(page_url).netloc.removeprefix("www.")
@@ -746,8 +772,28 @@ def scrape_source(src, F, cache, cfg, log):
                     if re.fullmatch(r"[\d\s#-]+", e["title"]) or GENERIC_TITLE.match(e["title"]):
                         e["title"] = pick_title(soup, u)
                 if not evs:
+                    evs = vue_shows(soup, u)
+                # Past voorstelling bij een Vue-blok 'shows' (Zwolse Theaters): lege lijst = al geweest, dan niet in de tekst zoeken
+                if not evs and not soup.find("component", attrs={"is": "shows"}):
                     e = text_reader(soup, u)
                     evs = [e] if e else []
+                # "detail_date_selector": datum, tijd en prijs alleen uit dat ene blok (Atlas: elders op de pagina staan
+                # datums van andere voorstellingen en kortingen). Geen blok = geen voorstellingspagina.
+                if src.get("detail_date_selector"):
+                    el = soup.select_one(src["detail_date_selector"])
+                    blok = el.get_text(" ", strip=True) if el else ""
+                    d = _txt_date(blok) if blok else None
+                    evs = []
+                    if d:
+                        tm = TIME_RE.search(blok)
+                        e = {"date": d.isoformat(), "time": f"{int(tm.group(1)):02d}:{tm.group(2)}" if tm else None,
+                             "title": pick_title(soup, u), "url": u}
+                        prijs = prijzen.from_text(blok)
+                        if prijs is not None:
+                            e["price"] = prijs
+                        if re.search(r"\buitverkocht\b|\bvolgeboekt\b|\bsold ?out\b", blok, re.I):
+                            e["status"] = "sold"
+                        evs = [e]
                 if src.get("timetable") and len(evs) == 1 and not evs[0].get("end"):  # settijden (013, Tivoli); niet bij meerdaags
                     evs[0].update(venues.detail_times(soup, evs[0]["title"]))
                     if any("<" in x for x in evs[0].get("support") or []):  # HTML-rommel uit de JSON-LD (Tivoli)
