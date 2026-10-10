@@ -458,7 +458,8 @@ def detail_links(soup, page_url, pattern=None, attrs=()):
         p = urlparse(u)
         if p.netloc.removeprefix("www.") != host or u.rstrip("/") == base or SKIP_RE.search(u):
             continue
-        if rx.search(p.path) and u not in seen:
+        # Met een eigen link_pattern telt ook de vraag mee (Vera: /?post_type=events&p=153705)
+        if rx.search(p.path + ("?" + p.query if pattern and p.query else "")) and u not in seen:
             seen.append(u)
     return seen
 
@@ -675,6 +676,9 @@ def scrape_source(src, F, cache, cfg, log):
                 v = item
                 for part in lj.get("path", "link").split("."):
                     v = v.get(part) if isinstance(v, dict) else None
+                # "template": van een slug een link maken (Boerderij: seo_slug -> https://.../programma/<slug>/)
+                if isinstance(v, str) and v and lj.get("template") and not v.startswith("http"):
+                    v = lj["template"].format(v.strip("/"))
                 if isinstance(v, str) and v.startswith("http") and v not in links:
                     links.append(v)
             if "{page}" not in lj["url"]:
@@ -731,6 +735,10 @@ def scrape_source(src, F, cache, cfg, log):
             parts = parts[1:]
         if parts and len(parts[0]) >= 3:
             e["title"] = parts[0]
+        # "Axel Rudi Pell - Poppodium Boerderij": naam van het podium achteraan eraf
+        kaal = re.sub(r"\s+[-–]\s+" + re.escape(re.sub(r"\s*\(.*?\)", "", src["name"])) + r"\s*$", "", e["title"], flags=re.I)
+        if len(kaal) >= 3:
+            e["title"] = kaal
         # "Donderdag 8 oktober v.v. EIGEN WIJS" / "9 t/m 11 oktober Biergarten": datum vooraan eraf
         stripped = re.sub(r"^(?:(?:ma|di|wo|do|vr|za|zo)[a-z]*\.?\s+)?\d{1,2}(?:\s*(?:t/m|-|–)\s*\d{1,2})?\s+(?:jan|feb|mrt|maa|apr|mei|jun|jul|aug|sep|okt|nov|dec)[a-z]*\.?"
                           r"(?:\s+20\d\d)?\s*(?:v\.v\.|:|-|–)?\s*", "", e["title"], flags=re.I)

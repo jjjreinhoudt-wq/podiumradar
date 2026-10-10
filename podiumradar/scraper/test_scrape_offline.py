@@ -182,4 +182,18 @@ ketel = f'<html><body><div class="hl-faq-child">Workshop Tegeltjespracht | zater
 evs = sources.scrape_source(dict(src, blocks={"selector": "div.hl-faq-child"}), _FB(ketel), {}, {}, lambda *a: None)
 check("blokken zonder titel-element: eerste deel van de eerste regel", [(e["title"], e["date"]) for e in evs], [("Workshop Tegeltjespracht", f"{j}-10-10")])
 
+# 13. links_json met template (Boerderij), link met vraag (Vera), podiumnaam achter de titel eraf
+class _FJ:
+    def get(self, url):
+        if "programma/axel" in url:
+            return f"<html><body><main><h1>Axel Rudi Pell - Poppodium Boerderij</h1><p>za 10 okt {j} aanvang 20:30</p></main></body></html>"
+        return '<html><body><a href="/?post_type=events&p=12&lang=nl">x</a><a href="/over">o</a></body></html>'
+    def get_json(self, url, params=None): return [{"seo_slug": "axel-rudi-pell"}]
+src = {"name": "Poppodium Boerderij", "type": "pop", "agenda_url": "https://b.nl/programma/", "link_pattern": "^/programma/[^/]+/$",
+       "links_json": {"url": "https://b.nl/events.php", "path": "seo_slug", "template": "https://b.nl/programma/{}/"}}
+evs = sources.scrape_source(src, _FJ(), {}, {}, lambda *a: None)
+check("links_json template + podiumnaam eraf", [(e["title"], e["url"]) for e in evs], [("Axel Rudi Pell", "https://b.nl/programma/axel-rudi-pell/")])
+check("link_pattern ziet ook de vraag (Vera)", sources.detail_links(sources.BeautifulSoup(_FJ().get(""), "html.parser"), "https://v.nl/programma/", r"[?&]post_type=events&p=\d+"),
+      ["https://v.nl/?post_type=events&p=12&lang=nl"])
+
 print("\n" + ("ALLES GOED" if not fouten else f"{fouten} FOUT(EN)")); sys.exit(1 if fouten else 0)

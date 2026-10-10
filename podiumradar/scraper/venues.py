@@ -325,19 +325,28 @@ def umbraco_getshows(src, F, cfg, log):
 
 def itix(src, F, cfg, log):
     """Itix CMS (Ogterop, Hof 88, Zeelandtheaters, Maaspoort): /shows.php?page=N geeft JSON met html.
+    Nieuwere sites (Maaspoort, okt 2026) geven daar alleen aantallen: dan de kaarten van /programma/?page=N zelf.
     Datum en tijd staan ook in de link: /programma/<slug>/01-10-2026-20-15."""
-    site, out, page = _site(src), [], 1
+    site, out, page, ssr = _site(src), [], 1, False
+    loc_rx = r"location(?:\.href)?\s*=\s*'([^']+)'"
     while page <= 40:
-        js = F.get_json(site + "/shows.php", {"page": page, "genres": "", "dates": "", "type": src.get("itix_type", "theatre")}) or {}
-        soup = BeautifulSoup(js.get("html") or "", "html.parser")
-        for art in soup.select("article.program-block"):
-            ttl = art.select_one(".program-block__title")
-            sub = art.select_one(".program-block__subtitle")
-            link = art.select_one("a.icon-info[href]") or art.select_one("a[href*='/programma/']")
-            href = link["href"] if link else ""
-            if not href:
-                m = re.search(r"location\s*=\s*'([^']+)'", str(art))
-                href = m.group(1) if m else ""
+        js = {} if ssr else F.get_json(site + "/shows.php", {"page": page, "genres": "", "dates": "", "type": src.get("itix_type", "theatre")}) or {}
+        html, pages = js.get("html"), int(js.get("pages") or 1)
+        if not html:   # nieuwe opbouw: de programmapagina zelf (en dan shows.php niet meer vragen)
+            ssr = True
+            html = F.get(f"{site}/programma/?page={page}") or ""
+            m = re.search(r'data-ssr-pages="(\d+)"', html)
+            pages = int(m.group(1)) if m else pages
+        soup = BeautifulSoup(html, "html.parser")
+        for art in soup.select("article.program-block, div.program-block"):
+            ttl = art.select_one(".program-block__title, .program-block-title .title")
+            sub = art.select_one(".program-block__subtitle, .program-block-title .subtitle")
+            m = re.search(loc_rx, art.get("onclick") or "")
+            link = art.select_one("a.icon-info[href]") or art.select_one("a[href*='/programma/'][href$='/']")
+            href = m.group(1) if m else (link["href"] if link else "")
+            if not re.search(r"/\d{2}-\d{2}-\d{4}-\d{2}-\d{2}/?$", href):
+                m = re.search(loc_rx, str(art))
+                href = m.group(1) if m else href
             m = re.search(r"/(\d{2})-(\d{2})-(\d{4})-(\d{2})-(\d{2})/?$", href)
             if not (ttl and m):
                 continue
@@ -346,11 +355,11 @@ def itix(src, F, cfg, log):
                 title = f"{title} - {sub.get_text(' ', strip=True)}"
             ev = {"date": f"{m.group(3)}-{m.group(2)}-{m.group(1)}", "time": f"{m.group(4)}:{m.group(5)}",
                   "title": title, "url": href if href.startswith("http") else site + href}
-            lab = art.select_one(".program-block__label")
-            if lab and "uitverkocht" in lab.get_text().lower():
+            lab = art.select_one(".program-block__label, .program-block-label")
+            if (lab and "uitverkocht" in lab.get_text().lower()) or art.select_one("[data-status='uitverkocht']"):
                 ev["status"] = "sold"
             out.append(ev)
-        if page >= int(js.get("pages") or 1):
+        if page >= pages or not html:
             break
         page += 1
     return out
