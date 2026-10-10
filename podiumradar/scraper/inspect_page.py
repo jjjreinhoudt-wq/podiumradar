@@ -8,7 +8,7 @@ Meerdere adressen met een spatie ertussen. Voorvoegsels voor één adres:
   seltxt<N>:<css>@<url> tekst, links en attributen van de eerste N (15) elementen
   sel:<css>@<url>      de HTML van de eerste 5 elementen die bij de CSS-selector passen (zonder plaatjes, max 8000 tekens per stuk)
   platform=<p>:<bron>  bron uit bronnen.json met dit platform uitlezen (aantallen, tijd, voorbeelden)
-  bron:{json}          bron uitproberen met andere instellingen (op naam + wijzigingen, of een nieuwe bron); spaties als \u0020
+  bron:{json}          bron uitproberen met andere instellingen (op naam + wijzigingen, of een nieuwe bron); als enige opdracht in de invoer
   jsonkeys:<regex>@<url> sleutels in JSON (of __NEXT_DATA__) die op de regex lijken
   gql:<query>          vraag aan de Paradiso-programmadienst
   links:<url>          alle links op de pagina (gegroepeerd), scripts, formulieren en data-attributen
@@ -98,7 +98,9 @@ def links(url):
         print(l.get("rel"), l.get("type"), l.get("href"))
 
 
-for arg in " ".join(sys.argv[1:]).split():
+ALLES = " ".join(sys.argv[1:]).strip()
+# bron:{json} mag spaties bevatten: dan is de hele invoer één opdracht
+for arg in ([ALLES] if ALLES.startswith("bron:{") else ALLES.split()):
     print("\n" + "#" * 100 + f"\n# {arg}\n" + "#" * 100)
     m = re.match(r"raw(\d*):(.+)$", arg)
     if m:
@@ -148,7 +150,7 @@ for arg in " ".join(sys.argv[1:]).split():
             for e in evs[:6] + evs[len(evs) // 2:len(evs) // 2 + 3]:
                 print("   ", json.dumps(e, ensure_ascii=False))
         continue
-    m = re.match(r"bron:(\{.+\})$", arg)
+    m = re.match(r"bron:(\{.+\})$", arg, re.S)
     if m:  # bron uitproberen met andere instellingen, zonder bronnen.json te wijzigen. Geen spaties: schrijf ze als  .
         # bron:{"name":"Little Devil","link_pattern":"/agenda/.+","max_details":20}  (bestaande bron op naam + wijzigingen)
         # bron:{"name":"Nieuw","city":"Tilburg","type":"pop","agenda_url":"https://..."}  (nieuwe bron)
