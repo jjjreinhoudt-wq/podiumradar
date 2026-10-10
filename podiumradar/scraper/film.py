@@ -4,7 +4,7 @@ Een bron in bronnen.json met "type": "film" en "platform": "<naam>" gaat naar de
 zonder (bekend) platform leest sources.py de site gewoon uit (JSON-LD ScreeningEvent of de filmpagina's).
 Elke uitlezer geeft een lijst events: {"date", "time", "title", "url", optioneel "dur" (minuten)}.
 """
-import datetime as dt, re
+import datetime as dt, json, re
 from urllib.parse import urljoin, urlparse
 from zoneinfo import ZoneInfo
 from bs4 import BeautifulSoup
@@ -208,8 +208,49 @@ def fraterhuis(src, F, cfg, log):
     return out
 
 
+
+def _astro(v):
+    """Astro-props: elke waarde is [type, waarde]; 1 = lijst, 3 = datum, 0 = gewoon of object."""
+    if isinstance(v, list) and len(v) == 2 and isinstance(v[0], int):
+        t, x = v
+        if t == 1 and isinstance(x, list):
+            return [_astro(i) for i in x]
+        return _astro(x) if isinstance(x, dict) else x
+    if isinstance(v, dict):
+        return {k: _astro(i) for k, i in v.items()}
+    return v
+
+
+def tricket(src, F, cfg, log):
+    """Tricket op een Astro-site (Cinecenter): films en voorstellingen staan in de props van <astro-island> op /films/."""
+    html = F.get(src["agenda_url"])
+    if not html:
+        return []
+    out, seen = [], set()
+    for isl in BeautifulSoup(html, "html.parser").find_all("astro-island", props=True):
+        try:
+            p = _astro(json.loads(isl["props"]))
+        except ValueError:
+            continue
+        data = p.get("data") if isinstance(p, dict) else None
+        for prod in (data.get("productions") or []) if isinstance(data, dict) else []:
+            if not isinstance(prod, dict):
+                continue
+            for sc in prod.get("screenings") or []:
+                if not isinstance(sc, dict) or not isinstance(sc.get("startAtUtc"), str) or (sc.get("id"), sc["startAtUtc"]) in seen:
+                    continue
+                seen.add((sc.get("id"), sc["startAtUtc"]))
+                try:
+                    x = dt.datetime.fromisoformat(sc["startAtUtc"].replace("Z", "+00:00")).astimezone(NL)
+                except ValueError:
+                    continue
+                dur = prod.get("durationInMinutes")
+                out.append(_ev(x.date(), x.strftime("%H:%M"), str(prod.get("title") or ""), sc.get("url") or src["agenda_url"],
+                               dur if isinstance(dur, int) else None))
+    return [e for e in out if e["title"]]
+
 PLATFORMS = {"pathe": pathe, "cinecitta": cinecitta, "tribe": tribe, "ticketlab": ticketlab,
-             "cinelink": cinelink, "wpgraphql": wpgraphql, "fraterhuis": fraterhuis}
+             "cinelink": cinelink, "wpgraphql": wpgraphql, "fraterhuis": fraterhuis, "tricket": tricket}
 
 
 def scrape(src, F, cfg, log):
