@@ -368,6 +368,12 @@ def from_text(soup, url):
     for bad in main.find_all(class_=OTHER_EVENTS_RE):
         if not bad.find("h1"):
             bad.decompose()
+    # Verborgen tekst telt niet: Webflow (Neushoorn) zet 'Geannuleerd' op élke pagina, verborgen met
+    # w-condition-invisible; anders gold elke show als afgelast (okt 2026)
+    for bad in main.find_all(lambda t: "w-condition-invisible" in (t.get("class") or []) or t.has_attr("hidden")
+                             or re.search(r"display\s*:\s*none", t.get("style") or "", re.I)):
+        if not bad.decomposed:
+            bad.decompose()
     txt = main.get_text("\n", strip=True)[:6000]
     title = pick_title(soup, url)
     d = _txt_date(txt)

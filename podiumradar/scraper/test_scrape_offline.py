@@ -132,4 +132,14 @@ check("eventStatus EventCancelled: afgelast", st(eventStatus="https://schema.org
 check("eventStatus EventPostponed: afgelast", st(eventStatus="EventPostponed"), "cancelled")
 check("uitverkocht in offers blijft uitverkocht", st(offers={"availability": "https://schema.org/SoldOut"}), "sold")
 
+# 9. verborgen tekst telt niet (Neushoorn/Webflow: 'Geannuleerd' staat verborgen op elke pagina)
+from bs4 import BeautifulSoup
+def ft(extra):
+    html = ('<html><body><main><h1>058 Jazzcafe: Ladybirds trio</h1><div>22 okt 2026</div>' + extra +
+            '<div>Deuren open:</div><div>17:00</div><div>Aanvang:</div><div>20:30</div></main></body></html>')
+    return sources.from_text(BeautifulSoup(html, "html.parser"), "https://x.nl/events/ladybirds").get("status")
+check("verborgen 'Geannuleerd' (w-condition-invisible): niet afgelast", ft('<div class="event-details_content w-condition-invisible">Geannuleerd</div>'), None)
+check("verborgen met hidden of display:none: niet afgelast", ft('<p hidden>Afgelast</p><span style="display: none">Geannuleerd</span>'), None)
+check("zichtbaar 'Geannuleerd': wel afgelast", ft('<div class="event-details_content">Geannuleerd</div>'), "cancelled")
+
 print("\n" + ("ALLES GOED" if not fouten else f"{fouten} FOUT(EN)")); sys.exit(1 if fouten else 0)
