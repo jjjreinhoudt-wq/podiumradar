@@ -245,6 +245,8 @@ def from_jsonld(o, page_url):
     midnden = isinstance(raw_end, str) and "T00:00" in raw_end   # 'T00:00' = einde van de dag ervoor (_iso geeft dan geen tijd terug)
     if end and ((end_t and end_t < "08:00") or (midnden and t)) and (end - d).days == 1:
         end = None  # nachtprogramma of tot middernacht (Here's The Thing, 013): één dag, geen meerdaags evenement
+    elif end and end_t and end_t < "08:00" and (end - d).days > 1:
+        end -= dt.timedelta(days=1)  # meerdaags met een laatste nacht tot na middernacht (Lente Kabinet): laatste dag is de dag ervoor
     # Bij een filmvoorstelling (ScreeningEvent) is de film de titel, niet "Voorstelling 20:15"
     wp, nm = _name(o.get("workPresented")), _name(o.get("name"))
     title = unescape(wp if wp and not re.fullmatch(r"[\d\s#-]+", wp) else nm or wp or "").strip()
@@ -537,11 +539,12 @@ def next_pages(soup, page_url, html):
 
 
 MON = r"(jan|feb|mrt|maa|mar|apr|mei|may|jun|jul|aug|sep|okt|oct|nov|dec)[a-z]*\.?"
-# "12, 13 & 14 juni 2027", "5 t/m 7 juni", "24-26 juli 2026", "vr 3 - zo 5 juli"
-FEST_RE = re.compile(r"\b(\d{1,2})(?:\s*(?:[-–—/&,]|t/m|tot en met|en|and)\s*(?:[a-z]{2,9}\.?\s+)?(\d{1,2}))*\s+"
+# "12, 13 & 14 juni 2027", "5 t/m 7 juni", "24-26 juli 2026", "vr 3 - zo 5 juli",
+# "18 • 19 • 20 juni 2027" (Pinkpop), "20 + 21 + 22 augustus 2027" (Lowlands), "8.9.10.11 juli" (Wildeburg), "6 | 7 | 8 mei"
+FEST_RE = re.compile(r"\b(\d{1,2})(?:\s*(?:[-–—/&,+•·.|]|t/m|tot en met|en|and)\s*(?:[a-z]{2,9}\.?\s+)?(\d{1,2}))*\s+"
                      + MON + r"(?:\s+'?(\d{4}|\d{2}))?\b", re.I)
-# "30 mei - 1 juni 2027", "Fri 27 Aug till Mon 30 Aug"
-FEST2_RE = re.compile(r"\b(\d{1,2})\s+" + MON + r"(?:\s+(\d{4}))?\s*(?:[-–—]|t/m|tot en met|tot|till|until)\s*(?:[a-z]{2,9}\.?\s+)?"
+# "30 mei - 1 juni 2027", "Fri 27 Aug till Mon 30 Aug", "tussen 24 sept en 1 okt 2027" (NFF)
+FEST2_RE = re.compile(r"\b(\d{1,2})\s+" + MON + r"(?:\s+(\d{4}))?\s*(?:[-–—]|t/m|tot en met|tot|till|until|en|and)\s*(?:[a-z]{2,9}\.?\s+)?"
                       r"(\d{1,2})\s+" + MON + r"(?:\s+(\d{4}))?", re.I)
 # Engels, maand eerst: "June 24 - 27", "April 15-18, 2027", "June 24-25-26", "August 14 2027"
 FEST3_RE = re.compile(r"\b" + MON + r"\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*(?:[-–—&/]|t/m|to|till|until)\s*(?:" + MON
@@ -592,7 +595,12 @@ def festival_event(src, F, log):
                     return dt.date(int(hint[-1]), m, int(day))
             y = (2000 + int(yy) if yy and len(yy) == 2 else int(yy)) if yy else TODAY.year
             d = dt.date(y, m, int(day))
-            return d.replace(year=y + 1) if not yy and d < TODAY - dt.timedelta(days=7) else d
+            # Datum zonder jaartal die al voorbij is: alleen volgend jaar als de pagina dat jaar ook noemt. Anders is het
+            # vrijwel altijd de tekst van de vorige editie (Psy-Fi, TT Festival, GOGBOT, Bevrijdingsfestivals: '5 mei'),
+            # en dan blijft het een datum in het verleden die ok() afwijst.
+            if not yy and d < TODAY - dt.timedelta(days=7) and re.search(rf"\b{y + 1}\b", head):
+                return d.replace(year=y + 1)
+            return d
 
         def ok(a, b, pos=None):
             # "tickets on sale until June 2nd" / "t/m 5 mei bestellen": geen festivaldatum

@@ -256,4 +256,23 @@ evs = sources.scrape_source(src, _FD(pages), {}, {}, lambda *a: None)
 check("detail_date_selector: alleen het blok telt (geen eind, geen korting), pagina zonder blok = niets",
       [(e["date"], e["time"], e.get("price"), e.get("end")) for e in evs], [(f"{j}-04-07", "20:00", 67, None)])
 
+# 17. festivals: dagreeksen met + • . | en "en"; geen verzonnen data uit tekst zonder jaartal; nacht na middernacht
+def fest(txt, month):
+    evs = sources.festival_event({"name": "X", "type": "festival", "month": month, "agenda_url": "https://x.nl/"},
+                                 _F(f"<html><head><title>{txt}</title></head><body><p>{txt}</p></body></html>"), lambda *a: None)
+    return [(e["date"], e.get("end")) for e in evs]
+for naam, txt, mnd, verwacht in [
+        ("Pinkpop •", f"Pinkpop – 18 • 19 • 20 juni {j}", "juni", [(f"{j}-06-18", f"{j}-06-20")]),
+        ("Lowlands +", f"Tot volgend jaar op 20 + 21 + 22 augustus {j}.", "augustus", [(f"{j}-08-20", f"{j}-08-22")]),
+        ("North Sea Jazz • zonder spaties", f"09•10•11 JULI {j} Ahoy", "juli", [(f"{j}-07-09", f"{j}-07-11")]),
+        ("Wildeburg punten", f"8.9.10.11 juli {j}", "juli", [(f"{j}-07-08", f"{j}-07-11")]),
+        ("NFF 'en' tussen twee datums", f"tussen 24 sept en 1 okt {j}", "september", [(f"{j}-09-24", f"{j}-10-01")]),
+        ("oude editie zonder jaartal: niets", "Psy-Fi 9-13 July Stölln", "juli", []),
+        ("Bevrijdingsfestival '5 mei' zonder jaartal: niets", "Bevrijdingsfestival 5 mei Den Bosch", "mei", []),
+        ("zonder jaartal maar pagina noemt volgend jaar", f"9-13 July, see you in {j}", "juli", [(f"{j}-07-09", f"{j}-07-13")]),
+        ("losse + in een prijs maakt geen periode", f"5 + 2 euro ... 3 juni {j}", "juni", [(f"{j}-06-03", None)])]:
+    check(f"festival: {naam}", fest(txt, mnd), verwacht)
+check("meerdaags met laatste nacht tot 01:00: eindigt de dag ervoor (Lente Kabinet)",
+      jl(startDate=f"{j}-05-15T12:00:00+02:00", endDate=f"{j}-05-16T23:00:00.000Z").get("end"), f"{j}-05-16")
+
 print("\n" + ("ALLES GOED" if not fouten else f"{fouten} FOUT(EN)")); sys.exit(1 if fouten else 0)
