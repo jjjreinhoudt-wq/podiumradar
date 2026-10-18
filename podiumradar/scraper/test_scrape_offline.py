@@ -275,4 +275,11 @@ for naam, txt, mnd, verwacht in [
 check("meerdaags met laatste nacht tot 01:00: eindigt de dag ervoor (Lente Kabinet)",
       jl(startDate=f"{j}-05-15T12:00:00+02:00", endDate=f"{j}-05-16T23:00:00.000Z").get("end"), f"{j}-05-16")
 
+# 18. JSON-LD-naam is de uitvoerder, de kop is de voorstelling (Schouwburg Tilburg, Dikkie Dik)
+u = "https://www.schouwburgconcertzaaltilburg.nl/nl/agenda/op-avontuur-met-dikkie-dik-trapperdetrap"
+kop = sources.BeautifulSoup("<html><head><meta property='og:title' content='Op avontuur met Dikkie Dik (2+) - Trapperdetrap'></head><body><h1>Op avontuur met Dikkie Dik (2+)</h1></body></html>", "html.parser")
+check("kop wint als die bij de link past en de JSON-LD-naam niet", sources.beter_dan_jsonld("Trapperdetrap &amp; Het Concertgebouw", kop, u), "Op avontuur met Dikkie Dik (2+)")
+check("gewone JSON-LD-naam blijft staan", sources.beter_dan_jsonld("Op avontuur met Dikkie Dik", kop, u), "Op avontuur met Dikkie Dik")
+check("korte link zonder titelwoorden: JSON-LD blijft", sources.beter_dan_jsonld("Trapperdetrap", kop, "https://x.nl/agenda/12345"), "Trapperdetrap")
+
 print("\n" + ("ALLES GOED" if not fouten else f"{fouten} FOUT(EN)")); sys.exit(1 if fouten else 0)

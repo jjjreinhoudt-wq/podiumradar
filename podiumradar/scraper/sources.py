@@ -446,6 +446,23 @@ def from_text(soup, url):
     return ev
 
 
+def _slugscore(titel, url):
+    """Welk deel van de woorden (3+ letters) uit de titel staat in het laatste stuk van de link."""
+    slug = urlparse(url).path.rstrip("/").rsplit("/", 1)[-1].lower()
+    woorden = [w for w in re.findall(r"[a-z0-9]+", unescape(titel).lower()) if len(w) >= 3]
+    return sum(w in slug for w in woorden) / len(woorden) if woorden else 0
+
+
+def beter_dan_jsonld(naam, soup, url):
+    """Sommige sites zetten de uitvoerenden als naam in de JSON-LD en de voorstelling in de kop (Schouwburg Tilburg:
+    JSON-LD 'Trapperdetrap & Het Concertgebouw', kop 'Op avontuur met Dikkie Dik (2+)', link .../op-avontuur-met-dikkie-dik-
+    trapperdetrap). Past de kop duidelijk bij de link en de JSON-LD-naam niet, dan wint de kop."""
+    kop = pick_title(soup, url)
+    if kop and kop != naam and not GENERIC_TITLE.match(kop) and _slugscore(kop, url) >= 0.8 and _slugscore(naam, url) < 0.5:
+        return kop
+    return naam
+
+
 def vue_shows(soup, url):
     """Speeldata uit een Vue-blok <component is="shows" :model='{"items": [{"information": {"date": "za 10 okt '26",
     "time": "20.00 uur", "price": "Van € 14,- tot € 27,50"}, "link": {"name": "Wachtlijst"}}]}'> (Zwolse Theaters)."""
@@ -779,6 +796,8 @@ def scrape_source(src, F, cache, cfg, log):
                     # Sommige sites zetten een nummer of kopje als naam in de JSON-LD; neem dan de paginatitel
                     if re.fullmatch(r"[\d\s#-]+", e["title"]) or GENERIC_TITLE.match(e["title"]):
                         e["title"] = pick_title(soup, u)
+                    else:
+                        e["title"] = beter_dan_jsonld(e["title"], soup, u)
                 # "detail_date_selector": datum, tijd en prijs alleen uit dat ene blok (Atlas: elders op de pagina staan
                 # datums van andere voorstellingen en kortingen). Geen blok = geen voorstellingspagina. Vóór de gewone
                 # tekstuitlezer, want die haalt kop- en sliderblokken uit de pagina weg.
