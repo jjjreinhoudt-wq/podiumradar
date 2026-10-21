@@ -1,18 +1,16 @@
 {
- "datum": "2026-10-20 06:33",
- "werkt": 433,
+ "datum": "2026-10-21 06:37",
+ "werkt": 432,
  "totaal": 495,
  "bronnen": [
   {
-   "name": "Brabanthallen",
+   "name": "Ziggo Dome",
    "type": "arena",
    "items": 0,
    "niet_op_tijd": false,
-   "lokaal": false,
-   "site": "brabanthallen.nl",
-   "antwoorden": {
-    "202": 1
-   }
+   "lokaal": true,
+   "site": "ziggodome.nl",
+   "antwoorden": {}
   },
   {
    "name": "Amsterdam Roots Festival",
@@ -55,18 +53,7 @@
    "lokaal": false,
    "site": "hetvrijewesten.eu",
    "antwoorden": {
-    "200": 1
-   }
-  },
-  {
-   "name": "Bevrijdingsfestival Brabant",
-   "type": "festival",
-   "items": 0,
-   "niet_op_tijd": false,
-   "lokaal": false,
-   "site": "bevrijdingsfestivalbrabant.nl",
-   "antwoorden": {
-    "202": 1
+    "verbindingsfout": 1
    }
   },
   {
@@ -183,7 +170,7 @@
    "lokaal": false,
    "site": "schouwburgconcertzaaltilburg.nl",
    "antwoorden": {
-    "200": 104
+    "200": 105
    }
   },
   {
@@ -217,6 +204,17 @@
    "site": "delftmusicfestival.nl",
    "antwoorden": {
     "200": 1
+   }
+  },
+  {
+   "name": "Deventer op Stelten",
+   "type": "festival",
+   "items": 0,
+   "niet_op_tijd": false,
+   "lokaal": false,
+   "site": "deventeropstelten.nl",
+   "antwoorden": {
+    "robots": 1
    }
   },
   {
@@ -566,14 +564,25 @@
    }
   },
   {
-   "name": "Het Bolwerk (theater & poppodium)",
+   "name": "013",
    "type": "pop",
    "items": 0,
    "niet_op_tijd": false,
    "lokaal": false,
-   "site": "ontdekpoort.nl",
+   "site": "013.nl",
    "antwoorden": {
-    "202": 2
+    "200": 1
+   }
+  },
+  {
+   "name": "Fluor",
+   "type": "pop",
+   "items": 0,
+   "niet_op_tijd": false,
+   "lokaal": false,
+   "site": "fluor033.nl",
+   "antwoorden": {
+    "robots": 1
    }
   },
   {
@@ -588,25 +597,14 @@
    }
   },
   {
-   "name": "Pier15",
+   "name": "Porgy & Bess",
    "type": "pop",
    "items": 0,
    "niet_op_tijd": false,
    "lokaal": false,
-   "site": "pier15.nl",
+   "site": "porgyenbess.nl",
    "antwoorden": {
-    "202": 1
-   }
-  },
-  {
-   "name": "Fontys Academy of the Arts (FHK)",
-   "type": "thea",
-   "items": 0,
-   "niet_op_tijd": false,
-   "lokaal": false,
-   "site": "fontys.artsevents.nl",
-   "antwoorden": {
-    "202": 1
+    "verbindingsfout": 1
    }
   },
   {
@@ -671,6 +669,28 @@
    }
   },
   {
+   "name": "Wilminktheater & Muziekcentrum",
+   "type": "thea",
+   "items": 0,
+   "niet_op_tijd": false,
+   "lokaal": false,
+   "site": "wilminktheater.nl",
+   "antwoorden": {
+    "timeout": 3
+   }
+  },
+  {
+   "name": "Brabanthallen",
+   "type": "arena",
+   "items": 58,
+   "niet_op_tijd": false,
+   "lokaal": false,
+   "site": "brabanthallen.nl",
+   "antwoorden": {
+    "200": 71
+   }
+  },
+  {
    "name": "GelreDome",
    "type": "arena",
    "items": 21,
@@ -684,12 +704,12 @@
   {
    "name": "Johan Cruijff ArenA",
    "type": "arena",
-   "items": 16,
+   "items": 18,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "johancruijffarena.nl",
    "antwoorden": {
-    "200": 17
+    "200": 19
    }
   },
   {
@@ -718,23 +738,23 @@
   {
    "name": "MartiniPlaza",
    "type": "arena",
-   "items": 13,
+   "items": 14,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "martiniplaza.nl",
    "antwoorden": {
-    "200": 14
+    "200": 15
    }
   },
   {
    "name": "Rotterdam Ahoy",
    "type": "arena",
-   "items": 72,
+   "items": 70,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "ahoy.nl",
    "antwoorden": {
-    "200": 195
+    "200": 193
    }
   },
   {
@@ -747,15 +767,6 @@
    "antwoorden": {
     "200": 4
    }
-  },
-  {
-   "name": "Ziggo Dome",
-   "type": "arena",
-   "items": 123,
-   "niet_op_tijd": false,
-   "lokaal": true,
-   "site": "ziggodome.nl",
-   "antwoorden": {}
   },
   {
    "name": "Altstadt",
@@ -776,7 +787,7 @@
    "lokaal": false,
    "site": "cafelievense.nl",
    "antwoorden": {
-    "200": 20
+    "200": 17
    }
   },
   {
@@ -804,12 +815,12 @@
   {
    "name": "Cul de Sac",
    "type": "cafe",
-   "items": 5,
+   "items": 6,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "culdesactilburg.nl",
    "antwoorden": {
-    "200": 7
+    "200": 8
    }
   },
   {
@@ -820,13 +831,13 @@
    "lokaal": false,
    "site": "littledevil.nl",
    "antwoorden": {
-    "200": 20
+    "200": 22
    }
   },
   {
    "name": "Amare",
    "type": "concert",
-   "items": 249,
+   "items": 248,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "amare.nl",
@@ -919,13 +930,13 @@
    "lokaal": false,
    "site": "mge.nl",
    "antwoorden": {
-    "200": 236
+    "200": 237
    }
   },
   {
    "name": "Muziekgebouw aan 't IJ",
    "type": "concert",
-   "items": 343,
+   "items": 344,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "muziekgebouw.nl",
@@ -958,7 +969,7 @@
   {
    "name": "Stadsschouwburg & De Vereeniging",
    "type": "concert",
-   "items": 196,
+   "items": 195,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "stadsschouwburgendevereeniging.nl",
@@ -980,12 +991,12 @@
   {
    "name": "Willem Twee Toonzaal (W2)",
    "type": "concert",
-   "items": 64,
+   "items": 65,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "willem-twee.nl",
    "antwoorden": {
-    "200": 171
+    "200": 172
    }
   },
   {
@@ -1072,6 +1083,17 @@
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "bestkeptsecret.nl",
+   "antwoorden": {
+    "200": 1
+   }
+  },
+  {
+   "name": "Bevrijdingsfestival Brabant",
+   "type": "festival",
+   "items": 1,
+   "niet_op_tijd": false,
+   "lokaal": false,
+   "site": "bevrijdingsfestivalbrabant.nl",
    "antwoorden": {
     "200": 1
    }
@@ -1303,17 +1325,6 @@
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "deventerboekenmarkt.nl",
-   "antwoorden": {
-    "200": 1
-   }
-  },
-  {
-   "name": "Deventer op Stelten",
-   "type": "festival",
-   "items": 1,
-   "niet_op_tijd": false,
-   "lokaal": false,
-   "site": "deventeropstelten.nl",
    "antwoorden": {
     "200": 1
    }
@@ -2109,29 +2120,29 @@
   {
    "name": "Bioscopen Leiden (Kijkhuis, Lido, Trianon)",
    "type": "film",
-   "items": 409,
+   "items": 402,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "bioscopenleiden.nl",
    "antwoorden": {
-    "200": 69
+    "200": 72
    }
   },
   {
    "name": "Cinebergen",
    "type": "film",
-   "items": 22,
+   "items": 21,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "cinebergen.nl",
    "antwoorden": {
-    "200": 25
+    "200": 24
    }
   },
   {
    "name": "Cinecenter",
    "type": "film",
-   "items": 161,
+   "items": 143,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "cinecenter.nl",
@@ -2142,7 +2153,7 @@
   {
    "name": "Cinecitta",
    "type": "film",
-   "items": 220,
+   "items": 190,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "cinecittatilburg.nl",
@@ -2153,12 +2164,12 @@
   {
    "name": "Cinema De Vlugt",
    "type": "film",
-   "items": 23,
+   "items": 24,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "cinemadevlugt.nl",
    "antwoorden": {
-    "200": 27
+    "200": 25
    }
   },
   {
@@ -2180,13 +2191,13 @@
    "lokaal": false,
    "site": "cinemagouda.nl",
    "antwoorden": {
-    "200": 82
+    "200": 83
    }
   },
   {
    "name": "Cinema Oostereiland",
    "type": "film",
-   "items": 127,
+   "items": 123,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "cinemaoostereiland.nl",
@@ -2195,18 +2206,18 @@
   {
    "name": "Concordia",
    "type": "film",
-   "items": 60,
+   "items": 63,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "concordia.nl",
    "antwoorden": {
-    "200": 47
+    "200": 46
    }
   },
   {
    "name": "Corso Bioscoop",
    "type": "film",
-   "items": 4,
+   "items": 9,
    "niet_op_tijd": false,
    "lokaal": true,
    "site": "corsobioscoop.nl",
@@ -2220,7 +2231,7 @@
    "lokaal": false,
    "site": "cultureelcentrumelckerlyc.nl",
    "antwoorden": {
-    "200": 6
+    "200": 53
    }
   },
   {
@@ -2237,45 +2248,45 @@
   {
    "name": "De Cacaofabriek",
    "type": "film",
-   "items": 162,
+   "items": 187,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "cacaofabriek.nl",
    "antwoorden": {
-    "200": 76
+    "200": 78
    }
   },
   {
    "name": "De Fabriek",
    "type": "film",
-   "items": 10,
+   "items": 12,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "de-fabriek.nl",
    "antwoorden": {
-    "200": 11
+    "200": 13
    }
   },
   {
    "name": "De FilmHallen",
    "type": "film",
-   "items": 1428,
+   "items": 1432,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "filmhallen.nl",
    "antwoorden": {
-    "200": 3
+    "200": 2
    }
   },
   {
    "name": "De Lieve Vrouw",
    "type": "film",
-   "items": 171,
+   "items": 177,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "lievevrouw.nl",
    "antwoorden": {
-    "200": 201
+    "200": 170
    }
   },
   {
@@ -2301,18 +2312,18 @@
   {
    "name": "Filmhuis Alkmaar",
    "type": "film",
-   "items": 60,
+   "items": 59,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "filmhuisalkmaar.nl",
    "antwoorden": {
-    "200": 61
+    "200": 60
    }
   },
   {
    "name": "Filmhuis Breda",
    "type": "film",
-   "items": 28,
+   "items": 73,
    "niet_op_tijd": false,
    "lokaal": true,
    "site": "filmhuisbreda.nl",
@@ -2332,18 +2343,18 @@
   {
    "name": "Filmhuis Cavia",
    "type": "film",
-   "items": 7,
+   "items": 8,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "filmhuiscavia.nl",
    "antwoorden": {
-    "200": 8
+    "200": 9
    }
   },
   {
    "name": "Filmhuis Den Haag",
    "type": "film",
-   "items": 144,
+   "items": 145,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "filmhuisdenhaag.nl",
@@ -2354,40 +2365,40 @@
   {
    "name": "Filmhuis Lumen",
    "type": "film",
-   "items": 14,
+   "items": 17,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "filmhuis-lumen.nl",
    "antwoorden": {
-    "200": 15
+    "200": 19
    }
   },
   {
    "name": "Filmhuis Zevenaar",
    "type": "film",
-   "items": 23,
+   "items": 26,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "filmhuiszevenaar.nl",
    "antwoorden": {
-    "200": 34
+    "200": 37
    }
   },
   {
    "name": "Filmkoepel",
    "type": "film",
-   "items": 303,
+   "items": 276,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "filmkoepel.nl",
    "antwoorden": {
-    "200": 66
+    "200": 64
    }
   },
   {
    "name": "Filmtheater Fraterhuis",
    "type": "film",
-   "items": 67,
+   "items": 60,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "filmtheaterfraterhuis.nl",
@@ -2401,13 +2412,13 @@
    "lokaal": false,
    "site": "filmtheaterhilversum.nl",
    "antwoorden": {
-    "200": 59
+    "200": 56
    }
   },
   {
    "name": "Filmtheater Kriterion",
    "type": "film",
-   "items": 32,
+   "items": 103,
    "niet_op_tijd": false,
    "lokaal": true,
    "site": "kriterion.nl",
@@ -2416,7 +2427,7 @@
   {
    "name": "Filmtheater Landvast",
    "type": "film",
-   "items": 90,
+   "items": 106,
    "niet_op_tijd": false,
    "lokaal": true,
    "site": "landvast.nl",
@@ -2425,7 +2436,7 @@
   {
    "name": "Filmtheater Voorschoten",
    "type": "film",
-   "items": 23,
+   "items": 21,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "filmtheatervoorschoten.nl",
@@ -2434,7 +2445,7 @@
   {
    "name": "Focus Filmtheater",
    "type": "film",
-   "items": 184,
+   "items": 158,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "focusarnhem.nl",
@@ -2443,18 +2454,18 @@
   {
    "name": "Forum Groningen (film)",
    "type": "film",
-   "items": 151,
+   "items": 135,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "forum.nl",
    "antwoorden": {
-    "200": 202
+    "200": 134
    }
   },
   {
    "name": "Gigant",
    "type": "film",
-   "items": 70,
+   "items": 79,
    "niet_op_tijd": false,
    "lokaal": true,
    "site": "gigant.nl",
@@ -2463,7 +2474,7 @@
   {
    "name": "Heerenstraat Theater",
    "type": "film",
-   "items": 26,
+   "items": 94,
    "niet_op_tijd": false,
    "lokaal": true,
    "site": "heerenstraattheater.nl",
@@ -2477,46 +2488,46 @@
    "lokaal": false,
    "site": "ketelhuis.nl",
    "antwoorden": {
-    "200": 32
+    "200": 50
    }
   },
   {
    "name": "KINO",
    "type": "film",
-   "items": 372,
+   "items": 366,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "kinorotterdam.nl",
    "antwoorden": {
-    "200": 91
+    "200": 94
    }
   },
   {
    "name": "LAB-1",
    "type": "film",
-   "items": 251,
+   "items": 246,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "lab-1.nl",
    "antwoorden": {
-    "200": 69
+    "200": 68
    }
   },
   {
    "name": "LAB111",
    "type": "film",
-   "items": 149,
+   "items": 150,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "lab111.nl",
    "antwoorden": {
-    "200": 123
+    "200": 116
    }
   },
   {
    "name": "LantarenVenster",
    "type": "film",
-   "items": 354,
+   "items": 317,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "lantarenvenster.nl",
@@ -2527,29 +2538,29 @@
   {
    "name": "Ledeltheater",
    "type": "film",
-   "items": 8,
+   "items": 13,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "ledeltheater.nl",
    "antwoorden": {
-    "200": 12
+    "200": 25
    }
   },
   {
    "name": "Louis Hartlooper Complex",
    "type": "film",
-   "items": 241,
+   "items": 220,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "hartlooper.nl",
    "antwoorden": {
-    "200": 83
+    "200": 84
    }
   },
   {
    "name": "Lumière",
    "type": "film",
-   "items": 224,
+   "items": 201,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "lumiere.nl",
@@ -2563,13 +2574,13 @@
    "lokaal": false,
    "site": "luxorzutphen.nl",
    "antwoorden": {
-    "200": 83
+    "200": 82
    }
   },
   {
    "name": "Natlab",
    "type": "film",
-   "items": 233,
+   "items": 217,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "natlab.nl",
@@ -2580,7 +2591,7 @@
   {
    "name": "Rialto De Pijp",
    "type": "film",
-   "items": 67,
+   "items": 58,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "depijp.rialtofilm.nl",
@@ -2591,46 +2602,45 @@
   {
    "name": "Schuur (Filmschuur)",
    "type": "film",
-   "items": 15,
+   "items": 16,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "schuur.nl",
    "antwoorden": {
-    "200": 16
+    "200": 17
    }
   },
   {
    "name": "Slachtstraat Filmtheater",
    "type": "film",
-   "items": 173,
+   "items": 127,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "slachtstraat.nl",
    "antwoorden": {
-    "200": 58
+    "200": 80
    }
   },
   {
    "name": "Slieker Film",
    "type": "film",
-   "items": 14,
+   "items": 17,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "sliekerfilm.nl",
    "antwoorden": {
-    "200": 16,
-    "verbindingsfout": 1
+    "200": 19
    }
   },
   {
    "name": "Springhaver",
    "type": "film",
-   "items": 98,
+   "items": 88,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "springhaver.nl",
    "antwoorden": {
-    "200": 72
+    "200": 73
    }
   },
   {
@@ -2641,30 +2651,30 @@
    "lokaal": false,
    "site": "studio-k.nu",
    "antwoorden": {
-    "200": 34,
+    "200": 27,
     "404": 5
    }
   },
   {
    "name": "The Movies",
    "type": "film",
-   "items": 204,
+   "items": 190,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "themovies.nl",
    "antwoorden": {
-    "200": 37
+    "200": 35
    }
   },
   {
    "name": "Theater Dakota",
    "type": "film",
-   "items": 31,
+   "items": 30,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "theaterdakota.nl",
    "antwoorden": {
-    "200": 35
+    "200": 34
    }
   },
   {
@@ -2675,13 +2685,13 @@
    "lokaal": false,
    "site": "tiliander.com",
    "antwoorden": {
-    "200": 52
+    "200": 54
    }
   },
   {
    "name": "Verkadefabriek (filmtheater)",
    "type": "film",
-   "items": 219,
+   "items": 220,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "verkadefabriek.nl",
@@ -2692,7 +2702,7 @@
   {
    "name": "Wenneker Cinema",
    "type": "film",
-   "items": 18,
+   "items": 20,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "wennekercinema.nl",
@@ -2739,7 +2749,7 @@
    "lokaal": false,
    "site": "batavialand.nl",
    "antwoorden": {
-    "200": 3
+    "200": 11
    }
   },
   {
@@ -2750,19 +2760,18 @@
    "lokaal": false,
    "site": "coda-apeldoorn.nl",
    "antwoorden": {
-    "200": 180
+    "200": 183
    }
   },
   {
    "name": "Centraal Museum",
    "type": "museum",
-   "items": 7,
+   "items": 13,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "centraalmuseum.nl",
    "antwoorden": {
-    "200": 12,
-    "timeout": 9
+    "200": 22
    }
   },
   {
@@ -2878,12 +2887,12 @@
   {
    "name": "Forum Groningen",
    "type": "museum",
-   "items": 244,
+   "items": 228,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "forum.nl",
    "antwoorden": {
-    "200": 202
+    "200": 134
    }
   },
   {
@@ -3004,7 +3013,7 @@
    "lokaal": false,
    "site": "nieuweinstituut.nl",
    "antwoorden": {
-    "200": 16
+    "200": 20
    }
   },
   {
@@ -3054,12 +3063,12 @@
   {
    "name": "Joods Cultureel Kwartier (Joods Museum, Nationaal Holocaustmuseum)",
    "type": "museum",
-   "items": 18,
+   "items": 21,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "jck.nl",
    "antwoorden": {
-    "200": 13
+    "200": 21
    }
   },
   {
@@ -3081,7 +3090,7 @@
    "lokaal": false,
    "site": "kasteeldehaar.nl",
    "antwoorden": {
-    "200": 5
+    "200": 6
    }
   },
   {
@@ -3219,12 +3228,12 @@
   {
    "name": "Mondriaanhuis",
    "type": "museum",
-   "items": 24,
+   "items": 25,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "mondriaanhuis.nl",
    "antwoorden": {
-    "200": 25
+    "200": 26
    }
   },
   {
@@ -3246,7 +3255,7 @@
    "lokaal": false,
    "site": "museon-omniversum.nl",
    "antwoorden": {
-    "200": 8
+    "200": 2
    }
   },
   {
@@ -3268,7 +3277,7 @@
    "lokaal": false,
    "site": "beeldenaanzee.nl",
    "antwoorden": {
-    "200": 16
+    "200": 17
    }
   },
   {
@@ -3313,7 +3322,7 @@
    "lokaal": false,
    "site": "lakenhal.nl",
    "antwoorden": {
-    "200": 4
+    "200": 5
    }
   },
   {
@@ -3390,18 +3399,19 @@
    "lokaal": false,
    "site": "moregorssel.nl",
    "antwoorden": {
-    "200": 12
+    "200": 13
    }
   },
   {
    "name": "Museum Prinsenhof Delft",
    "type": "museum",
-   "items": 4,
+   "items": 3,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "museumprinsenhofdelft.nl",
    "antwoorden": {
-    "200": 5
+    "200": 4,
+    "500": 1
    }
   },
   {
@@ -3467,7 +3477,7 @@
    "lokaal": false,
    "site": "nemosciencemuseum.nl",
    "antwoorden": {
-    "200": 7
+    "200": 16
    }
   },
   {
@@ -3489,7 +3499,7 @@
    "lokaal": false,
    "site": "nederlandsfotomuseum.nl",
    "antwoorden": {
-    "200": 5,
+    "200": 13,
     "404": 2
    }
   },
@@ -3523,7 +3533,7 @@
    "lokaal": false,
    "site": "oorlogsmuseum.nl",
    "antwoorden": {
-    "200": 1
+    "200": 4
    }
   },
   {
@@ -3578,7 +3588,7 @@
    "lokaal": false,
    "site": "rijksmuseumboerhaave.nl",
    "antwoorden": {
-    "200": 4
+    "200": 9
    }
   },
   {
@@ -3595,12 +3605,13 @@
   {
    "name": "Singer Laren",
    "type": "museum",
-   "items": 166,
+   "items": 87,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "singerlaren.nl",
    "antwoorden": {
-    "200": 20
+    "200": 6,
+    "timeout": 1
    }
   },
   {
@@ -3611,7 +3622,7 @@
    "lokaal": false,
    "site": "slotloevestein.nl",
    "antwoorden": {
-    "200": 10
+    "200": 4
    }
   },
   {
@@ -3633,7 +3644,7 @@
    "lokaal": false,
    "site": "stedelijkmuseumalkmaar.nl",
    "antwoorden": {
-    "200": 30
+    "200": 23
    }
   },
   {
@@ -3644,7 +3655,7 @@
    "lokaal": false,
    "site": "stedelijkmuseumbreda.nl",
    "antwoorden": {
-    "200": 11
+    "200": 12
    }
   },
   {
@@ -3655,13 +3666,13 @@
    "lokaal": false,
    "site": "stedelijkmuseumschiedam.nl",
    "antwoorden": {
-    "200": 15
+    "200": 7
    }
   },
   {
    "name": "Stichting Erfgoed Goirle / Museum De Schutsboom",
    "type": "museum",
-   "items": 14,
+   "items": 13,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "erfgoedgoirle.nl",
@@ -3725,12 +3736,12 @@
   {
    "name": "Van Gogh Village Nuenen",
    "type": "museum",
-   "items": 7,
+   "items": 6,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "vangoghvillagenuenen.nl",
    "antwoorden": {
-    "200": 8
+    "200": 7
    }
   },
   {
@@ -3741,7 +3752,7 @@
    "lokaal": false,
    "site": "vrijheidsmuseum.nl",
    "antwoorden": {
-    "200": 5
+    "200": 4
    }
   },
   {
@@ -3785,7 +3796,7 @@
    "lokaal": false,
    "site": "zaansmuseum.nl",
    "antwoorden": {
-    "200": 12
+    "200": 13
    }
   },
   {
@@ -3809,17 +3820,6 @@
    "antwoorden": {}
   },
   {
-   "name": "013",
-   "type": "pop",
-   "items": 154,
-   "niet_op_tijd": false,
-   "lokaal": false,
-   "site": "013.nl",
-   "antwoorden": {
-    "200": 30
-   }
-  },
-  {
    "name": "AFAS Live",
    "type": "pop",
    "items": 87,
@@ -3827,7 +3827,7 @@
    "lokaal": false,
    "site": "afaslive.nl",
    "antwoorden": {
-    "200": 90
+    "200": 88
    }
   },
   {
@@ -3838,7 +3838,7 @@
    "lokaal": false,
    "site": "annabel.nu",
    "antwoorden": {
-    "200": 22
+    "200": 21
    }
   },
   {
@@ -3866,12 +3866,12 @@
   {
    "name": "Burgerweeshuis",
    "type": "pop",
-   "items": 49,
+   "items": 51,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "burgerweeshuis.nl",
    "antwoorden": {
-    "200": 45
+    "200": 48
    }
   },
   {
@@ -3882,36 +3882,36 @@
    "lokaal": false,
    "site": "debosuil.nl",
    "antwoorden": {
-    "200": 67
+    "200": 66
    }
   },
   {
    "name": "De Cacaofabriek",
    "type": "pop",
-   "items": 193,
+   "items": 187,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "cacaofabriek.nl",
    "antwoorden": {
-    "200": 76
+    "200": 78
    }
   },
   {
    "name": "De Groene Engel",
    "type": "pop",
-   "items": 101,
+   "items": 104,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "groene-engel.nl",
    "antwoorden": {
-    "200": 98,
+    "200": 101,
     "404": 1
    }
   },
   {
    "name": "De Helling",
    "type": "pop",
-   "items": 66,
+   "items": 65,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "dehelling.nl",
@@ -3922,12 +3922,12 @@
   {
    "name": "De Meester",
    "type": "pop",
-   "items": 19,
+   "items": 20,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "poppodiumdemeester.nl",
    "antwoorden": {
-    "200": 17
+    "200": 18
    }
   },
   {
@@ -3944,23 +3944,23 @@
   {
    "name": "De Vorstin",
    "type": "pop",
-   "items": 54,
+   "items": 55,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "vorstin.nl",
    "antwoorden": {
-    "200": 59
+    "200": 58
    }
   },
   {
    "name": "Doornroosje",
    "type": "pop",
-   "items": 206,
+   "items": 208,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "doornroosje.nl",
    "antwoorden": {
-    "200": 197
+    "200": 39
    }
   },
   {
@@ -3971,13 +3971,13 @@
    "lokaal": false,
    "site": "dynamo-eindhoven.nl",
    "antwoorden": {
-    "200": 52
+    "200": 51
    }
   },
   {
    "name": "ECI Cultuurfabriek",
    "type": "pop",
-   "items": 85,
+   "items": 83,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "ecicultuurfabriek.nl",
@@ -3993,29 +3993,18 @@
    "lokaal": false,
    "site": "ekko.nl",
    "antwoorden": {
-    "200": 61
+    "200": 64
    }
   },
   {
    "name": "Effenaar",
    "type": "pop",
-   "items": 112,
+   "items": 111,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "effenaar.nl",
    "antwoorden": {
     "200": 19
-   }
-  },
-  {
-   "name": "Fluor",
-   "type": "pop",
-   "items": 55,
-   "niet_op_tijd": false,
-   "lokaal": false,
-   "site": "fluor033.nl",
-   "antwoorden": {
-    "200": 8
    }
   },
   {
@@ -4046,7 +4035,7 @@
    "lokaal": false,
    "site": "grenswerk.nl",
    "antwoorden": {
-    "200": 83,
+    "200": 84,
     "404": 2
    }
   },
@@ -4058,29 +4047,41 @@
    "lokaal": false,
    "site": "hall-fame.nl",
    "antwoorden": {
-    "200": 45
+    "200": 47
    }
   },
   {
    "name": "Hedon",
    "type": "pop",
-   "items": 129,
+   "items": 130,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "hedon-zwolle.nl",
    "antwoorden": {
-    "200": 129
+    "200": 128
+   }
+  },
+  {
+   "name": "Het Bolwerk (theater & poppodium)",
+   "type": "pop",
+   "items": 137,
+   "niet_op_tijd": false,
+   "lokaal": false,
+   "site": "ontdekpoort.nl",
+   "antwoorden": {
+    "200": 147,
+    "404": 4
    }
   },
   {
    "name": "Iduna",
    "type": "pop",
-   "items": 40,
+   "items": 41,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "iduna.nl",
    "antwoorden": {
-    "200": 42
+    "200": 43
    }
   },
   {
@@ -4102,18 +4103,18 @@
    "lokaal": false,
    "site": "kroepoekfabriek.nl",
    "antwoorden": {
-    "200": 30
+    "200": 29
    }
   },
   {
    "name": "Luxor Live",
    "type": "pop",
-   "items": 22,
+   "items": 26,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "luxorlive.nl",
    "antwoorden": {
-    "200": 118
+    "200": 123
    }
   },
   {
@@ -4135,7 +4136,7 @@
    "lokaal": false,
    "site": "melkweg.nl",
    "antwoorden": {
-    "200": 56
+    "200": 57
    }
   },
   {
@@ -4152,35 +4153,35 @@
   {
    "name": "Mezz",
    "type": "pop",
-   "items": 135,
+   "items": 137,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "mezz.nl",
    "antwoorden": {
-    "200": 135,
+    "200": 139,
     "400": 1
    }
   },
   {
    "name": "Muziekgieterij",
    "type": "pop",
-   "items": 121,
+   "items": 122,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "muziekgieterij.nl",
    "antwoorden": {
-    "200": 9
+    "200": 14
    }
   },
   {
    "name": "Neushoorn",
    "type": "pop",
-   "items": 96,
+   "items": 97,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "neushoorn.nl",
    "antwoorden": {
-    "200": 91
+    "200": 93
    }
   },
   {
@@ -4202,7 +4203,7 @@
    "lokaal": false,
    "site": "p3purmerend.nl",
    "antwoorden": {
-    "200": 67
+    "200": 68
    }
   },
   {
@@ -4213,7 +4214,7 @@
    "lokaal": false,
    "site": "p60.nl",
    "antwoorden": {
-    "200": 41
+    "200": 42
    }
   },
   {
@@ -4224,18 +4225,18 @@
    "lokaal": false,
    "site": "paradoxtilburg.nl",
    "antwoorden": {
-    "200": 14
+    "200": 15
    }
   },
   {
    "name": "Paard",
    "type": "pop",
-   "items": 164,
+   "items": 166,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "paard.nl",
    "antwoorden": {
-    "200": 159
+    "200": 160
    }
   },
   {
@@ -4246,29 +4247,40 @@
    "lokaal": false,
    "site": "paradiso.nl",
    "antwoorden": {
-    "200": 5
+    "200": 6
    }
   },
   {
    "name": "Patronaat",
    "type": "pop",
-   "items": 156,
+   "items": 159,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "patronaat.nl",
    "antwoorden": {
-    "200": 27
+    "200": 29
+   }
+  },
+  {
+   "name": "Pier15",
+   "type": "pop",
+   "items": 14,
+   "niet_op_tijd": false,
+   "lokaal": false,
+   "site": "pier15.nl",
+   "antwoorden": {
+    "200": 14
    }
   },
   {
    "name": "Podium Victorie",
    "type": "pop",
-   "items": 97,
+   "items": 98,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "podiumvictorie.nl",
    "antwoorden": {
-    "200": 95
+    "200": 94
    }
   },
   {
@@ -4301,18 +4313,7 @@
    "lokaal": false,
    "site": "poppodium-volt.nl",
    "antwoorden": {
-    "200": 51
-   }
-  },
-  {
-   "name": "Porgy & Bess",
-   "type": "pop",
-   "items": 40,
-   "niet_op_tijd": false,
-   "lokaal": false,
-   "site": "porgyenbess.nl",
-   "antwoorden": {
-    "200": 40
+    "200": 52
    }
   },
   {
@@ -4329,12 +4330,12 @@
   {
    "name": "Simplon",
    "type": "pop",
-   "items": 12,
+   "items": 11,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "simplon.nl",
    "antwoorden": {
-    "200": 9
+    "200": 48
    }
   },
   {
@@ -4345,13 +4346,13 @@
    "lokaal": false,
    "site": "tivolivredenburg.nl",
    "antwoorden": {
-    "200": 121
+    "200": 124
    }
   },
   {
    "name": "Tolhuistuin",
    "type": "pop",
-   "items": 148,
+   "items": 150,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "tolhuistuin.nl",
@@ -4367,24 +4368,24 @@
    "lokaal": false,
    "site": "vera-groningen.nl",
    "antwoorden": {
-    "200": 17
+    "200": 18
    }
   },
   {
    "name": "Willem Twee Poppodium (W2)",
    "type": "pop",
-   "items": 44,
+   "items": 45,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "willem-twee.nl",
    "antwoorden": {
-    "200": 171
+    "200": 172
    }
   },
   {
    "name": "'t Voorhuys",
    "type": "thea",
-   "items": 103,
+   "items": 102,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "theater-voorhuys.nl",
@@ -4426,12 +4427,12 @@
   {
    "name": "Atlas Theater",
    "type": "thea",
-   "items": 190,
+   "items": 189,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "atlastheater.nl",
    "antwoorden": {
-    "200": 188
+    "200": 187
    }
   },
   {
@@ -4459,7 +4460,7 @@
   {
    "name": "CC De Schalm / Ons Koningsoord Cultureel",
    "type": "thea",
-   "items": 47,
+   "items": 45,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "onskoningsoordcultureel.nl",
@@ -4470,18 +4471,18 @@
   {
    "name": "Castellum Theater & Film",
    "type": "thea",
-   "items": 56,
+   "items": 55,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "castellum.nl",
    "antwoorden": {
-    "200": 21
+    "200": 24
    }
   },
   {
    "name": "Chassé Theater",
    "type": "thea",
-   "items": 11,
+   "items": 24,
    "niet_op_tijd": false,
    "lokaal": true,
    "site": "chasse.nl",
@@ -4490,23 +4491,23 @@
   {
    "name": "Cpunt (v/h Schouwburg De Meerse)",
    "type": "thea",
-   "items": 140,
+   "items": 142,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "cpunt.nl",
    "antwoorden": {
-    "200": 86
+    "200": 88
    }
   },
   {
    "name": "Cultura Ede",
    "type": "thea",
-   "items": 116,
+   "items": 115,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "cultura-ede.nl",
    "antwoorden": {
-    "200": 221
+    "200": 214
    }
   },
   {
@@ -4517,7 +4518,7 @@
    "lokaal": false,
    "site": "cultureelcentrumelckerlyc.nl",
    "antwoorden": {
-    "200": 6
+    "200": 53
    }
   },
   {
@@ -4545,12 +4546,12 @@
   {
    "name": "Cultuurcluster De Tiliander",
    "type": "thea",
-   "items": 47,
+   "items": 49,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "tiliander.com",
    "antwoorden": {
-    "200": 52
+    "200": 54
    }
   },
   {
@@ -4578,29 +4579,29 @@
   {
    "name": "De Nieuwe Kolk",
    "type": "thea",
-   "items": 79,
+   "items": 77,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "denieuwekolk.nl",
-   "antwoorden": {
-    "200": 31
-   }
-  },
-  {
-   "name": "De Nobelaer",
-   "type": "thea",
-   "items": 201,
-   "niet_op_tijd": false,
-   "lokaal": false,
-   "site": "denobelaer.nl",
    "antwoorden": {
     "200": 29
    }
   },
   {
+   "name": "De Nobelaer",
+   "type": "thea",
+   "items": 198,
+   "niet_op_tijd": false,
+   "lokaal": false,
+   "site": "denobelaer.nl",
+   "antwoorden": {
+    "200": 33
+   }
+  },
+  {
    "name": "De Rijswijkse Schouwburg",
    "type": "thea",
-   "items": 12,
+   "items": 14,
    "niet_op_tijd": false,
    "lokaal": true,
    "site": "rijswijkseschouwburg.nl",
@@ -4609,7 +4610,7 @@
   {
    "name": "De Tamboer",
    "type": "thea",
-   "items": 8,
+   "items": 10,
    "niet_op_tijd": false,
    "lokaal": true,
    "site": "detamboer.nl",
@@ -4641,7 +4642,7 @@
   {
    "name": "Deventer Schouwburg",
    "type": "thea",
-   "items": 93,
+   "items": 95,
    "niet_op_tijd": false,
    "lokaal": true,
    "site": "deventerschouwburg.nl",
@@ -4681,6 +4682,17 @@
    }
   },
   {
+   "name": "Fontys Academy of the Arts (FHK)",
+   "type": "thea",
+   "items": 39,
+   "niet_op_tijd": false,
+   "lokaal": false,
+   "site": "fontys.artsevents.nl",
+   "antwoorden": {
+    "200": 40
+   }
+  },
+  {
    "name": "Goudse Schouwburg",
    "type": "thea",
    "items": 239,
@@ -4688,13 +4700,13 @@
    "lokaal": false,
    "site": "goudseschouwburg.nl",
    "antwoorden": {
-    "200": 33
+    "200": 34
    }
   },
   {
    "name": "Haventheater IJmuiden (v/h Stadsschouwburg Velsen)",
    "type": "thea",
-   "items": 5,
+   "items": 13,
    "niet_op_tijd": false,
    "lokaal": true,
    "site": "haventheaterijmuiden.nl",
@@ -4714,7 +4726,7 @@
   {
    "name": "Het Nationale Theater (Koninklijke Schouwburg)",
    "type": "thea",
-   "items": 647,
+   "items": 642,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "hnt.nl",
@@ -4736,18 +4748,19 @@
   {
    "name": "Internationaal Theater Amsterdam (Stadsschouwburg)",
    "type": "thea",
-   "items": 243,
+   "items": 240,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "ita.nl",
    "antwoorden": {
-    "200": 68
+    "200": 68,
+    "timeout": 1
    }
   },
   {
    "name": "Isala Theater",
    "type": "thea",
-   "items": 40,
+   "items": 41,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "isalatheater.nl",
@@ -4759,7 +4772,7 @@
   {
    "name": "Koninklijk Theater Carré",
    "type": "thea",
-   "items": 250,
+   "items": 252,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "carre.nl",
@@ -4770,18 +4783,18 @@
   {
    "name": "Kunstlinie (v/h Schouwburg Almere/KAF)",
    "type": "thea",
-   "items": 17,
+   "items": 16,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "kunstlinie.nl",
    "antwoorden": {
-    "200": 22
+    "200": 27
    }
   },
   {
    "name": "Leidse Schouwburg & Stadsgehoorzaal",
    "type": "thea",
-   "items": 339,
+   "items": 335,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "leidseschouwburg-stadsgehoorzaal.nl",
@@ -4792,12 +4805,12 @@
   {
    "name": "LocHal / Bibliotheek Midden-Brabant",
    "type": "thea",
-   "items": 121,
+   "items": 114,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "lochal.nl",
    "antwoorden": {
-    "200": 128
+    "200": 130
    }
   },
   {
@@ -4814,7 +4827,7 @@
   {
    "name": "Markant Theater Maashorst",
    "type": "thea",
-   "items": 239,
+   "items": 237,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "markantmaashorst.nl",
@@ -4825,7 +4838,7 @@
   {
    "name": "Meervaart",
    "type": "thea",
-   "items": 10,
+   "items": 9,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "meervaart.nl",
@@ -4841,7 +4854,7 @@
    "lokaal": false,
    "site": "munttheater.nl",
    "antwoorden": {
-    "200": 14
+    "200": 15
    }
   },
   {
@@ -4891,7 +4904,7 @@
   {
    "name": "Parktheater Eindhoven",
    "type": "thea",
-   "items": 383,
+   "items": 381,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "parktheater.nl",
@@ -4902,35 +4915,35 @@
   {
    "name": "Podium Bloos",
    "type": "thea",
-   "items": 26,
+   "items": 27,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "podiumbloos.nl",
    "antwoorden": {
-    "200": 33
+    "200": 34
    }
   },
   {
    "name": "Posthuis Theater",
    "type": "thea",
-   "items": 16,
+   "items": 74,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "posthuistheater.nl",
    "antwoorden": {
-    "200": 2,
+    "200": 8,
     "403": 2
    }
   },
   {
    "name": "Schouwburg & Concertzaal Tilburg",
    "type": "thea",
-   "items": 128,
+   "items": 127,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "schouwburgconcertzaaltilburg.nl",
    "antwoorden": {
-    "200": 104
+    "200": 105
    }
   },
   {
@@ -4947,7 +4960,7 @@
   {
    "name": "Schouwburg De Kring",
    "type": "thea",
-   "items": 260,
+   "items": 261,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "dekringroosendaal.nl",
@@ -4963,13 +4976,13 @@
    "lokaal": false,
    "site": "hetpark.nl",
    "antwoorden": {
-    "200": 239
+    "200": 36
    }
   },
   {
    "name": "Schouwburg Kunstmin",
    "type": "thea",
-   "items": 207,
+   "items": 209,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "kunstmin.nl",
@@ -5002,18 +5015,18 @@
   {
    "name": "Stadsgehoorzaal Vlaardingen",
    "type": "thea",
-   "items": 28,
+   "items": 29,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "stadsgehoorzaal.nl",
    "antwoorden": {
-    "200": 10
+    "200": 12
    }
   },
   {
    "name": "Stadsschouwburg & Philharmonie Haarlem",
    "type": "thea",
-   "items": 33,
+   "items": 25,
    "niet_op_tijd": false,
    "lokaal": true,
    "site": "stadsschouwburghaarlem.nl",
@@ -5022,23 +5035,23 @@
   {
    "name": "Stadsschouwburg De Harmonie",
    "type": "thea",
-   "items": 18,
+   "items": 25,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "harmonie.nl",
    "antwoorden": {
-    "200": 10
+    "200": 13
    }
   },
   {
    "name": "Stadsschouwburg Utrecht",
    "type": "thea",
-   "items": 99,
+   "items": 121,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "stadsschouwburg-utrecht.nl",
    "antwoorden": {
-    "200": 79
+    "200": 96
    }
   },
   {
@@ -5049,13 +5062,13 @@
    "lokaal": false,
    "site": "tilburgshoop.com",
    "antwoorden": {
-    "200": 17
+    "200": 16
    }
   },
   {
    "name": "Stadstheater Zoetermeer",
    "type": "thea",
-   "items": 225,
+   "items": 227,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "stadstheater.nl",
@@ -5066,7 +5079,7 @@
   {
    "name": "TAQA Theater De Vest",
    "type": "thea",
-   "items": 306,
+   "items": 304,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "theaterdevest.nl",
@@ -5077,12 +5090,12 @@
   {
    "name": "Theater Agnietenhof",
    "type": "thea",
-   "items": 9,
+   "items": 99,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "agnietenhof.nl",
    "antwoorden": {
-    "200": 1,
+    "200": 11,
     "403": 2
    }
   },
@@ -5123,7 +5136,7 @@
   {
    "name": "Theater De Lievekamp",
    "type": "thea",
-   "items": 8,
+   "items": 7,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "lievekamp.nl",
@@ -5134,19 +5147,19 @@
   {
    "name": "Theater De Maagd",
    "type": "thea",
-   "items": 24,
+   "items": 67,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "demaagd.nl",
    "antwoorden": {
-    "200": 1,
-    "403": 2
+    "200": 3,
+    "timeout": 4
    }
   },
   {
    "name": "Theater De Maaspoort",
    "type": "thea",
-   "items": 269,
+   "items": 273,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "maaspoort.nl",
@@ -5162,24 +5175,24 @@
    "lokaal": false,
    "site": "denieuwevorst.nl",
    "antwoorden": {
-    "200": 11
+    "200": 12
    }
   },
   {
    "name": "Theater De Oranjerie",
    "type": "thea",
-   "items": 99,
+   "items": 98,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "theaterroermond.nl",
    "antwoorden": {
-    "200": 100
+    "200": 99
    }
   },
   {
    "name": "Theater De Purmaryn",
    "type": "thea",
-   "items": 197,
+   "items": 198,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "depurmaryn.nl",
@@ -5190,12 +5203,12 @@
   {
    "name": "Theater De Stoep",
    "type": "thea",
-   "items": 53,
+   "items": 52,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "theaterdestoep.nl",
    "antwoorden": {
-    "200": 32
+    "200": 30
    }
   },
   {
@@ -5206,7 +5219,7 @@
    "lokaal": false,
    "site": "hanzehof.nl",
    "antwoorden": {
-    "200": 13
+    "200": 14
    }
   },
   {
@@ -5228,7 +5241,7 @@
    "lokaal": false,
    "site": "theaterspeelhuis.nl",
    "antwoorden": {
-    "200": 35
+    "200": 36
    }
   },
   {
@@ -5245,7 +5258,7 @@
   {
    "name": "Theater Orpheus",
    "type": "thea",
-   "items": 346,
+   "items": 344,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "orpheus.nl",
@@ -5256,13 +5269,14 @@
   {
    "name": "Theater Rotterdam (Schouwburg)",
    "type": "thea",
-   "items": 44,
+   "items": 8,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "theaterrotterdam.nl",
    "antwoorden": {
-    "200": 1,
-    "403": 2
+    "timeout": 7,
+    "200": 9,
+    "403": 10
    }
   },
   {
@@ -5273,13 +5287,13 @@
    "lokaal": false,
    "site": "spant.org",
    "antwoorden": {
-    "200": 16
+    "200": 15
    }
   },
   {
    "name": "Theater Zuidplein",
    "type": "thea",
-   "items": 201,
+   "items": 205,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "theaterzuidplein.nl",
@@ -5290,29 +5304,29 @@
   {
    "name": "Theater aan de Parade",
    "type": "thea",
-   "items": 8,
+   "items": 7,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "theateraandeparade.nl",
    "antwoorden": {
-    "200": 9
+    "200": 8
    }
   },
   {
    "name": "Theater aan de Schie",
    "type": "thea",
-   "items": 30,
+   "items": 31,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "theateraandeschie.nl",
    "antwoorden": {
-    "200": 56
+    "200": 58
    }
   },
   {
    "name": "Theater aan het Vrijthof",
    "type": "thea",
-   "items": 240,
+   "items": 239,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "theateraanhetvrijthof.nl",
@@ -5324,7 +5338,7 @@
   {
    "name": "Theater de Veste",
    "type": "thea",
-   "items": 222,
+   "items": 221,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "theaterdeveste.nl",
@@ -5340,13 +5354,13 @@
    "lokaal": false,
    "site": "tilburguniversity.edu",
    "antwoorden": {
-    "200": 16
+    "200": 17
    }
   },
   {
    "name": "Verkadefabriek (theater en muziek)",
    "type": "thea",
-   "items": 233,
+   "items": 214,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "verkadefabriek.nl",
@@ -5355,20 +5369,9 @@
    }
   },
   {
-   "name": "Wilminktheater & Muziekcentrum",
-   "type": "thea",
-   "items": 391,
-   "niet_op_tijd": false,
-   "lokaal": false,
-   "site": "wilminktheater.nl",
-   "antwoorden": {
-    "200": 15
-   }
-  },
-  {
    "name": "Zaantheater",
    "type": "thea",
-   "items": 221,
+   "items": 220,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "zaantheater.nl",
@@ -5390,12 +5393,12 @@
   {
    "name": "Zwolse Theaters (De Spiegel & Odeon)",
    "type": "thea",
-   "items": 413,
+   "items": 419,
    "niet_op_tijd": false,
    "lokaal": false,
    "site": "zwolsetheaters.nl",
    "antwoorden": {
-    "200": 444
+    "200": 448
    }
   }
  ]
