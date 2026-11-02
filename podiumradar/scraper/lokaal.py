@@ -47,8 +47,39 @@ def main():
     if not results:
         log("geen lokale bronnen in bronnen.json")
         return
-    data = {"datum": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "bronnen": {sources.local_key(src): evs for src, evs in results if evs is not None},
+    vandaag = dt.date.today().isoformat()
+    # Vorige uitkomst: geeft een bron nu niets (site even dicht, 403 van Cloudflare bij Ziggo Dome), dan blijven de items van
+    # de vorige geslaagde keer staan, hoogstens 14 dagen ('opgehaald' = per bron de dag van de laatste geslaagde ophaalronde)
+    vorige, opgehaald = {}, {}
+    try:
+        oud = json.loads(sources.LOKAAL.read_text(encoding="utf-8")) if sources.LOKAAL.exists() else {}
+        if isinstance(oud.get("bronnen"), dict):
+            vorige = oud["bronnen"]
+        if isinstance(oud.get("opgehaald"), dict):
+            opgehaald = oud["opgehaald"]
+    except (OSError, ValueError):
+        pass
+    bronnen = {}
+    for src, evs in results:
+        key = sources.local_key(src)
+        if evs is None:
+            continue
+        if evs or len(vorige.get(key) or []) < 6:
+            bronnen[key], opgehaald[key] = evs, vandaag
+        else:
+            dag = str(opgehaald.get(key) or oud.get("datum", "2000-01-01"))[:10]
+            try:
+                oud_dagen = (dt.date.today() - dt.date.fromisoformat(dag)).days
+            except ValueError:
+                oud_dagen = 999
+            if oud_dagen <= 14:
+                log(f"  {src['name']}: nu niets gekregen; de {len(vorige[key])} items van {dag} blijven staan")
+                bronnen[key], opgehaald[key] = vorige[key], dag
+            else:
+                log(f"  {src['name']}: al {oud_dagen} dagen niets gekregen; oude items losgelaten")
+                bronnen[key], opgehaald[key] = evs, vandaag
+    data = {"datum": dt.datetime.now().strftime("%Y-%m-%d %H:%M"), "bronnen": bronnen,
+            "opgehaald": {k: v for k, v in opgehaald.items() if k in bronnen},
             # Antwoordcodes per site en het logboek van deze run: zo is ook zonder deze pc te zien waarom een bron 0 gaf
             "antwoorden": sources.ANTWOORDEN, "log": REGELS[-300:]}
     n = sum(len(v) for v in data["bronnen"].values())

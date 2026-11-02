@@ -282,4 +282,32 @@ check("kop wint als die bij de link past en de JSON-LD-naam niet", sources.beter
 check("gewone JSON-LD-naam blijft staan", sources.beter_dan_jsonld("Op avontuur met Dikkie Dik", kop, u), "Op avontuur met Dikkie Dik")
 check("korte link zonder titelwoorden: JSON-LD blijft", sources.beter_dan_jsonld("Trapperdetrap", kop, "https://x.nl/agenda/12345"), "Trapperdetrap")
 
+# 19. één evenement op meer podia tegelijk (Herrie op de Heuvel bij Cul de Sac én Café Weemoed): één kaartje met 'ook'
+VN = {"cds": {"name": "Cul de Sac", "city": "Tilburg", "type": "cafe"}, "wee": {"name": "Café Weemoed", "city": "Tilburg", "type": "cafe"},
+      "lit": {"name": "Little Devil", "city": "Tilburg", "type": "cafe"}, "sch": {"name": "Schouwburg", "city": "Tilburg", "type": "thea"},
+      "bre": {"name": "Mezz", "city": "Breda", "type": "pop"}}
+def mv(items):
+    evs = {f"e{i}": dict(e, id=f"e{i}", date=e.get("date", f"{j}-11-04"), time=e.get("time", "20:30"), url=e.get("url", f"https://{e['v']}.nl/{i}"),
+                         genre=e.get("genre", "Overig"), first_seen=e.get("first_seen", f"{j}-10-23")) for i, e in enumerate(items)}
+    out = scrape.merge_multi_venue(evs, VN)
+    return sorted((e["v"], e["title"], [o["v"] for o in e.get("ook", [])], e["first_seen"]) for e in out.values())
+check("deelverzameling van woorden, zelfde stad/dag/tijd: samengevoegd, kortste titel voorop, oudste first_seen",
+      mv([{"v": "wee", "title": "Herrie op de korte heuvel", "first_seen": f"{j}-10-21"}, {"v": "cds", "title": "Herrie op de Heuvel"}, {"v": "lit", "title": "Herrie op de Heuvel!"}]),
+      [("cds", "Herrie op de Heuvel", ["wee", "lit"], f"{j}-10-21")])
+check("andere tijd: apart", mv([{"v": "wee", "title": "Herrie op de Heuvel", "time": "21:00"}, {"v": "cds", "title": "Herrie op de Heuvel"}]),
+      [("cds", "Herrie op de Heuvel", [], f"{j}-10-23"), ("wee", "Herrie op de Heuvel", [], f"{j}-10-23")])
+check("andere stad: apart", mv([{"v": "bre", "title": "Herrie op de Heuvel"}, {"v": "cds", "title": "Herrie op de Heuvel"}]),
+      [("bre", "Herrie op de Heuvel", [], f"{j}-10-23"), ("cds", "Herrie op de Heuvel", [], f"{j}-10-23")])
+check("algemene titel (pubquiz, open podium): nooit samengevoegd",
+      mv([{"v": "wee", "title": "De grote pubquiz avond"}, {"v": "cds", "title": "De grote pubquiz avond"}, {"v": "wee", "title": "Open podium avond"}, {"v": "lit", "title": "Open podium avond"}]),
+      [("cds", "De grote pubquiz avond", [], f"{j}-10-23"), ("lit", "Open podium avond", [], f"{j}-10-23"), ("wee", "De grote pubquiz avond", [], f"{j}-10-23"), ("wee", "Open podium avond", [], f"{j}-10-23")])
+check("theater en film doen niet mee", mv([{"v": "sch", "title": "Herrie op de Heuvel"}, {"v": "cds", "title": "Herrie op de Heuvel"}, {"v": "wee", "title": "Herrie op de Heuvel", "genre": "Film"}]),
+      [("cds", "Herrie op de Heuvel", [], f"{j}-10-23"), ("sch", "Herrie op de Heuvel", [], f"{j}-10-23"), ("wee", "Herrie op de Heuvel", [], f"{j}-10-23")])
+check("korte of eenwoordige titel (band 'Jungle' in twee cafés): apart", mv([{"v": "wee", "title": "Jungle live"}, {"v": "cds", "title": "Jungle live"}]),
+      [("cds", "Jungle live", [], f"{j}-10-23"), ("wee", "Jungle live", [], f"{j}-10-23")])
+s_out, _ = scrape.schoon.schoon_alles({"updated": "x", "venues": {k: dict(v, prov="NB") for k, v in VN.items()},
+                                        "events": [{"id": "e1", "v": "cds", "title": "Herrie", "date": f"{j}-11-04", "time": "20:30", "url": "https://c.nl",
+                                                    "ook": [{"v": "wee", "url": "https://w.nl/x"}, {"v": "onbekend", "url": "https://q.nl"}, {"v": "cds", "url": "https://c.nl"}]}]})
+check("opschonen: 'ook' houdt alleen bekende andere podia, en dat podium blijft in venues", (s_out["events"][0]["ook"], sorted(s_out["venues"])), ([{"v": "wee", "url": "https://w.nl/x"}], ["cds", "wee"]))
+
 print("\n" + ("ALLES GOED" if not fouten else f"{fouten} FOUT(EN)")); sys.exit(1 if fouten else 0)

@@ -1,6 +1,6 @@
 [
  {"name": "Paradiso", "city": "Amsterdam", "prov": "Noord-Holland", "type": "pop", "agenda_url": "https://www.paradiso.nl/", "platform": "paradiso", "location": "Paradiso"},
- {"name": "Melkweg", "city": "Amsterdam", "prov": "Noord-Holland", "type": "pop", "agenda_url": "https://www.melkweg.nl/nl/agenda/", "platform": "melkweg"},
+ {"name": "Melkweg", "city": "Amsterdam", "prov": "Noord-Holland", "type": "pop", "agenda_url": "https://www.melkweg.nl/nl/agenda/", "platform": "melkweg", "local_only": true, "note": "sinds 28 okt 2026 antwoordt melkweg.nl aan GitHub op alles 404 (ook de homepage); vanaf een gewone aansluiting werkt de agenda gewoon"},
  {"name": "AFAS Live", "city": "Amsterdam", "prov": "Noord-Holland", "type": "pop", "agenda_url": "https://www.afaslive.nl/agenda"},
  {"name": "Ziggo Dome", "city": "Amsterdam", "prov": "Noord-Holland", "type": "arena", "agenda_url": "https://www.ziggodome.nl/agenda/", "platform": "ziggodome", "local_only": true},
  {"name": "Johan Cruijff ArenA", "city": "Amsterdam", "prov": "Noord-Holland", "type": "arena", "agenda_url": "https://www.johancruijffarena.nl/kalender/", "link_pattern": "^/kalender/[0-9]+-"},

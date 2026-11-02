@@ -3,7 +3,7 @@
 Een bron in bronnen.json met "platform": "<naam>" (zie PLATFORMS) gaat hierheen.
 Elke uitlezer geeft events {"date", "time", "title", "url", optioneel "doors", "status", "support"}.
 """
-import datetime as dt, json, re
+import datetime as dt, json, re, time
 from zoneinfo import ZoneInfo
 from bs4 import BeautifulSoup
 from html import unescape
@@ -125,10 +125,22 @@ def detail_times(soup, title):
 
 
 def ziggodome(src, F, cfg, log):
-    """Ziggo Dome: /api/agenda/aankomend/ (de tijd is vrijwel altijd 'deuren open')."""
+    """Ziggo Dome: /api/agenda/aankomend/ (de tijd is vrijwel altijd 'deuren open'), 50 per pagina.
+    Sinds eind okt 2026 staat Cloudflare ervoor: de eerste pagina komt vaak uit de cache, een volgende krijgt soms 403.
+    Dan wachten we even en proberen we die pagina nog twee keer; lukt het dan nog niet, dan geven we een fout
+    (en geen halve lijst, want dan zouden de shows van over twee maanden uit de agenda verdwijnen)."""
     out, offset = [], 0
     while offset < 1000:
-        js = F.get_json(f"https://www.ziggodome.nl/api/agenda/aankomend/?limit=50&offset={offset}") or {}
+        url = f"https://www.ziggodome.nl/api/agenda/aankomend/?limit=50&offset={offset}"
+        js = F.get_json(url)
+        for poging in range(2):
+            if isinstance(js, dict):
+                break
+            log(f"  {src['name']}: pagina met offset {offset} niet gekregen (antwoorden: {F.stats.get('ziggodome.nl', {})}); even wachten en opnieuw")
+            time.sleep(20 * (poging + 1))
+            js = F.get_json(url)
+        if not isinstance(js, dict):
+            raise RuntimeError(f"Ziggo Dome weigert pagina met offset {offset} (antwoorden: {F.stats.get('ziggodome.nl', {})})")
         for e in js.get("data") or []:
             m = re.match(r"(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})", e.get("showDate") or "")
             if not m or e.get("privateEvent"):

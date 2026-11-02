@@ -98,6 +98,12 @@ def schoon_event(e):
             out["times"] = ts
     if e.get("kids") is True:
         out["kids"] = True
+    ook = e.get("ook")   # zelfde evenement ook bij andere podia (scrape.merge_multi_venue): podium-id + link daar
+    if isinstance(ook, list):
+        ook = [{"v": x["v"], "url": url(x.get("url"))} for x in ook[:8]
+               if isinstance(x, dict) and isinstance(x.get("v"), str) and VID.match(x["v"]) and x["v"] != e["v"]]
+        if ook:
+            out["ook"] = ook
     return out, None
 
 
@@ -126,11 +132,15 @@ def schoon_alles(out):
         if se and se["v"] not in venues:
             se, reden = None, "onbekend podium"
         if se:
+            if "ook" in se:   # alleen podia die we kennen
+                se["ook"] = [x for x in se["ook"] if x["v"] in venues] or None
+                if not se["ook"]:
+                    del se["ook"]
             events.append(se)
         else:
             redenen[reden] += 1
     redenen["te veel items"] += max(0, len(ruw) - MAX_EVENTS)
-    gebruikt = {e["v"] for e in events}
+    gebruikt = {e["v"] for e in events} | {x["v"] for e in events for x in e.get("ook", [])}
     return ({"updated": out.get("updated"), "venues": {k: v for k, v in venues.items() if k in gebruikt}, "events": events},
             {"in": len(ruw), "weg": len(ruw) - len(events), "redenen": +redenen})
 

@@ -506,6 +506,61 @@ def dedupe(events):
     return out
 
 
+GENERIEK_RE = re.compile(r"open ?(mic|podium|stage|jam)|jam ?sessi|pub ?quiz|\bquiz\b|karaoke|bingo|live ?muziek|live ?music|\bdj\b|borrel|"
+                         r"happy hour|afterparty|after party|\bparty\b|\bfeest\b|\bsessie\b|\bsession\b|\bcover|dansavond|dance night|salsa|singalong", re.I)
+
+
+def titel_tokens(t):
+    """Woorden van een titel zonder hoofdletters, accenten en leestekens (set), om titels van twee podia te vergelijken."""
+    t = unicodedata.normalize("NFKD", unescape(t)).encode("ascii", "ignore").decode().lower()
+    return set(re.findall(r"[a-z0-9]+", t))
+
+
+def merge_multi_venue(events, venues):
+    """Eén evenement op meer podia tegelijk (Herrie op de Heuvel bij Cul de Sac én Café Weemoed, Popronde, kroegentochten):
+    elk café zet het met een eigen titel en link op zijn site. Zelfde stad, dag en aanvangstijd, en de woorden van de ene
+    titel zitten allemaal in de andere ('Herrie op de Heuvel' ⊂ 'Herrie op de korte heuvel'): dan wordt het één kaartje met
+    het podium met de kortste titel voorop en de andere podia in `ook` (podium-id + link). Alleen bij podia/cafés (geen
+    theaters, films, festivals, musea), geen periodes, en niet bij algemene titels (open podium, jamsessie, pubquiz ...):
+    twee cafés met elk een pubquiz om 20:30 zijn twee pubquizzen. Het oudste `first_seen` blijft, zodat het niet opnieuw 'nieuw' wordt."""
+    SOORTEN = {"pop", "concert", "arena", "cafe"}
+    buckets = {}
+    for k, e in events.items():
+        v = venues.get(e["v"]) or {}
+        if v.get("type") not in SOORTEN or e.get("genre") in ("Film", "Tentoonstelling") or e.get("end") or not e.get("time"):
+            continue
+        tokens = titel_tokens(e["title"])
+        if len(tokens) < 3 or len("".join(tokens)) < 10 or GENERIEK_RE.search(e["title"]):
+            continue
+        buckets.setdefault((norm(v.get("city", "")), e["date"], e["time"]), []).append((tokens, k))
+    weg = set()
+    for groep in buckets.values():
+        if len(groep) < 2:
+            continue
+        groep.sort(key=lambda x: (len(x[0]), venues[events[x[1]]["v"]]["name"]))   # kortste titel voorop
+        hoofden = []   # [(tokens, key, [leden])]
+        for tokens, k in groep:
+            for ht, hk, leden in hoofden:
+                if ht <= tokens and events[hk]["v"] != events[k]["v"] and all(events[k]["v"] != events[m]["v"] for m in leden):
+                    leden.append(k)
+                    break
+            else:
+                hoofden.append((tokens, k, []))
+        for _, hk, leden in hoofden:
+            if not leden:
+                continue
+            h = events[hk]
+            leden.sort(key=lambda m: venues[events[m]["v"]]["name"])
+            h["ook"] = [{"v": events[m]["v"], "url": events[m]["url"]} for m in leden]
+            h["first_seen"] = min([h.get("first_seen", "9")] + [events[m].get("first_seen", "9") for m in leden])
+            if h.get("price") is None:
+                prijzen = [events[m]["price"] for m in leden if events[m].get("price") is not None]
+                if prijzen:
+                    h["price"] = min(prijzen)
+            weg.update(leden)
+    return {k: e for k, e in events.items() if k not in weg}
+
+
 def night_show(e):
     """Avondconcert dat 'tot de volgende dag' loopt (eindtijd middernacht, bv. SPOT Groningen) is geen tweedaags evenement."""
     if not e.get("end") or e["vtype"] in ("festival", "museum") or (e.get("time") or "") < "17:00":
@@ -605,6 +660,10 @@ def main():
         e["first_seen"] = first_seen.get(e["id"], TODAY.isoformat())
         for k in ("venue", "city", "prov", "kind", "vtype"):
             e.pop(k, None)
+    n0 = len(events)
+    events = merge_multi_venue(events, venues)
+    if n0 != len(events):
+        print(f"Evenementen op meer podia tegelijk samengevoegd: {n0 - len(events)} kaartjes minder")
 
     out = {"updated": dt.datetime.now(ZoneInfo("Europe/Amsterdam")).strftime("%Y-%m-%d %H:%M"), "venues": venues,
            "events": sorted(events.values(), key=lambda e: (e["date"], e["time"] or "99"))}

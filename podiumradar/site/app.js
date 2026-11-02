@@ -53,7 +53,9 @@ let BAD=0;
     // alleen echte webadressen als link (geen javascript:-links uit een bron)
     url:/^https?:\/\/[^\s<>"]+$/i.test(String(r.url||"").trim().replace(/ /g,"%20"))?String(r.url).trim().replace(/ /g,"%20"):"#",isFest:r.id[0]==="f"||type==="fest",status:r.status||null,firstSeen:r.first_seen,
     dur:r.dur||null,kids:!!r.kids||isKids(r.title,r.genre),endD,endDate:r.end?new Date(...r.end.split("-").map((x,i)=>i===1?x-1:+x)):null,started,
-    rawDate:r.date, price:priceOf(r.price), times:timesOf(r.times)});
+    rawDate:r.date, price:priceOf(r.price), times:timesOf(r.times),
+    // zelfde evenement ook bij andere podia (Herrie op de Heuvel bij meerdere cafés): podium-id + link daar
+    ook:Array.isArray(r.ook)?r.ook.filter(o=>o&&typeof o==="object"&&typeof o.v==="string"&&V[o.v]&&o.v!==r.v).slice(0,8).map(o=>({v:o.v,url:/^https?:\/\/[^\s<>"]+$/i.test(String(o.url||"").trim().replace(/ /g,"%20"))?String(o.url).trim().replace(/ /g,"%20"):""})):[]});
 }catch(err){BAD++} });   // een rij die niet te lezen is wordt overgeslagen
 if(!EV.length){ document.querySelector("#main").innerHTML='<div class="empty"><strong>De agenda is leeg of kon niet gelezen worden</strong>Ververs de pagina. Blijft het zo, laat het weten aan degene die je de link gaf.</div>'; return }
 const SNAPSHOT=(()=>{try{const [dpart,t]=DATA.updated.split(" ");const [y,m,d]=dpart.split("-").map(Number);return d+" "+["januari","februari","maart","april","mei","juni","juli","augustus","september","oktober","november","december"][m-1]+" om "+t}catch{return "onbekend"}})();
@@ -69,9 +71,13 @@ const norm=s=>String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f\u
 const CITY_AKA=c=>/hertogenbosch/i.test(c)?"den bosch":/^den haag$/i.test(c)?"s-gravenhage 's-gravenhage":"";
 const artistKey=n=>n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
 EV.forEach(e=>{e.ak=artistKey(e.artist); if(e.time==null&&e.times) e.time=e.times[0].s;
-  const v=V[e.v]; e.hay=norm([e.title,v.name,v.city,CITY_AKA(v.city),e.genre,e.support.join(" ")].join(" "));
+  const v=V[e.v]; e.hay=norm([e.title,v.name,...e.ook.map(o=>V[o.v].name),v.city,CITY_AKA(v.city),e.genre,e.support.join(" ")].join(" "));
   e.age=e.firstSeen?Math.max(0,-dayNr(e.firstSeen)):999});   // dagen sinds het item voor het eerst op de agenda kwam
 const BYID=new Map(EV.map(e=>[e.id,e]));
+// Alle podia van een item (hoofdpodium + 'ook'), en de podiumregel: "Cul de Sac, Café Weemoed, Tilburg" (bij meer dan drie: "... e.a.")
+const vidsOf=e=>[e.v,...e.ook.map(o=>o.v)];
+const atV=(e,vid)=>e.v===vid||e.ook.some(o=>o.v===vid);
+const venueLine=e=>{const ns=vidsOf(e).map(id=>V[id].name); return esc((ns.length>3?ns.slice(0,2).join(", ")+" e.a.":ns.join(", "))+", "+V[e.v].city)};
 
 /* ---------- PLACES ---------- */
 const HOMES={"Tilburg":[51.5555,5.0913],"Breda":[51.5719,4.7683],"Eindhoven":[51.4416,5.4697],"Den Bosch":[51.6978,5.3037],"Helmond":[51.4793,5.6570],"Oss":[51.7650,5.5180],"Bergen op Zoom":[51.4949,4.2911],"Roosendaal":[51.5308,4.4653],"Amsterdam":[52.3676,4.9041],"Utrecht":[52.0907,5.1214],"Rotterdam":[51.9244,4.4777],"Den Haag":[52.0705,4.3007],"Nijmegen":[51.8126,5.8372],"Arnhem":[51.9851,5.8987],"Zwolle":[52.5168,6.0830],"Groningen":[53.2194,6.5665],"Maastricht":[50.8514,5.6910],"Venlo":[51.3704,6.1724]};
@@ -187,8 +193,8 @@ function filtered(ignoreDay,ignoreMonth,allTypes,noSort){
     if(!ignoreDay&&S.day>=0&&!onDay(e,S.day)) return false;
     if(mr&&!inMonth(e,mr)) return false;
     if(S.regio.size&&!S.regio.has(v.prov)) return false;
-    if(S.venue&&e.v!==S.venue) return false;
-    if(e.v!==S.venue&&hiddenLoc(e.v)) return false;
+    if(S.venue&&!atV(e,S.venue)) return false;
+    if(!atV(e,S.venue)&&vidsOf(e).every(hiddenLoc)) return false;
     if(S.genre.size&&!S.genre.has(e.genre)) return false;
     if(S.time){ if(e.time==null) return false;
       if(S.time==="mid"&&!(e.time<18*60)) return false;
@@ -260,7 +266,7 @@ function evRow(e,o={}){
       :`<div class="t">${e.time==null?"—":hm(e.time)}<small>${o.showDate?short(e):(e.time==null?"tijd volgt":"aanvang")}</small></div>`}
     <div><div class="a">${esc(e.artist)}${flag}</div>
       ${e.support.length?`<div class="s">met ${esc(e.support.join(", "))}</div>`:(e.title!==e.artist&&!e.title.startsWith(e.artist+" +")?`<div class="s">${esc(e.title.slice(e.artist.length).replace(/^\s*-\s*/,""))}</div>`:"")}
-      <div class="v">${esc(v.name)}, ${esc(v.city)}</div>
+      <div class="v">${venueLine(e)}</div>
       <div class="tt">${tr.car==null?"reistijd onbekend":"± "+tr.car+" min met de auto"}</div>
       ${kind?`<span class="tag kind">${KIND[e.type]}</span>`:""}${kind&&e.genre===KIND[e.type]?"":`<span class="tag">${esc(e.genre)}</span>`}${e.price!=null?`<span class="tag price${e.price===0?" free":""}">${priceTxt(e.price)}</span>`:""}${GO[e.id]?'<span class="tag going">✓ Ik ga</span>':""}${e.status==="sold"?'<span class="tag sold">Uitverkocht</span>':""}${o.reason?`<div class="s${o.warn?" warn":""}" style="margin-top:4px">${esc(o.reason)}</div>`:""}</div>
     <button class="star" data-fav="${e.ak}" data-name="${esc(e.artist)}" aria-pressed="${S.fav.has(e.ak)}" aria-label="Volg ${esc(e.artist)}">★</button>
@@ -498,7 +504,7 @@ function viewFav(){
   const fv=VG.filter(g=>S.favV.has(g.key)).sort((a,b)=>a.name.localeCompare(b.name,"nl"));
   if(!fv.length) h+=`<p class="s" style="margin:0">Tik op de ster bij een podium (onder Podia) om het te volgen. Je ziet dan hier wat er binnenkort is en wat er nieuw bij is gekomen.</p>`;
   fv.forEach(g=>{
-    const all=EV.filter(e=>g.ids.has(e.v)).sort((a,b)=>(b.started-a.started)||a.d-b.d||(a.time??1440)-(b.time??1440));
+    const all=EV.filter(e=>vidsOf(e).some(id=>g.ids.has(id))).sort((a,b)=>(b.started-a.started)||a.d-b.d||(a.time??1440)-(b.time??1440));
     const nw=all.filter(e=>NEW.has(e.id)), next=all.filter(e=>!NEW.has(e.id)).slice(0,3);
     h+=`<div class="vfav"><div class="vfavh"><button class="linkbtn" data-openvenue="${esc(g.key)}">${esc(g.name)}</button><span class="s">${esc(g.city)} · ${all.length} op de agenda${nw.length?` · <b class="newtxt">${nw.length} nieuw</b>`:""}</span>${vStar(g)}</div>`+
       nw.slice(0,5).map(e=>evRow(e,{showDate:true,reason:"Nieuw sinds je laatste bezoek"})).join("")+
@@ -522,9 +528,9 @@ function viewFav(){
 // Eén regel per podium; zelfde naam en stad (bv. podium + eigen filmzaal) samen
 const VKIND={pop:"Poppodium",concert:"Concertzaal",arena:"Arena",cafe:"Café",thea:"Theater",film:"Bioscoop / filmhuis",museum:"Museum",festival:"Festival"};
 const VGROUPS=[{k:"",l:"Alles"},{k:"muz",l:"Muziek",t:["pop","concert","arena","cafe"]},{k:"thea",l:"Theater",t:["thea"]},{k:"film",l:"Film",t:["film"]},{k:"museum",l:"Musea",t:["museum"]},{k:"festival",l:"Festivals",t:["festival"]}];
-const VG=(()=>{const m={}; EV.forEach(e=>{const v=V[e.v]; const k=(v.name+"|"+v.city).toLowerCase();
-  const g=m[k]||(m[k]={key:k,name:v.name,city:v.city,type:v.type,ids:new Set(),n:0,next:null,hay:norm(v.name+" "+v.city+" "+CITY_AKA(v.city))}); g.ids.add(e.v); g.n++;
-  if(!g.next||e.d<g.next.d) g.next=e}); return Object.values(m)})();
+const VG=(()=>{const m={}; EV.forEach(e=>vidsOf(e).forEach(vid=>{const v=V[vid]; const k=(v.name+"|"+v.city).toLowerCase();
+  const g=m[k]||(m[k]={key:k,name:v.name,city:v.city,type:v.type,ids:new Set(),n:0,next:null,hay:norm(v.name+" "+v.city+" "+CITY_AKA(v.city))}); g.ids.add(vid); g.n++;
+  if(!g.next||e.d<g.next.d) g.next=e})); return Object.values(m)})();
 const vgOf=vid=>{const v=V[vid]; return (v.name+"|"+v.city).toLowerCase()};
 const VCOL={pop:"pop",concert:"pop",arena:"pop",cafe:"pop",thea:"thea",film:"film",museum:"expo",festival:"fest"};
 const vStar=(g,big)=>`<button class="star${big?" big":""}" data-favv="${esc(g.key)}" data-name="${esc(g.name)}" aria-pressed="${S.favV.has(g.key)}" aria-label="Volg podium ${esc(g.name)}">★</button>`;
@@ -537,7 +543,7 @@ function viewVenues(){
   if(S.venuePage){
     const g=VG.find(x=>x.key===S.venuePage); if(!g){S.venuePage=null;return viewVenues()}
     const tr=travel([...g.ids][0]);
-    const list=EV.filter(e=>g.ids.has(e.v)).sort((a,b)=>(b.started-a.started)||a.d-b.d||(a.time??1440)-(b.time??1440));
+    const list=EV.filter(e=>vidsOf(e).some(id=>g.ids.has(id))).sort((a,b)=>(b.started-a.started)||a.d-b.d||(a.time??1440)-(b.time??1440));
     let h=`<div class="meta"><button data-vback>‹ Alle podia</button></div>
       <div class="vhead"><div class="dhead"><h1>${esc(g.name)}</h1>${vStar(g,true)}</div><div class="s">${esc(g.city)} · ${esc(VKIND[g.type]||"")}${tr.car!=null?` · ± ${tr.car} min met de auto`:""}</div>
       <div class="s">${list.length} op de agenda${S.favV.has(g.key)?" · je volgt dit podium":""}</div></div>`;
@@ -685,7 +691,7 @@ function buildFilters(){
   $("#fRegio").innerHTML=regios.map(r=>chip(S.regio.has(r),r,r)).join("");
   $("#fGenre").innerHTML=genres.map(g=>chip(S.genre.has(g),g,g)).join("");
   $("#fTime").innerHTML=[["","Alles"],["mid","Middag"],["eve","Avond"],["late","Nacht (na 22:00)"]].map(([k,l])=>chip(S.time===k,k,l)).join("");
-  const vs=[...new Set(EV.filter(e=>inTab(e)).map(e=>e.v))].map(id=>V[id]).filter(v=>!S.regio.size||S.regio.has(v.prov)).sort((a,b)=>a.name.localeCompare(b.name,"nl"));
+  const vs=[...new Set(EV.filter(e=>inTab(e)).flatMap(vidsOf))].map(id=>V[id]).filter(v=>!S.regio.size||S.regio.has(v.prov)).sort((a,b)=>a.name.localeCompare(b.name,"nl"));
   vs.sort((a,b)=>inCity(b.id)-inCity(a.id)); // eigen stad eerst, daarna A-Z (sort is stabiel)
   $("#fVenue").innerHTML=`<option value="">Alle podia</option>`+vs.map(v=>`<option value="${v.id}"${S.venue===v.id?" selected":""}>${esc(v.name)} (${esc(v.city)})</option>`).join("");
   $("#fOnlyFav").checked=S.onlyFav; $("#fOnlyFree").checked=S.onlyFree;
@@ -723,7 +729,7 @@ $("#fOnlyFree").onchange=e=>S.onlyFree=e.target.checked;
 /* Steden en podia aan/uit: per stad een vinkje, uitklapbaar naar de losse podia */
 function buildLocList(){
   const q=($("#fLocQ").value||"").trim().toLowerCase(), open=new Set([...document.querySelectorAll("#fLoc details[open]")].map(d=>d.dataset.city));
-  const cnt={}; EV.forEach(e=>{if(inTab(e)) cnt[e.v]=(cnt[e.v]||0)+1});
+  const cnt={}; EV.forEach(e=>{if(inTab(e)) vidsOf(e).forEach(vid=>cnt[vid]=(cnt[vid]||0)+1)});
   const cities={}; Object.keys(cnt).forEach(id=>{const v=V[id], k=cityKey(v.city); (cities[k]=cities[k]||{name:v.city||"?",vs:[]}).vs.push(v)});
   const home=cityKey(S.home);
   const keys=Object.keys(cities).sort((a,b)=>(b===home)-(a===home)||cities[a].name.localeCompare(cities[b].name,"nl"));
@@ -815,12 +821,14 @@ function openDetail(id,o={}){
    ${o.surprise?`<div class="surp" style="--acc:var(--${e.type});--acc-soft:var(--${e.type}-soft)">🎲 Verrassing voor ${o.surprise}, in de buurt</div>`:""}
    <div class="dhead"><div><div class="dsub">${range(e)?(e.started?"Nu te zien, ":"")+range(e):dayLabel(e.d)}</div><div class="dtitle">${esc(e.artist)}</div>
      ${e.title!==e.artist?`<div class="dsub">${esc(e.title)}</div>`:""}
-     <div class="dsub">${esc(v.name)}, ${esc(v.city)} · <button class="linkbtn" data-openvenue="${esc(vgOf(e.v))}">Alles bij dit podium</button></div></div>
+     <div class="dsub">${venueLine(e)} · <button class="linkbtn" data-openvenue="${esc(vgOf(e.v))}">Alles bij dit podium</button></div>
+     ${e.ook.length?`<div class="dsub">Zelfde evenement, ook op de agenda van ${e.ook.map(o=>esc(V[o.v].name)).join(", ")}</div>`:""}</div>
      <button class="star" data-fav="${e.ak}" data-name="${esc(e.artist)}" aria-pressed="${S.fav.has(e.ak)}" aria-label="Volg ${esc(e.artist)}" style="font-size:30px">★</button></div>
    <div class="facts"><div><small>Genre</small><b>${esc(e.genre)}</b></div>${tr.car!=null?`<div><small>Auto</small><b>± ${tr.car} min</b></div><div><small>OV</small><b>± ${tr.ov} min</b></div>`:""}${e.price!=null?`<div><small>${e.price===0?"Entree":"Prijs vanaf"}</small><b>${priceTxt(e.price)}</b></div>`:""}${e.status==="sold"?`<div><small>Kaarten</small><b style="color:var(--warn)">Uitverkocht</b></div>`:""}</div>
    ${tr.car!=null?`<p class="s travnote">Reistijd is een schatting vanaf ${S.home==="__geo"?"je opgeslagen locatie":esc(S.home)} (afstand hemelsbreed). Google Maps rekent vanaf waar je nu bent, met verkeer en dienstregeling.</p>`:""}
    <div class="timeline">${tl}</div>
    <div class="row2"><a class="btn" href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">Info en kaarten bij ${esc(V[e.v].name)}</a></div>
+   ${e.ook.filter(o=>o.url).map(o=>`<div class="row2" style="margin-top:6px"><a class="btn ghost" href="${esc(o.url)}" target="_blank" rel="noopener noreferrer">Info bij ${esc(V[o.v].name)}</a></div>`).join("")}
    <div class="row2" style="margin-top:10px"><button class="btn ghost go" id="goBtn" type="button" aria-pressed="${going}">${going?"✓ Ik ga":"Ik ga"}</button>${o.surprise?`<button class="btn ghost" id="surpBtn" type="button">${ICO.dice}Nog een verrassing</button>`:""}</div>
    <div class="row2 wrapr" id="linkRow" style="margin-top:10px">${linkRow(e)}</div>
    <div class="row2" style="margin-top:10px">${e.time!=null?`<button class="btn ghost" id="icsBtn">Zet in agenda</button><a class="btn ghost" id="gcal" target="_blank" rel="noopener">Google Agenda</a>`:`<p class="s">Agenda-knop verschijnt zodra de tijd bekend is.</p>`}</div>
