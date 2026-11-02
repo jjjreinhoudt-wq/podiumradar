@@ -4,8 +4,8 @@
 "ok": "2026-11-02"
 },
 "013|pop": {
-"n": 131,
-"ok": "2026-11-01"
+"n": 139,
+"ok": "2026-11-02"
 },
 "909 Festival|festival": {
 "n": 1,
@@ -32,11 +32,11 @@
 "ok": "2026-11-02"
 },
 "Altstadt|cafe": {
-"n": 13,
+"n": 16,
 "ok": "2026-11-02"
 },
 "Amare|concert": {
-"n": 233,
+"n": 235,
 "ok": "2026-11-02"
 },
 "Amphion|thea": {
@@ -92,7 +92,7 @@
 "ok": "2026-11-02"
 },
 "Beatrix Theater|thea": {
-"n": 8,
+"n": 7,
 "ok": "2026-11-02"
 },
 "Berkel-Enschot Bruist|festival": {
@@ -208,7 +208,7 @@
 "ok": "2026-11-02"
 },
 "Burgerweeshuis|pop": {
-"n": 50,
+"n": 51,
 "ok": "2026-11-02"
 },
 "CC De Schalm / Ons Koningsoord Cultureel|thea": {
@@ -240,7 +240,7 @@
 "ok": "2026-11-02"
 },
 "Castellum Theater & Film|thea": {
-"n": 37,
+"n": 38,
 "ok": "2026-11-02"
 },
 "Centraal Museum|museum": {
@@ -248,19 +248,19 @@
 "ok": "2026-11-02"
 },
 "Chassé Theater|thea": {
-"n": 32,
+"n": 60,
 "ok": "2026-11-02"
 },
 "Cinebergen|film": {
-"n": 22,
+"n": 29,
 "ok": "2026-11-02"
 },
 "Cinecenter|film": {
-"n": 89,
+"n": 175,
 "ok": "2026-11-02"
 },
 "Cinecitta|film": {
-"n": 73,
+"n": 225,
 "ok": "2026-11-02"
 },
 "Cinekid|festival": {
@@ -276,11 +276,11 @@
 "ok": "2026-11-02"
 },
 "Cinema Gouda|film": {
-"n": 66,
+"n": 76,
 "ok": "2026-11-02"
 },
 "Cinema Oostereiland|film": {
-"n": 79,
+"n": 138,
 "ok": "2026-11-02"
 },
 "Cobra Museum|museum": {
@@ -288,15 +288,15 @@
 "ok": "2026-11-02"
 },
 "Concert at SEA|festival": {
-"n": 1,
+"n": 0,
 "ok": "2026-11-02"
 },
 "Concordia|film": {
-"n": 58,
+"n": 59,
 "ok": "2026-11-02"
 },
 "Corso Bioscoop|film": {
-"n": 14,
+"n": 20,
 "ok": "2026-11-02"
 },
 "Cpunt (v/h Schouwburg De Meerse)|thea": {
@@ -312,7 +312,7 @@
 "ok": "2026-11-02"
 },
 "Cultura Ede|thea": {
-"n": 127,
+"n": 133,
 "ok": "2026-11-02"
 },
 "Cultureel Centrum Elckerlyc (Filmclub)|film": {
@@ -320,7 +320,7 @@
 "ok": "2026-11-02"
 },
 "Cultureel Centrum Elckerlyc|thea": {
-"n": 49,
+"n": 50,
 "ok": "2026-11-02"
 },
 "Cultureel Centrum Jan van Besouw (Beschouwfilm/filmavond)|film": {
@@ -368,15 +368,15 @@
 "ok": "2026-11-02"
 },
 "De Cacaofabriek|film": {
-"n": 172,
+"n": 57,
 "ok": "2026-11-02"
 },
 "De Cacaofabriek|pop": {
-"n": 145,
+"n": 209,
 "ok": "2026-11-02"
 },
 "De Doelen|concert": {
-"n": 193,
+"n": 194,
 "ok": "2026-11-02"
 },
 "De Fabriek|film": {
@@ -392,7 +392,7 @@
 "ok": "2026-11-02"
 },
 "De Helling|pop": {
-"n": 57,
+"n": 59,
 "ok": "2026-11-02"
 },
 "De Lawei|thea": {
@@ -400,7 +400,7 @@
 "ok": "2026-11-02"
 },
 "De Lieve Vrouw|film": {
-"n": 153,
+"n": 243,
 "ok": "2026-11-02"
 },
 "De Meester|pop": {
@@ -416,7 +416,7 @@
 "ok": "2026-11-02"
 },
 "De Nobelaer|thea": {
-"n": 177,
+"n": 178,
 "ok": "2026-11-02"
 },
 "De Parade|festival": {
@@ -432,11 +432,11 @@
 "ok": "2026-11-02"
 },
 "De Rijswijkse Schouwburg|thea": {
-"n": 13,
+"n": 15,
 "ok": "2026-11-02"
 },
 "De Tamboer|thea": {
-"n": 9,
+"n": 11,
 "ok": "2026-11-02"
 },
 "De Tilburgse Kermis|festival": {
@@ -452,7 +452,7 @@
 "ok": "2026-11-02"
 },
 "De Vorstin|pop": {
-"n": 55,
+"n": 56,
 "ok": "2026-11-02"
 },
 "DeLaMar Theater|thea": {
@@ -484,7 +484,7 @@
 "ok": "2026-11-02"
 },
 "Deventer Schouwburg|thea": {
-"n": 84,
+"n": 85,
 "ok": "2026-11-02"
 },
 "Deventer op Stelten|festival": {
@@ -500,7 +500,7 @@
 "ok": "2026-11-02"
 },
 "Doornroosje|pop": {
-"n": 190,
+"n": 191,
 "ok": "2026-11-02"
 },
 "Dordrechts Museum|museum": {
@@ -536,7 +536,7 @@
 "ok": "2026-11-02"
 },
 "Dynamo|pop": {
-"n": 34,
+"n": 33,
 "ok": "2026-11-02"
 },
 "ECI Cultuurfabriek|pop": {
@@ -544,11 +544,11 @@
 "ok": "2026-11-02"
 },
 "EKKO|pop": {
-"n": 64,
+"n": 65,
 "ok": "2026-11-02"
 },
 "Effenaar|pop": {
-"n": 106,
+"n": 108,
 "ok": "2026-11-02"
 },
 "Efteling Theater|thea": {
@@ -600,15 +600,15 @@
 "ok": "2026-11-02"
 },
 "Filmhuis Alkmaar|film": {
-"n": 48,
+"n": 56,
 "ok": "2026-11-02"
 },
 "Filmhuis Breda|film": {
-"n": 34,
+"n": 76,
 "ok": "2026-11-02"
 },
 "Filmhuis Bussum|film": {
-"n": 11,
+"n": 8,
 "ok": "2026-11-02"
 },
 "Filmhuis Cavia|film": {
@@ -616,35 +616,35 @@
 "ok": "2026-11-02"
 },
 "Filmhuis Den Haag|film": {
-"n": 114,
+"n": 121,
 "ok": "2026-11-02"
 },
 "Filmhuis Lumen|film": {
-"n": 14,
+"n": 12,
 "ok": "2026-11-02"
 },
 "Filmhuis Zevenaar|film": {
-"n": 39,
+"n": 29,
 "ok": "2026-11-02"
 },
 "Filmkoepel|film": {
-"n": 158,
+"n": 202,
 "ok": "2026-11-02"
 },
 "Filmtheater Fraterhuis|film": {
-"n": 24,
+"n": 72,
 "ok": "2026-11-02"
 },
 "Filmtheater Hilversum|film": {
-"n": 99,
+"n": 98,
 "ok": "2026-11-02"
 },
 "Filmtheater Kriterion|film": {
-"n": 38,
+"n": 48,
 "ok": "2026-11-02"
 },
 "Filmtheater Landvast|film": {
-"n": 28,
+"n": 95,
 "ok": "2026-11-02"
 },
 "Filmtheater Voorschoten|film": {
@@ -656,11 +656,11 @@
 "ok": "2026-11-02"
 },
 "Fluor|pop": {
-"n": 52,
+"n": 53,
 "ok": "2026-11-02"
 },
 "Focus Filmtheater|film": {
-"n": 69,
+"n": 174,
 "ok": "2026-11-02"
 },
 "Fontys Academy of the Arts (FHK)|thea": {
@@ -668,11 +668,11 @@
 "ok": "2026-11-02"
 },
 "Forum Groningen (film)|film": {
-"n": 150,
+"n": 180,
 "ok": "2026-11-02"
 },
 "Forum Groningen|museum": {
-"n": 171,
+"n": 254,
 "ok": "2026-11-02"
 },
 "Fotomuseum Den Haag|museum": {
@@ -716,7 +716,7 @@
 "ok": "2026-11-02"
 },
 "Gigant|film": {
-"n": 62,
+"n": 69,
 "ok": "2026-11-02"
 },
 "Gigant|pop": {
@@ -744,11 +744,11 @@
 "ok": "2026-11-02"
 },
 "Grote Kerk Breda (tentoonstellingen)|museum": {
-"n": 2,
+"n": 1,
 "ok": "2026-11-02"
 },
 "Grote Kerk Breda|concert": {
-"n": 6,
+"n": 7,
 "ok": "2026-11-02"
 },
 "Grote Kerk Den Bosch (Protestantse Gemeente, concerten)|concert": {
@@ -780,7 +780,7 @@
 "ok": "2026-11-02"
 },
 "Heerenstraat Theater|film": {
-"n": 28,
+"n": 97,
 "ok": "2026-11-02"
 },
 "Herinneringscentrum Kamp Westerbork|museum": {
@@ -804,7 +804,7 @@
 "ok": "2026-11-02"
 },
 "Het Ketelhuis|film": {
-"n": 99,
+"n": 101,
 "ok": "2026-11-02"
 },
 "Het Markiezenhof|museum": {
@@ -816,7 +816,7 @@
 "ok": "2026-11-02"
 },
 "Het Nationale Theater (Koninklijke Schouwburg)|thea": {
-"n": 590,
+"n": 593,
 "ok": "2026-11-02"
 },
 "Het Nieuwe Instituut|museum": {
@@ -824,7 +824,7 @@
 "ok": "2026-11-02"
 },
 "Het Noordbrabants Museum|museum": {
-"n": 110,
+"n": 104,
 "ok": "2026-11-02"
 },
 "Het Scheepvaartmuseum|museum": {
@@ -872,7 +872,7 @@
 "ok": "2026-11-02"
 },
 "Internationaal Theater Amsterdam (Stadsschouwburg)|thea": {
-"n": 251,
+"n": 249,
 "ok": "2026-11-02"
 },
 "International Film Festival Rotterdam (IFFR)|festival": {
@@ -916,7 +916,7 @@
 "ok": "2026-11-02"
 },
 "KINO|film": {
-"n": 257,
+"n": 267,
 "ok": "2026-11-02"
 },
 "KM21|museum": {
@@ -980,7 +980,7 @@
 "ok": "2026-11-02"
 },
 "Kunstlinie (v/h Schouwburg Almere/KAF)|thea": {
-"n": 19,
+"n": 20,
 "ok": "2026-11-02"
 },
 "Kunstmuseum Den Haag|museum": {
@@ -992,11 +992,11 @@
 "ok": "2026-11-02"
 },
 "LAB-1|film": {
-"n": 130,
+"n": 156,
 "ok": "2026-11-02"
 },
 "LAB111|film": {
-"n": 118,
+"n": 127,
 "ok": "2026-11-02"
 },
 "LUX|film": {
@@ -1004,7 +1004,7 @@
 "ok": "2026-11-02"
 },
 "LantarenVenster|film": {
-"n": 161,
+"n": 281,
 "ok": "2026-11-02"
 },
 "Le Guess Who?|festival": {
@@ -1048,7 +1048,7 @@
 "ok": "2026-11-02"
 },
 "Louis Hartlooper Complex|film": {
-"n": 116,
+"n": 164,
 "ok": "2026-11-02"
 },
 "Loveland Festival|festival": {
@@ -1064,7 +1064,7 @@
 "ok": "2026-11-02"
 },
 "Lumière|film": {
-"n": 54,
+"n": 183,
 "ok": "2026-11-02"
 },
 "Lustwarande|museum": {
@@ -1076,7 +1076,7 @@
 "ok": "2026-11-02"
 },
 "Luxor Live|pop": {
-"n": 23,
+"n": 24,
 "ok": "2026-11-02"
 },
 "Luxor Theater (Nieuwe & Oude Luxor)|thea": {
@@ -1096,7 +1096,7 @@
 "ok": "2026-11-02"
 },
 "Maritiem Museum Rotterdam|museum": {
-"n": 5,
+"n": 4,
 "ok": "2026-11-02"
 },
 "Markant Theater Maashorst|thea": {
@@ -1128,7 +1128,7 @@
 "ok": "2026-11-02"
 },
 "Mezz|pop": {
-"n": 135,
+"n": 136,
 "ok": "2026-11-02"
 },
 "Milkshake Festival|festival": {
@@ -1180,7 +1180,7 @@
 "ok": "2026-11-02"
 },
 "Museum Boijmans Van Beuningen / Depot|museum": {
-"n": 65,
+"n": 63,
 "ok": "2026-11-02"
 },
 "Museum Catharijneconvent|museum": {
@@ -1224,7 +1224,7 @@
 "ok": "2026-11-02"
 },
 "Museum Prinsenhof Delft|museum": {
-"n": 2,
+"n": 4,
 "ok": "2026-11-02"
 },
 "Museum Schokland|museum": {
@@ -1260,7 +1260,7 @@
 "ok": "2026-11-02"
 },
 "Musis & Stadstheater Arnhem|concert": {
-"n": 300,
+"n": 302,
 "ok": "2026-11-02"
 },
 "Muziekgebouw Eindhoven (MgE)|concert": {
@@ -1268,11 +1268,11 @@
 "ok": "2026-11-02"
 },
 "Muziekgebouw aan 't IJ|concert": {
-"n": 299,
+"n": 294,
 "ok": "2026-11-02"
 },
 "Muziekgieterij|pop": {
-"n": 115,
+"n": 114,
 "ok": "2026-11-02"
 },
 "Mysteryland|festival": {
@@ -1292,7 +1292,7 @@
 "ok": "2026-11-02"
 },
 "Natlab|film": {
-"n": 116,
+"n": 186,
 "ok": "2026-11-02"
 },
 "Natuurmuseum Brabant|museum": {
@@ -1308,7 +1308,7 @@
 "ok": "2026-11-02"
 },
 "Nederlands Fotomuseum|museum": {
-"n": 8,
+"n": 6,
 "ok": "2026-11-02"
 },
 "Nederlands Openluchtmuseum|museum": {
@@ -1320,7 +1320,7 @@
 "ok": "2026-11-02"
 },
 "Neushoorn|pop": {
-"n": 94,
+"n": 93,
 "ok": "2026-11-02"
 },
 "Nieuwe Nor|pop": {
@@ -1336,7 +1336,7 @@
 "ok": "2026-11-02"
 },
 "Nobel (v/h Gebr. De Nobel)|pop": {
-"n": 97,
+"n": 99,
 "ok": "2026-11-02"
 },
 "Noordelijk Film Festival|festival": {
@@ -1392,8 +1392,8 @@
 "ok": "2026-11-02"
 },
 "P3 Purmerend|pop": {
-"n": 62,
-"ok": "2026-11-01"
+"n": 61,
+"ok": "2026-11-02"
 },
 "P60|pop": {
 "n": 36,
@@ -1416,11 +1416,11 @@
 "ok": "2026-11-02"
 },
 "Pand P|thea": {
-"n": 89,
-"ok": "2026-10-30"
+"n": 86,
+"ok": "2026-11-02"
 },
 "Paradiso|pop": {
-"n": 249,
+"n": 250,
 "ok": "2026-11-02"
 },
 "Parkstad Limburg Theaters (Heerlen & Kerkrade)|thea": {
@@ -1440,7 +1440,7 @@
 "ok": "2026-11-02"
 },
 "Patronaat|pop": {
-"n": 158,
+"n": 159,
 "ok": "2026-11-02"
 },
 "Philips Museum|museum": {
@@ -1460,11 +1460,11 @@
 "ok": "2026-11-02"
 },
 "Podium Bloos|thea": {
-"n": 26,
+"n": 23,
 "ok": "2026-11-02"
 },
 "Podium Victorie|pop": {
-"n": 95,
+"n": 97,
 "ok": "2026-11-02"
 },
 "Poetry Circle 013|thea": {
@@ -1488,7 +1488,7 @@
 "ok": "2026-11-01"
 },
 "Posthuis Theater|thea": {
-"n": 49,
+"n": 67,
 "ok": "2026-11-02"
 },
 "Pride Amsterdam|festival": {
@@ -1512,7 +1512,7 @@
 "ok": "2026-11-02"
 },
 "Rialto De Pijp|film": {
-"n": 19,
+"n": 33,
 "ok": "2026-11-02"
 },
 "Ribs & Blues|festival": {
@@ -1536,7 +1536,7 @@
 "ok": "2026-11-02"
 },
 "Rotown|pop": {
-"n": 117,
+"n": 118,
 "ok": "2026-11-02"
 },
 "Rotterdam Ahoy|arena": {
@@ -1556,7 +1556,7 @@
 "ok": "2026-11-02"
 },
 "Schouwburg & Concertzaal Tilburg|thea": {
-"n": 136,
+"n": 135,
 "ok": "2026-11-02"
 },
 "Schouwburg Amstelveen|thea": {
@@ -1564,8 +1564,8 @@
 "ok": "2026-11-02"
 },
 "Schouwburg De Kring|thea": {
-"n": 250,
-"ok": "2026-11-01"
+"n": 252,
+"ok": "2026-11-02"
 },
 "Schouwburg Hengelo|thea": {
 "n": 166,
@@ -1596,11 +1596,11 @@
 "ok": "2026-11-02"
 },
 "Slachtstraat Filmtheater|film": {
-"n": 60,
+"n": 150,
 "ok": "2026-11-02"
 },
 "Slieker Film|film": {
-"n": 4,
+"n": 9,
 "ok": "2026-11-02"
 },
 "Slot Loevestein|museum": {
@@ -1624,7 +1624,7 @@
 "ok": "2026-11-02"
 },
 "Springhaver|film": {
-"n": 41,
+"n": 70,
 "ok": "2026-11-02"
 },
 "Stadsgehoorzaal Vlaardingen|thea": {
@@ -1664,7 +1664,7 @@
 "ok": "2026-11-02"
 },
 "Stedelijk Museum Breda|museum": {
-"n": 5,
+"n": 6,
 "ok": "2026-11-02"
 },
 "Stedelijk Museum Schiedam|museum": {
@@ -1712,11 +1712,11 @@
 "ok": "2026-11-02"
 },
 "The Movies|film": {
-"n": 94,
+"n": 97,
 "ok": "2026-11-02"
 },
 "Theater Agnietenhof|thea": {
-"n": 45,
+"n": 81,
 "ok": "2026-11-02"
 },
 "Theater Amsterdam|thea": {
@@ -1728,7 +1728,7 @@
 "ok": "2026-11-02"
 },
 "Theater De Kampanje|thea": {
-"n": 180,
+"n": 181,
 "ok": "2026-11-02"
 },
 "Theater De Kom|thea": {
@@ -1748,7 +1748,7 @@
 "ok": "2026-10-30"
 },
 "Theater De Maaspoort|thea": {
-"n": 256,
+"n": 258,
 "ok": "2026-11-02"
 },
 "Theater De Nieuwe Vorst|thea": {
@@ -1792,7 +1792,7 @@
 "ok": "2026-11-02"
 },
 "Theater Orpheus|thea": {
-"n": 325,
+"n": 326,
 "ok": "2026-11-02"
 },
 "Theater Rotterdam (Schouwburg)|thea": {
@@ -1876,7 +1876,7 @@
 "ok": "2026-11-02"
 },
 "Van Abbemuseum|museum": {
-"n": 10,
+"n": 9,
 "ok": "2026-11-02"
 },
 "Van Gogh Museum|museum": {
@@ -1892,7 +1892,7 @@
 "ok": "2026-11-02"
 },
 "Verkadefabriek (filmtheater)|film": {
-"n": 119,
+"n": 120,
 "ok": "2026-11-02"
 },
 "Verkadefabriek (theater en muziek)|thea": {
@@ -1944,7 +1944,7 @@
 "ok": "2026-11-02"
 },
 "Wilminktheater & Muziekcentrum|thea": {
-"n": 371,
+"n": 369,
 "ok": "2026-11-02"
 },
 "Wonderfeel|festival": {
