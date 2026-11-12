@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # vast: Playwright 1.56.1 kent Ubuntu 26.04 (ubuntu-latest sinds nov 2026) nog niet
     timeout-minutes: 20
     defaults:
       run:
