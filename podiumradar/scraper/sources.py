@@ -330,6 +330,36 @@ def _txt_date(txt):
     return best[1] if best else None
 
 
+# Datum die het podium zelf in de titel zet: "Focus ✦ do 18 feb ✦ Luxor Live", "Femxle Frontier - vr 22 jan".
+# Altijd met een weekdag ervoor, zodat we kunnen controleren of dag en datum bij elkaar horen.
+TITEL_DATUM_RE = re.compile(
+    r"\s*(?:[✦•·|]|\s[-–])\s*(ma|di|wo|do|vr|za|zo)(?:\.|[a-z]{0,5}dag)?\s+(\d{1,2})\s+"
+    r"(jan|feb|mrt|maa|apr|mei|jun|jul|aug|sep|okt|nov|dec)[a-z]*\.?(?:\s+(20\d\d))?\s*(?:[✦•·|]\s*[^✦•·|]{2,40})?$", re.I)
+WEEKDAG = {"ma": 0, "di": 1, "wo": 2, "do": 3, "vr": 4, "za": 5, "zo": 6}
+
+
+def titel_datum(title, today=None):
+    """('Focus', date(2027, 2, 18)) voor 'Focus ✦ do 18 feb ✦ Luxor Live'; (title, None) als er geen datum achteraan staat.
+    De datum telt alleen als de weekdag klopt en hij niet voorbij is (zonder jaartal: dit jaar of volgend jaar, het eerste
+    dat past). Klopt de weekdag niet, dan blijft de titel zoals hij is: liever een lange titel dan een verzonnen datum."""
+    today = today or TODAY
+    m = TITEL_DATUM_RE.search(title or "")
+    if not m:
+        return title, None
+    kaal = title[:m.start()].strip()
+    if len(kaal) < 2:
+        return title, None
+    wd, dag, mon = WEEKDAG[m.group(1).lower()], int(m.group(2)), MONTHS[m.group(3).lower()[:3]]
+    for y in ([int(m.group(4))] if m.group(4) else [today.year, today.year + 1]):
+        try:
+            d = dt.date(y, mon, dag)
+        except ValueError:
+            continue
+        if d.weekday() == wd and d >= today - dt.timedelta(days=1):
+            return kaal, d
+    return title, None
+
+
 GENERIC_TITLE = re.compile(r"^(agenda|programma|programme|overzicht|evenementen|events?|tickets?|kaarten|koop|nu te zien|"
                            r"tentoonstellingen?|voorstellingen?|concerten|films?|filmagenda|theateragenda|weekladder|"
                            r"specials?|archief|home|welkom|verwacht|binnenkort|\d+|\s|[^\w])+$", re.I)
@@ -840,7 +870,18 @@ def scrape_source(src, F, cache, cfg, log):
             events.setdefault(k(ev), ev)
     skip = re.compile("|".join(map(re.escape, cfg.get("skip_title_words", []))) or "(?!)", re.I)
     out = []
+    per_url = {}
     for e in events.values():
+        per_url[e["url"]] = per_url.get(e["url"], 0) + 1
+    for e in events.values():
+        # "Focus ✦ do 18 feb ✦ Luxor Live": het podium zet de speeldatum in de titel. Die datum is betrouwbaarder dan de
+        # eerste datum uit de paginatekst (Luxor Live, nov 2026: 9 van de 17 shows stonden op een verkeerde dag, zes ervan
+        # op 1 januari). Alleen bij één voorstelling per pagina en geen periode; de titel wordt meteen de kale naam.
+        kaal, td = titel_datum(e["title"])
+        if td:
+            e["title"] = kaal
+            if not e.get("end") and per_url[e["url"]] == 1:
+                e["date"] = td.isoformat()
         # "Meeuw — Het Nationale Theater | regie Nina Spijkers" -> "Meeuw"
         # "Wodan Boys // zaterdag 10 oktober, Willem Twee Den Bosch" -> "Wodan Boys"
         parts = [p.strip() for p in re.split(r"\s+[—|]\s+|\s*//\s*", e["title"]) if p.strip()]

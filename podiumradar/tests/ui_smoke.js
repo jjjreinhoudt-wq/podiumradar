@@ -52,6 +52,45 @@ const UPD = nlMs(real.updated);
   check('zoeken geeft resultaat of melding', (await p.locator('#main .ev, #main .empty').count()) > 0);
   await p.fill('#q', ''); await p.waitForTimeout(300);
 
+  // 2b. zoeken terwijl er een dag gekozen is (het Blokkenschema kiest vandaag): niets vandaag, wel op andere dagen
+  {
+    const dag0 = real.updated.slice(0, 10), plat = t => String(t).toLowerCase();
+    const vandaag = real.events.filter(e => e.date <= dag0 && (e.end || e.date) >= dag0).map(e => plat(e.title + ' ' + real.venues[e.v].name + ' ' + real.venues[e.v].city)).join(' | ');
+    const later = real.events.find(e => e.date > dag0 && !e.end && /^[A-Za-z]{7,} [A-Za-z ]{3,20}$/.test(e.title) && !vandaag.includes(plat(e.title.split(' ')[0])));
+    if (later) {
+      await p.click('nav.tabs button[data-view="grid"]'); await p.click('nav.tabs button[data-view="list"]');
+      await p.fill('#q', later.title); await p.waitForTimeout(500);
+      check('zoeken op een dag zonder treffer: verwijst naar andere dagen', /andere dagen/.test(await p.locator('#main .empty').innerText().catch(() => '')), later.title);
+      await p.locator('#main .empty button').click(); await p.waitForTimeout(300);
+      check('zoeken: Toon alle data geeft de treffer', (await p.locator('#main .ev').count()) > 0);
+      await p.fill('#q', ''); await p.waitForTimeout(300);
+    }
+  }
+
+  // 2c. radar in 'Vanavond in de buurt': stippen, niets over elkaar, een tik beperkt de lijst tot dat podium
+  await p.locator('[data-view-go="tonight"]').first().click(); await p.waitForTimeout(300);
+  const stippen = await p.locator(".rdot").count(), aantalEv = await p.locator('#main .ev').count();
+  check('radar: stippen zodra er vanavond iets is', stippen > 0 || (await p.locator('#main > .ev').count()) === 0, stippen);
+  if (stippen) {
+    // Plek en maat zonder de animatie (een stip die oplicht is even groter): offsetLeft/Top is het midden van de stip
+    const botsing = await p.evaluate(() => { const d = [...document.querySelectorAll('.rdot')].map(e => [e.offsetLeft, e.offsetTop, e.offsetWidth / 2]); let n = 0;
+      for (let i = 0; i < d.length; i++) for (let j = i + 1; j < d.length; j++) if (Math.hypot(d[i][0] - d[j][0], d[i][1] - d[j][1]) < d[i][2] + d[j][2] - 1) n++; return n; });
+    check('radar: geen stippen over elkaar', botsing === 0, botsing);
+    check('radar: alle stippen binnen het scherm', await p.evaluate(() => { const w = document.querySelector('.radar').offsetWidth;
+      return [...document.querySelectorAll('.rdot')].every(e => { const r = e.offsetWidth / 2; return e.offsetLeft - r >= -1 && e.offsetLeft + r <= w + 1 && e.offsetTop - r >= -1 && e.offsetTop + r <= w + 1; }); }));
+    const stip = p.locator('.rdot').first(), naam = (await stip.getAttribute('aria-label')).split(',')[0];
+    await stip.click({ force: true }); await p.waitForTimeout(200);
+    const gekozen = await p.locator('#main > .ev').count();
+    check('radar: tik op een stip toont alleen dat podium', gekozen > 0 && gekozen <= aantalEv && (await p.locator('#main > .ev .v').allInnerTexts()).every(t => t.includes(naam)), [naam, gekozen, aantalEv]);
+    check('radar: gekozen stip is gemarkeerd', (await p.locator('.rdot[aria-pressed="true"]').count()) === 1);
+    await p.locator('.rcap button').click(); await p.waitForTimeout(200);
+    check('radar: Alle stippen toont alles weer', (await p.locator('.rdot[aria-pressed="true"]').count()) === 0 && (await p.locator('#main .ev').count()) === aantalEv);
+    await p.click('[data-tn-radar]'); check('radar: uit te zetten', (await p.locator('.radarbox').count()) === 0);
+    await p.click('[data-tn-radar]'); check('radar: weer aan', (await p.locator('.radarbox').count()) === 1);
+  }
+  check('radar: geen fouten', p.errs.length === 0, p.errs);
+  await p.click('nav.tabs button[data-view="list"]'); await p.locator('#dates .day.all').click().catch(() => {}); await p.waitForTimeout(200);
+
   // 3. detailscherm
   await p.locator('#main .ev').first().click(); await p.waitForSelector('#detailSheet.open');
   check('detailscherm: geen link naar GitHub', (await p.locator('#detailSheet a[href*="github.com"]').count()) === 0);
