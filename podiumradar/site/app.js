@@ -436,6 +436,98 @@ function openFilm(key,fromDay=0){
     <p class="note">Tijden van ${SNAPSHOT}, overgenomen van de sites van de bioscopen. Kijk daar voordat je gaat.</p>`;
   openSheet("#detailSheet"); $("#detailSheet").scrollTop=0;
 }
+/* ---------- ECHT OF NEP? Dagelijks spelletje: staat deze band echt in de agenda, of heeft de app hem verzonnen? ---------- */
+// Elke dag dezelfde tien namen voor iedereen (zaadje = de datum), zodat je scores kunt vergelijken. Echte namen komen uit de
+// agenda van de poppodia; neppe worden gemaakt door woorden van echte namen te husselen of uit de woordenlijstjes hieronder.
+const EON_BAD=/fuck|shit|nazi|rape|cunt|bitch|hitler|kanker|neger|whore|slut/i;
+const EON_SKIP=/[:\d|•✦@/,]|\b(tour|live|night|party|festival|presents|invites|sessie|session|club|quiz|release|show|feat|ft|vs|x|friends|orchestra|orkest|koor|band|trio|quartet|kwartet|quintet|ensemble|dj|jam|open|avond|middag)\b/i;
+const EON_GENRES=new Set(["Metal","Punk","Rock","Indie","Overig","Hiphop","Folk/Americana","Blues","Pop","Dance","Wereld","Soul/Funk","Singer-songwriter"]);
+const EON_W={
+  enAdj:["Velvet","Electric","Silent","Purple","Hollow","Burning","Frozen","Midnight","Rusty","Savage","Gentle","Cosmic","Plastic","Feral","Crimson","Lazy","Wicked","Paper"],
+  enNoun:["Lighthouse","Goat","Tractor","Oracle","Hammer","Parade","Motel","Wolves","Antenna","Harvest","Casket","Pigeons","Swamp","Engine","Sermon","Buffet","Lantern","Orchard"],
+  nlAdj:["Natte","Boze","Trage","Vette","Stille","Losse","Zure","Gouden","Schele","Brave"],
+  nlNoun:["Rotonde","Frikandel","Kliko","Vluchtstrook","Stroopwafel","Regenton","Bakfiets","Tosti","Dakgoot","Kroket","Schuurdeur","Wasstraat","Volkstuin","Bitterbal","Carpoolplaats","Koelbox"],
+  nlNaam:["Henk","Truus","Sjaak","Ria","Kees","Annie","Jopie","Tinus"],
+  zwaar:["Inferno","Abyss","Ritual","Doom","Funeral","Apocalypse","Cult","Tribunal"]};
+const eonNice=n=>{n=String(n).replace(/\s*\([^)]*\)/g,"").trim(); const let_=n.replace(/[^A-Za-zÀ-ÿ]/g,""); return let_.length>4&&n===n.toUpperCase()?n.toLowerCase().replace(/(^|[\s\-.&])([a-zà-ÿ])/g,(m,a,b)=>a+b.toUpperCase()):n};
+function eonRng(seed){let h=2166136261; for(const ch of String(seed)){h^=ch.codePointAt(0); h=Math.imul(h,16777619)} h>>>=0;
+  return()=>{h=h+0x6D2B79F5|0; let t=Math.imul(h^h>>>15,1|h); t=t+Math.imul(t^t>>>7,61|t)^t; return((t^t>>>14)>>>0)/4294967296}}
+// Echte namen: bij voorkeur alleen artiesten die 's nachts op Spotify zijn teruggevonden (dan is het zeker een band en geen
+// avond of reeks); is die lijst er (nog) niet, dan alles wat op een bandnaam lijkt.
+let EONPOOL=null, EONSRC=null;
+function eonPool(){ const src=SPOT&&SPOT.found.size>200?"spot":"alles"; if(EONPOOL&&EONSRC===src) return EONPOOL; const seen=new Set(), out=[];
+  EV.forEach(e=>{ if(e.type!=="pop"||e.isFest||e.endD!=null||!EON_GENRES.has(e.genre)||seen.has(e.ak)||!tourOk(e)) return;
+    if(src==="spot"&&!SPOT.found.has(e.ak)) return;
+    const a=String(e.artist).trim(); if(a.length<4||a.length>26||a.split(/\s+/).length>4||EON_SKIP.test(a)||EON_BAD.test(a)) return;
+    seen.add(e.ak); out.push(e) });
+  EONSRC=src; return EONPOOL=out }
+function eonFake(rnd,pool,real,used){
+  const pick=a=>a[Math.floor(rnd()*a.length)], W=EON_W, two=pool.filter(e=>String(e.artist).trim().split(/\s+/).length===2);
+  for(let i=0;i<60;i++){ const m=rnd(); let n;
+    if(m<.45&&two.length>8){const a=eonNice(pick(two).artist).split(/\s+/), b=eonNice(pick(two).artist).split(/\s+/); n=a[0]+" "+b[1]}
+    else if(m<.6) n=pick(W.enAdj)+" "+pick(W.enNoun);
+    else if(m<.7) n="The "+pick(W.enAdj)+" "+pick(W.enNoun);
+    else if(m<.8) n=pick(W.nlNoun)+" "+pick(W.zwaar);
+    else if(m<.9) n="De "+pick(W.nlAdj)+" "+pick(W.nlNoun);
+    else n=pick(W.nlNaam)+" en de "+pick(W.nlNoun);
+    const k=artistKey(n); if(k.length>=5&&n.length<=26&&!real.has(k)&&!used.has(k)&&!EON_BAD.test(n)){used.add(k); return n} }
+  return "De Verdwaalde Roadies";
+}
+// Tien vragen: zes echte en vier neppe (of andersom), in een door het zaadje bepaalde volgorde
+function eonQuestions(seed){
+  const rnd=eonRng(seed), pool=eonPool(), real=new Set(EV.map(e=>e.ak)), used=new Set(), nReal=rnd()<.5?6:5, qs=[];
+  if(pool.length<20) return [];
+  while(qs.length<nReal){const e=pool[Math.floor(rnd()*pool.length)]; if(!used.has(e.ak)){used.add(e.ak); qs.push({name:eonNice(e.artist),real:true,e})}}
+  while(qs.length<10) qs.push({name:eonFake(rnd,pool,real,used),real:false});
+  for(let i=qs.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1)); [qs[i],qs[j]]=[qs[j],qs[i]]}
+  return qs;
+}
+const eonDay=()=>today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+const EON_RANK=n=>n===10?"Programmeur van het jaar":n>=8?"Stamgast aan de bar":n>=6?"Kent de weg naar de garderobe":n>=4?"Komt vooral voor de bitterballen":"Stond je in de verkeerde zaal?";
+let EON=null;
+function eonOpen(free){
+  const st=store.get("pr_eon",{}), day=eonDay(), played=st&&st.day===day&&Array.isArray(st.res)&&st.res.length===10;
+  const daily=!free&&!played, seed=free?"vrij"+Date.now():"eon"+day;
+  EON={qs:eonQuestions(seed),i:0,res:played&&!free?st.res.slice(0,10):[],daily:!free,done:played&&!free,answered:false};
+  if(!EON.qs.length){toast("Er staan nu te weinig bands in de agenda voor dit spel"); EON=null; return}
+  lastDetail=null; eonRender(); openSheet("#detailSheet"); $("#detailSheet").scrollTop=0;
+}
+function eonRender(){
+  const g=EON, bar=`<div class="sheetbar"><button class="sheetx" type="button" data-close><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>Sluiten</button><div class="grab"></div></div>`;
+  const dots=`<div class="eondots" aria-hidden="true">${g.qs.map((q,i)=>`<i class="${g.res[i]==null?(i===g.i&&!g.done?"cur":""):g.res[i]?"ok":"no"}"></i>`).join("")}</div>`;
+  if(g.done){
+    const n=g.res.filter(Boolean).length, st=store.get("pr_eon",{}), reals=g.qs.filter(q=>q.real);
+    $("#detailSheet").innerHTML=bar+`<div class="eon"><div class="dsub">Echt of nep?${g.daily?" van "+today.getDate()+" "+MON[today.getMonth()]:" (losse ronde)"}</div>
+      <div class="eonscore">${n}<small> / 10</small></div><div class="eonrank">${EON_RANK(n)}</div>${dots}
+      ${g.daily&&st.streak>1?`<p class="s" style="text-align:center">${st.streak} dagen op rij gespeeld</p>`:""}
+      <div class="row2" style="margin-top:14px">${g.daily?`<button class="btn" type="button" data-eon-share>Deel je score</button>`:""}<button class="btn ghost" type="button" data-eon-free>Nog een losse ronde</button></div>
+      ${g.daily?`<p class="s" style="text-align:center;margin-top:10px">Morgen staan er tien nieuwe namen klaar, voor iedereen dezelfde.</p>`:""}
+      <h3>Deze waren echt</h3><div class="simlist">${reals.map(q=>{const e=q.e; return `<div class="ev" role="button" tabindex="0" data-ev="${e.id}"><div><div class="a">${esc(q.name)}</div><div class="v">${short(e)}, ${esc(V[e.v].name)}, ${esc(V[e.v].city)}</div></div><button class="star" data-fav="${e.ak}" data-name="${esc(e.artist)}" aria-pressed="${S.fav.has(e.ak)}" aria-label="Volg ${esc(e.artist)}">★</button></div>`}).join("")}</div>
+      <h3>En deze hebben wij verzonnen</h3><p class="s">${g.qs.filter(q=>!q.real).map(q=>esc(q.name)).join(", ")}. Mocht er toch ergens een band zo heten: hij staat in elk geval niet in deze agenda.</p></div>`;
+    return;
+  }
+  const q=g.qs[g.i], ans=g.answered, ok=ans&&g.res[g.i];
+  $("#detailSheet").innerHTML=bar+`<div class="eon"><div class="dsub">Echt of nep? ${g.i+1} van 10${g.daily?"":" (losse ronde)"}</div>${dots}
+    <div class="eoncard${ans?(q.real?" real":" fake"):""}">${sigSvg(artistKey(q.name),"eonsig")}<div class="eonname">${esc(q.name)}</div></div>
+    ${ans?`<div class="eonres ${ok?"ok":"no"}" role="status"><b>${ok?"Goed!":"Helaas."}</b> ${q.real?`Echt: speelt ${short(q.e)} in ${esc(V[q.e.v].name)}, ${esc(V[q.e.v].city)}.`:"Nep: deze hebben wij verzonnen."}</div>
+      <div class="row2">${q.real?`<button class="btn ghost" type="button" data-fav="${q.e.ak}" data-name="${esc(q.e.artist)}" aria-pressed="${S.fav.has(q.e.ak)}">${S.fav.has(q.e.ak)?"Je volgt deze band":"Volg deze band"}</button>`:""}<button class="btn" type="button" data-eon-next>${g.i===9?"Bekijk je score":"Volgende"}</button></div>`
+      :`<p class="s" style="text-align:center">Speelt deze band de komende maanden op een Nederlands poppodium, of hebben wij hem verzonnen?</p>
+      <div class="row2"><button class="btn eonb" type="button" data-eon-a="1">Echt</button><button class="btn eonb nep" type="button" data-eon-a="0">Nep</button></div>`}</div>`;
+}
+function eonAnswer(real){ const g=EON; if(!g||g.done||g.answered) return; g.res[g.i]=(g.qs[g.i].real===real); g.answered=true; eonRender() }
+function eonNext(){ const g=EON; if(!g||!g.answered) return; g.answered=false;
+  if(g.i<9){g.i++; eonRender(); return}
+  g.done=true;
+  if(g.daily){ const st=store.get("pr_eon",{}), day=eonDay(), y=new Date(today); y.setDate(y.getDate()-1);
+    const yk=y.getFullYear()+"-"+String(y.getMonth()+1).padStart(2,"0")+"-"+String(y.getDate()).padStart(2,"0");
+    store.set("pr_eon",{day,res:g.res.map(Boolean),streak:st&&st.day===yk?(+st.streak||1)+1:1}) }
+  eonRender(); $("#detailSheet").scrollTop=0;
+}
+async function eonShare(){ const g=EON; if(!g) return;
+  const text=`Echt of nep? ${today.getDate()} ${MON[today.getMonth()]}: ${g.res.filter(Boolean).length}/10\n${g.res.map(r=>r?"🟩":"🟥").join("")}\nPodiumradar`;
+  if(navigator.share){ try{ await navigator.share({text}); return }catch(err){ if(err&&err.name==="AbortError") return } }
+  try{ await navigator.clipboard.writeText(text); toast("Score gekopieerd") }catch{ toast("Delen lukte niet") }
+}
 /* ---------- RENDER ---------- */
 // Gemarkeerde datum in het midden van de rij zetten (na wisselen van weergave of kiezen in de Kalender)
 const showDay=()=>{const dp=$('#dates .day[aria-pressed="true"]:not(.all)'), dd=$("#dates"); if(dp&&dd.offsetParent){const a=dp.getBoundingClientRect(), b=dd.getBoundingClientRect(); if(a.left<b.left||a.right>b.right) dd.scrollLeft+=a.left-b.left-(dd.clientWidth-dp.offsetWidth)/2}};
@@ -526,7 +618,7 @@ const LIM={n:300,sig:""};
 function quickRow(){
   const n=filtered(true,false,false,true).reduce((c,e)=>c+(e.age<=7?1:0),0);
   const lc=S.type==="expo"?lastChance().length:0;
-  return `<div class="qrow"><button class="qpill" data-surprise type="button">${ICO.dice}Verras me</button>${lc?`<button class="qpill" data-view-go="last" type="button">${ICO.spark}Laatste kans <small>${nf(lc)}</small></button>`:""}<button class="qpill" data-view-go="cal" type="button">${ICO.cal}Kalender</button>${n?`<button class="qpill" data-view-go="new" type="button">${ICO.spark}Nieuw <small>${nf(n)}</small></button>`:""}</div>`;
+  return `<div class="qrow"><button class="qpill" data-surprise type="button">${ICO.dice}Verras me</button>${lc?`<button class="qpill" data-view-go="last" type="button">${ICO.spark}Laatste kans <small>${nf(lc)}</small></button>`:""}${S.type==="pop"?`<button class="qpill" data-eon type="button"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.2 9a3 3 0 1 1 4.6 2.5c-.9.6-1.8 1.300-1.800 2.500"/><circle cx="12" cy="18" r=".6" fill="currentColor"/><circle cx="12" cy="12" r="10"/></svg>Echt of nep?${(store.get("pr_eon",{})||{}).day===eonDay()?"":'<small class="eonnew">vandaag</small>'}</button>`:""}<button class="qpill" data-view-go="cal" type="button">${ICO.cal}Kalender</button>${n?`<button class="qpill" data-view-go="new" type="button">${ICO.spark}Nieuw <small>${nf(n)}</small></button>`:""}</div>`;
 }
 /* Verras me: willekeurig iets in de buurt, vanavond; anders dit weekend; anders de komende twee weken */
 const SURP={seen:new Set(),last:null};
@@ -1210,6 +1302,11 @@ document.addEventListener("click",e=>{
     else if(z==="home"){const [x,y]=proj(S.homeXY[0],S.homeXY[1]); zoomTo(x,y,NL.w/4)} else {MAPV.vb=[0,0,NL.w,NL.h]; applyView()}
     return}
   if(e.target.closest("[data-showover]")){S.showOver=true; render(); return}
+  if(e.target.closest("[data-eon]")){eonOpen(false); return}
+  if(e.target.closest("[data-eon-free]")){eonOpen(true); return}
+  const ea=e.target.closest("[data-eon-a]"); if(ea){eonAnswer(ea.dataset.eonA==="1"); return}
+  if(e.target.closest("[data-eon-next]")){eonNext(); return}
+  if(e.target.closest("[data-eon-share]")){eonShare(); return}
   const fm=e.target.closest("[data-fmore]"); if(fm){fm.closest(".fday").classList.add("all"); fm.remove(); return}
   const fdm=e.target.closest("[data-fdaysmore]"); if(fdm){fdm.closest(".fdays").classList.add("all"); fdm.remove(); return}
   const fl=e.target.closest("[data-film]"); if(fl&&!e.target.closest("[data-ev]")){openFilm(fl.dataset.film,+fl.dataset.fday||0); return}

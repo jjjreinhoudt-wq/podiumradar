@@ -270,6 +270,28 @@ const UPD = nlMs(real.updated);
     await p.context().close(); appVer = 1;
   }
 
+  // 12. Echt of nep?: tien namen per dag (voor iedereen dezelfde), score bewaard, losse ronde erna
+  {
+    const speel = async q => { const namen = []; for (let i = 0; i < 10; i++) { namen.push(await q.locator('.eonname').innerText()); await q.click('[data-eon-a="0"]'); await q.click('[data-eon-next]'); } return namen; };
+    p = await newPage(); await p.clock.setFixedTime(new Date('2026-11-16T12:00:00+01:00')); await start(p);
+    await p.waitForFunction(() => fetch('spotify.json').then(r => r.ok), null, { timeout: 8000 }).catch(() => {}); await p.waitForTimeout(500);
+    await p.click('[data-eon]'); const n1 = await speel(p);
+    const st = await p.evaluate(() => JSON.parse(localStorage.getItem('pr_eon')));
+    const score = +(await p.locator('.eonscore').innerText()).split('/')[0];
+    check('echt of nep: tien verschillende namen en een score', new Set(n1).size === 10 && st.res.length === 10 && score === st.res.filter(Boolean).length && score >= 4 && score <= 5, [score, n1]);
+    check("echt of nep: de 'echte' namen staan in de agenda", (await p.locator('#detailSheet .simlist .ev[data-ev]').count()) === 10 - score);
+    await p.goBack(); await p.waitForTimeout(300); await p.click('[data-eon]');
+    check('echt of nep: vandaag al gespeeld toont meteen de score', (await p.locator('.eonscore').count()) === 1);
+    await p.click('[data-eon-free]'); const n2 = await speel(p);
+    check('echt of nep: een losse ronde heeft andere namen en telt niet mee', n2.join() !== n1.join() && (await p.evaluate(() => JSON.parse(localStorage.getItem('pr_eon')).day)) === '2026-11-16');
+    const p2 = await newPage(); await p2.clock.setFixedTime(new Date('2026-11-16T20:00:00+01:00')); await start(p2);
+    await p2.waitForFunction(() => fetch('spotify.json').then(r => r.ok), null, { timeout: 8000 }).catch(() => {}); await p2.waitForTimeout(500);
+    await p2.click('[data-eon]'); const n3 = await speel(p2);
+    check('echt of nep: iemand anders krijgt dezelfde dag dezelfde namen', n3.join() === n1.join());
+    check('echt of nep: geen fouten en geen verzoeken naar buiten', p.errs.length === 0 && p.ext.length === 0 && p2.errs.length === 0, [p.errs, p.ext, p2.errs]);
+    await p.context().close(); await p2.context().close();
+  }
+
   await browser.close(); server.close();
   console.log('\n' + (fouten ? fouten + ' FOUT(EN)' : 'ALLES GOED')); process.exit(fouten ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(2); });
