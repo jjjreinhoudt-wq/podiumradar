@@ -436,6 +436,100 @@ function openFilm(key,fromDay=0){
     <p class="note">Tijden van ${SNAPSHOT}, overgenomen van de sites van de bioscopen. Kijk daar voordat je gaat.</p>`;
   openSheet("#detailSheet"); $("#detailSheet").scrollTop=0;
 }
+/* ---------- NEDERLAND BIJ NACHT: een donkere kaart waarop podia oplichten zodra er iets begint ---------- */
+// Schuif door de avond (12:00 tot 03:00) of laat hem afspelen. Elk podium waar op dat moment iets bezig is, gloeit in de kleur
+// van de soort; hoe meer er speelt, hoe groter de gloed, en waar net iets begint zie je een ring. Getekend op een canvas met de
+// kaart uit nl.json (geen kaarttegels van buiten). Eindtijden zijn een schatting (endOf).
+const NIGHT={day:0,t:null,kinds:new Set(["pop","thea"]),play:false,city:null,raf:0,items:[],sig:"",paths:null,prev:0};
+const NIGHT_T0=12*60, NIGHT_T1=27*60, NIGHT_COL={pop:[143,160,255],thea:[242,133,182],film:[187,166,255]}, NIGHT_LBL={pop:"Concerten",thea:"Theater",film:"Film"};
+function nightItems(){
+  const sig=NIGHT.day+"|"+[...NIGHT.kinds].join()+"|"+S.hideV.size+"|"+S.hideC.size; if(sig===NIGHT.sig) return NIGHT.items;
+  const out=[]; EV.forEach(e=>{ if(e.endD!=null||e.time==null||!NIGHT.kinds.has(e.type)||hiddenLoc(e.v)) return; const v=V[e.v]; if(v.lat==null) return;
+    let s; if(e.d===NIGHT.day&&e.time>=240) s=e.time; else if(e.d===NIGHT.day+1&&e.time<240) s=e.time+1440; else return;   // na middernacht hoort bij de avond ervoor
+    const [x,y]=proj(v.lat,v.lon); out.push({e,s,en:s+Math.max(45,(endOf(e)??e.time+120)-e.time),x,y,ck:cityKey(v.city),city:v.city}) });
+  NIGHT.sig=sig; return NIGHT.items=out;
+}
+const nightClock=t=>hm(Math.round(t/5)*5);
+const nightDayLbl=d=>d===0?"Vandaag":d===1?"Morgen":(()=>{const x=dateOf(d); return WD[x.getDay()]+" "+x.getDate()})();
+function viewNight(){
+  if(NIGHT.t==null){const nm=Math.round(nowMin()/5)*5; NIGHT.t=NIGHT.day===0&&nm>=NIGHT_T0?nm:20*60+30}
+  const chip=(attr,val,on,lab,style="")=>`<button class="chip" ${attr}="${val}" aria-pressed="${on}"${style}>${lab}</button>`;
+  return `<div class="meta"><button data-view-go="list">‹ Agenda</button></div>
+    <div class="vhead"><h1>Nederland bij nacht</h1><div class="s">Waar gaat het licht aan? Schuif door de avond of laat hem afspelen. Tik op een stad om te zien wat er speelt.</div></div>
+    <div class="tnbar"><div class="chips">${[0,1,2,3,4,5,6].map(d=>chip("data-night-day",d,NIGHT.day===d,nightDayLbl(d))).join("")}</div></div>
+    <div class="chips tnkinds">${Object.keys(NIGHT_LBL).map(k=>chip("data-night-kind",k,NIGHT.kinds.has(k),NIGHT_LBL[k],` style="--acc:var(--${k})"`)).join("")}</div>
+    <div class="nightbox"><div class="nightmap"><canvas id="nightCv" role="img" aria-label="Kaart van Nederland met oplichtende podia"></canvas>
+      <div class="nightclock" aria-hidden="true"><b id="nightClock">${nightClock(NIGHT.t)}</b><span id="nightDay">${nightDayLbl(NIGHT.day)}</span></div></div>
+      <div class="nightctl"><button type="button" class="nightplay" id="nightPlay" aria-label="Afspelen of pauzeren"></button>
+        <input type="range" id="nightT" min="${NIGHT_T0}" max="${NIGHT_T1}" step="5" value="${Math.round(NIGHT.t/5)*5}" aria-label="Tijdstip"></div>
+      <div class="rcap" aria-live="polite"><span id="nightStats"></span></div></div>
+    <div class="chips nightcities" id="nightCities"></div>
+    <div id="nightList"></div>`;
+}
+function nightInit(){
+  if(!NL){ if(!nlLoad) nlLoad=fetch("nl.json").then(r=>{if(!r.ok) throw new Error("kaart"); return r.json()}).then(j=>{NL=j}).catch(()=>{nlLoad=null});
+    nlLoad.then(()=>{ if(S.view==="night"){ if(NL) nightUpdate(); else {const s=$("#nightStats"); if(s) s.textContent="De kaart kon niet laden. Controleer je verbinding."} } }); return }
+  nightUpdate();
+}
+function nightStop(){ NIGHT.play=false; cancelAnimationFrame(NIGHT.raf); const b=$("#nightPlay"); if(b) b.classList.remove("on") }
+function nightPlayToggle(){
+  if(NIGHT.play){nightStop(); nightUpdate(); return}
+  if(NIGHT.t>=NIGHT_T1-5) NIGHT.t=16*60;
+  NIGHT.play=true; NIGHT.prev=0; const b=$("#nightPlay"); if(b) b.classList.add("on");
+  const step=ts=>{ if(!NIGHT.play||S.view!=="night") return nightStop();
+    if(NIGHT.prev) NIGHT.t=Math.min(NIGHT_T1,NIGHT.t+(ts-NIGHT.prev)*.05);   // ±50 minuten per seconde: 16:00 tot 03:00 in ongeveer 13 seconden
+    NIGHT.prev=ts; const sl=$("#nightT"); if(sl) sl.value=Math.round(NIGHT.t/5)*5;
+    nightUpdate(true); if(NIGHT.t>=NIGHT_T1){nightStop(); nightUpdate(); return} NIGHT.raf=requestAnimationFrame(step) };
+  NIGHT.raf=requestAnimationFrame(step);
+}
+// Tekent de kaart en werkt klok, tellers, steden en de lijst bij. `licht`=true tijdens afspelen: dan de lijst niet steeds opnieuw opbouwen.
+function nightUpdate(licht){
+  const cv=$("#nightCv"); if(!cv||!NL) return;
+  const t=NIGHT.t, items=nightItems(), act=items.filter(i=>i.s<=t&&t<i.en);
+  // --- canvas ---
+  const cw=cv.clientWidth||340, dpr=Math.min(2,window.devicePixelRatio||1), W=Math.round(cw*dpr), H=Math.round(cw*NL.h/NL.w*dpr);
+  if(cv.width!==W||cv.height!==H){cv.width=W; cv.height=H}
+  const x=cv.getContext("2d"), k=W/NL.w, dusk=Math.max(0,Math.min(1,(t-16*60)/150)), mix=(a,b)=>a.map((v,i)=>Math.round(v+(b[i]-v)*dusk)), rgb=a=>`rgb(${a.join(",")})`;
+  if(!NIGHT.paths) NIGHT.paths={prov:NL.prov.map(p=>new Path2D(p.d)),nb:new Path2D(NL.nb),inner:new Path2D(NL.inner)};
+  x.setTransform(1,0,0,1,0,0); x.globalCompositeOperation="source-over"; x.fillStyle=rgb(mix([38,52,104],[9,12,30])); x.fillRect(0,0,W,H);
+  x.setTransform(k,0,0,k,0,0);
+  x.fillStyle=rgb(mix([46,58,108],[14,18,40])); x.fill(NIGHT.paths.nb);
+  x.fillStyle=rgb(mix([62,76,134],[24,30,62])); NIGHT.paths.prov.forEach(p=>x.fill(p));
+  x.strokeStyle=`rgba(255,255,255,${.1-.04*dusk})`; x.lineWidth=1.2; x.stroke(NIGHT.paths.inner);
+  // gloed per podium en soort
+  const by=new Map(); act.forEach(i=>{const key=i.e.v+"|"+i.e.type; let g=by.get(key); if(!g) by.set(key,g={x:i.x,y:i.y,n:0,a:0,c:NIGHT_COL[i.e.type]||NIGHT_COL.pop}); g.n++; g.a=Math.max(g.a,Math.min(1,(t-i.s+2)/12,(i.en-t+2)/12))});
+  x.globalCompositeOperation="lighter";
+  by.forEach(g=>{const r=20+9*Math.sqrt(g.n), gr=x.createRadialGradient(g.x,g.y,0,g.x,g.y,r), a=.2+.5*g.a;
+    gr.addColorStop(0,`rgba(${g.c.join(",")},${a})`); gr.addColorStop(.35,`rgba(${g.c.join(",")},${a*.45})`); gr.addColorStop(1,`rgba(${g.c.join(",")},0)`);
+    x.fillStyle=gr; x.beginPath(); x.arc(g.x,g.y,r,0,7); x.fill();
+    x.fillStyle=`rgba(255,246,220,${.55+.4*g.a})`; x.beginPath(); x.arc(g.x,g.y,2.2+Math.min(3,g.n*.5),0,7); x.fill()});
+  // ring waar net iets begint (eerste 25 minuten)
+  items.forEach(i=>{const d=t-i.s; if(d<0||d>25) return; const c=NIGHT_COL[i.e.type]||NIGHT_COL.pop; x.strokeStyle=`rgba(${c.join(",")},${.8*(1-d/25)})`; x.lineWidth=2.5; x.beginPath(); x.arc(i.x,i.y,8+d*1.8,0,7); x.stroke()});
+  x.globalCompositeOperation="source-over";
+  // jij
+  const [hx,hy]=proj(S.homeXY[0],S.homeXY[1]); x.strokeStyle="#fff"; x.lineWidth=2.5; x.beginPath(); x.arc(hx,hy,7,0,7); x.stroke();
+  // steden: de drukste zes krijgen een naam op de kaart
+  const cities=new Map(); act.forEach(i=>{let c=cities.get(i.ck); if(!c) cities.set(i.ck,c={ck:i.ck,name:i.city,n:0,x:0,y:0}); c.n++; c.x+=i.x; c.y+=i.y});
+  const top=[...cities.values()].sort((a,b)=>b.n-a.n||a.name.localeCompare(b.name,"nl"));
+  x.font=`700 ${Math.round(26)}px Archivo, Arial, sans-serif`; x.textAlign="center"; x.lineJoin="round";
+  top.slice(0,6).forEach(c=>{const cx=c.x/c.n, cy=c.y/c.n-30; x.strokeStyle="rgba(9,12,30,.85)"; x.lineWidth=6; x.strokeText(c.name,cx,cy); x.fillStyle=NIGHT.city===c.ck?"#FFB829":"rgba(255,255,255,.92)"; x.fillText(c.name,cx,cy)});
+  // --- tekst ---
+  const ck=$("#nightClock"); if(ck) ck.textContent=nightClock(t);
+  const st=$("#nightStats"), venues=new Set(act.map(i=>i.e.v)).size;
+  if(st) st.innerHTML=act.length?`<b>${nf(act.length)}</b> ${act.length===1?"ding":"dingen"} bezig op <b>${nf(venues)}</b> ${venues===1?"plek":"plekken"} in ${cities.size} ${cities.size===1?"stad":"steden"}`:"Op dit tijdstip is er niets bezig.";
+  if(licht) return;
+  if(NIGHT.city&&!cities.has(NIGHT.city)&&!items.some(i=>i.ck===NIGHT.city)) NIGHT.city=null;
+  const cc=$("#nightCities"); if(cc) cc.innerHTML=top.slice(0,10).map(c=>`<button class="chip" data-night-city="${esc(c.ck)}" aria-pressed="${NIGHT.city===c.ck}">${esc(c.name)} <small>${c.n}</small></button>`).join("");
+  const nl=$("#nightList"); if(!nl) return;
+  if(!NIGHT.city){nl.innerHTML=top.length?"":`<div class="empty"><strong>Het is nog donker</strong>Schuif naar een later tijdstip of kies een andere dag.</div>`; return}
+  const here=items.filter(i=>i.ck===NIGHT.city&&i.en>t&&i.s<=t+60).sort((a,b)=>a.s-b.s), nm=(here[0]||items.find(i=>i.ck===NIGHT.city)||{}).city||"";
+  nl.innerHTML=`<h2 class="dh">${esc(nm)} om ${nightClock(t)}</h2>`+(here.length?here.slice(0,40).map(i=>evRow(i.e,{kind:true,showDate:NIGHT.day!==0,noNear:true,reason:i.s<=t?"Bezig tot ongeveer "+hm(i.en):"Begint om "+hm(i.s)})).join(""):`<p class="s">Hier is op dit tijdstip niets bezig en begint het komende uur niets.</p>`);
+}
+function nightPick(ev){
+  const cv=$("#nightCv"); if(!cv||!NL) return; const r=cv.getBoundingClientRect(), px=(ev.clientX-r.left)/r.width*NL.w, py=(ev.clientY-r.top)/r.height*NL.h, t=NIGHT.t;
+  let best=null; nightItems().forEach(i=>{ if(!(i.s<=t&&t<i.en)) return; const d=Math.hypot(i.x-px,i.y-py); if(d<70&&(!best||d<best.d)) best={d,ck:i.ck} });
+  NIGHT.city=best?best.ck:null; nightUpdate(); if(best){const l=$("#nightList"); if(l&&l.firstElementChild) l.firstElementChild.scrollIntoView({block:"nearest",behavior:"smooth"})}
+}
 /* ---------- RENDER ---------- */
 // Gemarkeerde datum in het midden van de rij zetten (na wisselen van weergave of kiezen in de Kalender)
 const showDay=()=>{const dp=$('#dates .day[aria-pressed="true"]:not(.all)'), dd=$("#dates"); if(dp&&dd.offsetParent){const a=dp.getBoundingClientRect(), b=dd.getBoundingClientRect(); if(a.left<b.left||a.right>b.right) dd.scrollLeft+=a.left-b.left-(dd.clientWidth-dp.offsetWidth)/2}};
@@ -480,7 +574,7 @@ function evRow(e,o={}){
       ${e.support.length?`<div class="s">met ${esc(e.support.join(", "))}</div>`:(e.title!==e.artist&&!e.title.startsWith(e.artist+" +")?`<div class="s">${esc(e.title.slice(e.artist.length).replace(/^\s*-\s*/,""))}</div>`:"")}
       <div class="v">${venueLine(e)}</div>
       <div class="tt">${tLong(e.v)}</div>
-      ${kind?`<span class="tag kind">${KIND[e.type]}</span>`:""}${kind&&e.genre===KIND[e.type]?"":`<span class="tag">${esc(e.genre)}</span>`}${e.price!=null?`<span class="tag price${e.price===0?" free":""}">${priceTxt(e.price)}</span>`:""}${GO[e.id]?'<span class="tag going">✓ Ik ga</span>':""}${e.status==="sold"?'<span class="tag sold">Uitverkocht</span>':""}${o.reason?`<div class="s${o.warn?" warn":""}" style="margin-top:4px">${esc(o.reason)}</div>`:""}${nr?`<div class="s nearer">Ook dichterbij: ${esc(V[nr.v].city)}, ${short(nr)} (${tShort(nr.v)})</div>`:""}</div>
+      ${kind?`<span class="tag kind">${KIND[e.type]}</span>`:""}${kind&&e.genre===KIND[e.type]?"":`<span class="tag">${esc(e.genre)}</span>`}${e.price!=null?`<span class="tag price${e.price===0?" free":""}">${priceTxt(e.price)}</span>`:""}${GO[e.id]?'<span class="tag going">✓ Ik ga</span>':""}${e.status==="sold"?'<span class="tag sold">Uitverkocht</span>':""}${o.reason?`<div class="s${o.warn?" warn":""}${o.cls?" "+o.cls:""}" style="margin-top:4px">${esc(o.reason)}</div>`:""}${nr?`<div class="s nearer">Ook dichterbij: ${esc(V[nr.v].city)}, ${short(nr)} (${tShort(nr.v)})</div>`:""}</div>
     <button class="star" data-fav="${e.ak}" data-name="${esc(e.artist)}" aria-pressed="${S.fav.has(e.ak)}" aria-label="Volg ${esc(e.artist)}">★</button>
   </div>`;
 }
@@ -526,7 +620,7 @@ const LIM={n:300,sig:""};
 function quickRow(){
   const n=filtered(true,false,false,true).reduce((c,e)=>c+(e.age<=7?1:0),0);
   const lc=S.type==="expo"?lastChance().length:0;
-  return `<div class="qrow"><button class="qpill" data-surprise type="button">${ICO.dice}Verras me</button>${lc?`<button class="qpill" data-view-go="last" type="button">${ICO.spark}Laatste kans <small>${nf(lc)}</small></button>`:""}<button class="qpill" data-view-go="cal" type="button">${ICO.cal}Kalender</button>${n?`<button class="qpill" data-view-go="new" type="button">${ICO.spark}Nieuw <small>${nf(n)}</small></button>`:""}</div>`;
+  return `<div class="qrow"><button class="qpill" data-surprise type="button">${ICO.dice}Verras me</button><button class="qpill" data-view-go="night" type="button"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.500 8.500 0 0 1 9.500 4a8.500 8.500 0 1 0 10.500 10.500z"/></svg>Bij nacht</button>${lc?`<button class="qpill" data-view-go="last" type="button">${ICO.spark}Laatste kans <small>${nf(lc)}</small></button>`:""}<button class="qpill" data-view-go="cal" type="button">${ICO.cal}Kalender</button>${n?`<button class="qpill" data-view-go="new" type="button">${ICO.spark}Nieuw <small>${nf(n)}</small></button>`:""}</div>`;
 }
 /* Verras me: willekeurig iets in de buurt, vanavond; anders dit weekend; anders de komende twee weken */
 const SURP={seen:new Set(),last:null};
@@ -625,7 +719,7 @@ function viewList(){
   return h+srcNote();
 }
 /* ---------- VANAVOND IN DE BUURT (alle soorten samen) ---------- */
-const TN={when:"today",max:[15,30,45].includes(store.get("pr_tnmax",30))?store.get("pr_tnmax",30):30,kinds:new Set(Object.keys(KIND)),radar:store.get("pr_tnradar",true)!==false,sel:null};
+const TN={when:"today",max:[15,30,45].includes(store.get("pr_tnmax",30))?store.get("pr_tnmax",30):30,kinds:new Set(Object.keys(KIND)),radar:store.get("pr_tnradar",true)!==false,sel:null,haal:false,dep:0,kompas:false};
 const nowMin=()=>{const n=new Date();return n.getHours()*60+n.getMinutes()};
 // Dit weekend: vrijdag t/m zondag; is het al vr/za/zo, dan vanaf vandaag
 const weekend=()=>{const wd=today.getDay(); return wd===0?[0,0]:wd>=5?[0,7-wd]:[5-wd,7-wd]};
@@ -652,7 +746,7 @@ function tonightList(when=TN.when,ignoreQ){
 const RAD={R:150,C:160,T:6,in:.14,out:.92};
 function radarDots(timed){
   const h=S.homeXY, by=new Map();
-  timed.forEach(e=>{const v=V[e.v]; if(v.lat==null) return; let g=by.get(e.v); if(!g) by.set(e.v,g={vid:e.v,n:0,types:{}}); g.n++; g.types[e.type]=(g.types[e.type]||0)+1});
+  timed.forEach(e=>{const v=V[e.v]; if(v.lat==null) return; let g=by.get(e.v); if(!g) by.set(e.v,g={vid:e.v,n:0,types:{},evs:[]}); g.evs.push(e); g.n++; g.types[e.type]=(g.types[e.type]||0)+1});
   const dots=[...by.values()].map(g=>{const v=V[g.vid], c=travel(g.vid).car??TN.max, rd=Math.PI/180;
     const p1=h[0]*rd, p2=v.lat*rd, dl=(v.lon-h[1])*rd;
     const b=Math.atan2(Math.sin(dl)*Math.cos(p2),Math.cos(p1)*Math.sin(p2)-Math.sin(p1)*Math.cos(p2)*Math.cos(dl));  // 0 = noord, met de klok mee
@@ -669,6 +763,70 @@ function radarDots(timed){
     if(!moved) break}
   return dots;
 }
+/* ---------- HAAL IK HET NOG? (radar en lijst van vandaag) ----------
+   Als je over `dep` minuten vertrekt: ben je er voor het begint? Reistijd = de schatting van travel() (lopen/fietsen/auto).
+   ok = minstens 10 min voor aanvang binnen, krap = tot 10 min ervoor of erna, laat = begin gemist maar nog minstens een
+   halfuur te zien, mis = niet meer de moeite. Bij concerten met een bekende begintijd van de hoofdact telt die. */
+const HAALCOL={ok:"#5AD69D",krap:"#FFC043",laat:"#FF7A6B",mis:"#69708F"}, HAALRANK={ok:0,krap:1,laat:2,mis:3};
+function haal(e,dep=TN.dep){
+  if(e.d!==0||e.time==null||e.endD!=null) return null;
+  const tr=travel(e.v); if(tr.car==null) return null;
+  const start=e.start!=null&&e.start>e.time?e.start:e.time, end=endOf(e)??e.time+120, arr=nowMin()+dep+tMin(tr), marge=start-arr;
+  const k=marge>=10?"ok":marge>=-10?"krap":arr<=end-30?"laat":"mis", wat=e.start!=null&&e.start>e.time?"de hoofdact":"aanvang";
+  const txt=k==="ok"?`Haal je: je bent er ${hm(arr)}, ${marge} min voor ${wat}`:k==="krap"?`Krap: je bent er ${hm(arr)}, ${marge>=0?marge+" min voor":(-marge)+" min na"} ${wat}`
+    :k==="laat"?`Begin gemist: je bent er ${hm(arr)}, ${-marge} min na ${wat}`:"Niet meer te halen";
+  return {k,txt,arr,marge};
+}
+const haalDot=(g,dep)=>g.evs.map(e=>haal(e,dep)).filter(Boolean).sort((a,b)=>HAALRANK[a.k]-HAALRANK[b.k]||b.marge-a.marge)[0]||null;
+const depTxt=()=>TN.dep?`over <b>${TN.dep} min</b> (${hm(nowMin()+TN.dep)})`:"<b>nu</b>";
+
+/* ---------- KOMPAS: de radar draait mee met je telefoon ----------
+   De stippen staan al op hun echte kompasrichting; met het kompas van de telefoon draait de hele schijf zo dat 'boven'
+   de kant is waar je heen wijst. Wat binnen de kegel (±16°) ligt, licht op en staat in het onderschrift. Alleen CSS-variabele
+   --hd op .radar verandert; er wordt niets opnieuw getekend. iPhone vraagt één keer toestemming (moet vanuit een tik). */
+const KP={on:false,cur:0,target:null,abs:false,raf:0,dots:[],aim:null,last:0,got:false,timer:0};
+const kompasKan=()=>typeof DeviceOrientationEvent!=="undefined"&&(navigator.maxTouchPoints||0)>0;
+function kompasEvent(ev){
+  let hd=null;
+  if(typeof ev.webkitCompassHeading==="number"&&isFinite(ev.webkitCompassHeading)) hd=ev.webkitCompassHeading;       // iPhone: graden vanaf noord, met de klok mee
+  else if((ev.absolute||ev.type==="deviceorientationabsolute")&&typeof ev.alpha==="number"&&isFinite(ev.alpha)){ KP.abs=true; hd=360-ev.alpha }
+  else return;                                                                                                       // relatieve alpha (zonder noorden) zegt niets
+  if(ev.type==="deviceorientation"&&KP.abs&&typeof ev.webkitCompassHeading!=="number") return;
+  const so=(screen.orientation&&screen.orientation.angle)||0; KP.target=((hd+so)%360+360)%360; KP.got=true;
+}
+function kompasLoop(){
+  if(!KP.on) return; KP.raf=requestAnimationFrame(kompasLoop);
+  if(KP.target==null) return;
+  const d=((KP.target-KP.cur+540)%360)-180; if(Math.abs(d)>.05) KP.cur=(KP.cur+d*.22+360)%360;
+  const el=document.querySelector(".radar.kompas"); if(!el) return;
+  el.style.setProperty("--hd",KP.cur.toFixed(1)+"deg");
+  KP.last=(KP.last+1)%8; if(KP.last!==1) return;                                                              // niet elk beeldje: ongeveer 8 keer per seconde
+  // welke stip ligt recht voor je? (kleinste hoek met de kijkrichting, binnen 16 graden; bij gelijke hoek de dichtste)
+  let best=null; KP.dots.forEach(g=>{const b=(Math.atan2(g.x,-g.y)*180/Math.PI+360)%360, rel=Math.abs(((b-KP.cur+540)%360)-180); if(rel<=16&&(!best||rel+g.car*.15<best.s)) best={g,s:rel+g.car*.15}});
+  const vid=best?best.g.vid:null; if(vid===KP.aim) return; KP.aim=vid;
+  el.querySelectorAll(".rdot.aim").forEach(b=>b.classList.remove("aim"));
+  if(vid){const b=el.querySelector(`.rdot[data-rv="${vid}"]`); if(b) b.classList.add("aim")}
+  const cap=document.getElementById("kpCap"); if(cap) cap.innerHTML=kompasCap(best?best.g:null);
+}
+function kompasCap(g){
+  if(!g) return `<span>Draai je telefoon: wat recht voor je ligt, licht op.${S.home==="__geo"?"":" De richting klopt pas echt met ‘Mijn locatie’ aan."}</span>`;
+  const e=[...g.evs].sort((a,b)=>a.d-b.d||(a.time??0)-(b.time??0))[0], v=V[g.vid];
+  return `<span>Recht voor je: <b>${esc(v.name)}</b>, ${tShort(g.vid)}. ${esc(e.artist)}${e.time!=null?" om "+hm(e.time):""}${g.n>1?" en nog "+(g.n-1):""}.</span><button type="button" data-rv="${g.vid}">Toon</button>`;
+}
+function kompasStop(){ if(!KP.on&&!TN.kompas) return; KP.on=false; TN.kompas=false; cancelAnimationFrame(KP.raf); clearTimeout(KP.timer);
+  window.removeEventListener("deviceorientationabsolute",kompasEvent,true); window.removeEventListener("deviceorientation",kompasEvent,true) }
+async function kompasToggle(){
+  if(TN.kompas){kompasStop(); render(); return}
+  try{ if(typeof DeviceOrientationEvent.requestPermission==="function"){ const r=await DeviceOrientationEvent.requestPermission(); if(r!=="granted"){toast("Geen toestemming voor het kompas"); return} } }
+  catch{ toast("Het kompas werkt hier niet"); return }
+  TN.kompas=true; TN.radar=true; TN.sel=null; KP.on=true; KP.got=false; KP.abs=false; KP.target=null; KP.aim=null;
+  window.addEventListener("deviceorientationabsolute",kompasEvent,true); window.addEventListener("deviceorientation",kompasEvent,true);
+  cancelAnimationFrame(KP.raf); KP.raf=requestAnimationFrame(kompasLoop);
+  clearTimeout(KP.timer); KP.timer=setTimeout(()=>{ if(KP.on&&!KP.got){kompasStop(); render(); toast("Je toestel geeft geen kompasrichting door")} },4000);
+  render();
+  // het kompas klopt alleen vanaf waar je staat: vraag de locatie als die nog niet aan staat
+  if(S.home!=="__geo"&&navigator.geolocation) $("#geoBtn").click();
+}
 function radarHtml(dots,wk){
   const {R,C,T}=RAD, pc=u=>((C+u*R)/3.2).toFixed(2), t0=-((Date.now()%(T*1000))/1000).toFixed(2);
   const fr=[1/3,2/3,1], rr=f=>(RAD.in+(RAD.out-RAD.in)*f)*R;
@@ -681,15 +839,20 @@ function radarHtml(dots,wk){
     let y=cy+g.px/2+3, bx=[x-w/2,y,x+w/2,y+14];
     if(g.vid!==TN.sel){ if(nl>=9) return; if(!vrij(bx)){y=cy-g.px/2-17; bx=[x-w/2,y,x+w/2,y+14]; if(!vrij(bx)) return} }
     boxes.push(bx); nl++; labs+=`<span class="rlab${g.vid===TN.sel?" on":""}" style="left:${(x/3.2).toFixed(2)}%;top:${(y/3.2).toFixed(2)}%" aria-hidden="true">${esc(nm)}</span>`});
-  const btns=dots.map(g=>{const v=V[g.vid], a=(Math.atan2(g.x,-g.y)/(2*Math.PI)+1)%1;
-    return `<button class="rdot" data-rv="${g.vid}" aria-pressed="${g.vid===TN.sel}" style="left:${pc(g.x)}%;top:${pc(g.y)}%;--s:${g.px}px;--c:var(--${g.type});--d:${(t0+a*T-T).toFixed(2)}s" aria-label="${esc(v.name+", "+v.city+": "+g.n+(g.n===1?" ding":" dingen")+", ± "+g.car+" min rijden")}">${g.n>1?g.n:""}</button>`}).join("");
+  const btns=dots.map(g=>{const v=V[g.vid], a=(Math.atan2(g.x,-g.y)/(2*Math.PI)+1)%1, hs=TN.haal?haalDot(g,TN.dep):null;
+    return `<button class="rdot" data-rv="${g.vid}" aria-pressed="${g.vid===TN.sel}" style="left:${pc(g.x)}%;top:${pc(g.y)}%;--s:${g.px}px;--c:${hs?HAALCOL[hs.k]:TN.haal?HAALCOL.mis:`var(--${g.type})`};--d:${(t0+a*T-T).toFixed(2)}s" aria-label="${esc(v.name+", "+v.city+": "+g.n+(g.n===1?" ding":" dingen")+", ± "+g.car+" min rijden"+(hs?". "+hs.txt:""))}">${g.n>1?g.n:""}</button>`}).join("");
   const sel=dots.find(g=>g.vid===TN.sel), home=S.home==="__geo"?"jouw locatie":S.home;
   const cap=sel?`<span><b>${esc(V[sel.vid].name)}</b>, ${esc(V[sel.vid].city)} · ± ${sel.car} min · ${sel.n} ${wk?"dit weekend":"vandaag"}</span><button type="button" data-rv="">Alle stippen</button>`
+    :TN.kompas?kompasCap(null)
+    :TN.haal?`<span><i class="hk" style="background:${HAALCOL.ok}"></i>haal je <i class="hk" style="background:${HAALCOL.krap}"></i>krap <i class="hk" style="background:${HAALCOL.laat}"></i>begin gemist <i class="hk" style="background:${HAALCOL.mis}"></i>niet meer. Reistijd is een schatting.</span>`
     :`<span>${esc(cap1(home))} in het midden, elke ring is ${Math.round(TN.max/3)} min rijden. <b>Tik op een stip</b> om te zien wat er speelt.</span>`;
-  return `<div class="radarbox"><div class="radar${sel?" picked":""}" role="group" aria-label="Radar: ${dots.length} ${dots.length===1?"plek":"plekken"} binnen ${TN.max} minuten rijden" style="--t0:${t0}s">
-    <svg viewBox="0 0 320 320" aria-hidden="true">${fr.map(f=>`<circle cx="${C}" cy="${C}" r="${rr(f).toFixed(1)}"/>`).join("")}<line x1="${C}" y1="${C-rr(1)}" x2="${C}" y2="${C+rr(1)}"/><line x1="${C-rr(1)}" y1="${C}" x2="${C+rr(1)}" y2="${C}"/>
-      ${fr.map(f=>`<text x="${C}" y="${(C+rr(f)-4).toFixed(1)}">${Math.round(TN.max*f)} min</text>`).join("")}<text class="kmp" x="${C}" y="14">N</text><text class="kmp" x="${C}" y="316">Z</text><text class="kmp" x="312" y="${C+4}">O</text><text class="kmp" x="8" y="${C+4}">W</text></svg>
-    <div class="sweep" aria-hidden="true"></div><i class="rhome" aria-hidden="true"></i>${btns}${labs}</div><div class="rcap" aria-live="polite">${cap}</div></div>`;
+  KP.dots=dots;
+  return `<div class="radarbox"><div class="radar${sel?" picked":""}${TN.kompas?" kompas":""}" role="group" aria-label="Radar: ${dots.length} ${dots.length===1?"plek":"plekken"} binnen ${TN.max} minuten rijden" style="--t0:${t0}s;--hd:${TN.kompas?KP.cur.toFixed(1):0}deg">
+    <svg viewBox="0 0 320 320" aria-hidden="true">${fr.map(f=>`<circle cx="${C}" cy="${C}" r="${rr(f).toFixed(1)}"/>`).join("")}<g class="rotg"><line x1="${C}" y1="${C-rr(1)}" x2="${C}" y2="${C+rr(1)}"/><line x1="${C-rr(1)}" y1="${C}" x2="${C+rr(1)}" y2="${C}"/><text class="kmp" x="${C}" y="14">N</text><text class="kmp" x="${C}" y="316">Z</text><text class="kmp" x="312" y="${C+4}">O</text><text class="kmp" x="8" y="${C+4}">W</text></g>
+      ${fr.map(f=>`<text x="${C}" y="${(C+rr(f)-4).toFixed(1)}">${Math.round(TN.max*f)} min</text>`).join("")}</svg>
+    <div class="sweep" aria-hidden="true"></div><i class="rhome" aria-hidden="true"></i><div class="rrot">${btns}${labs}</div>${TN.kompas?'<i class="kneedle" aria-hidden="true"></i>':""}</div>
+    ${TN.haal&&!wk?`<label class="depbar">Ik vertrek <span id="depTxt">${depTxt()}</span><input type="range" id="tnDep" min="0" max="120" step="5" value="${TN.dep}" aria-label="Vertrek over hoeveel minuten"></label>`:""}
+    <div class="rcap" id="kpCap" aria-live="${TN.kompas?"off":"polite"}">${cap}</div></div>`;
 }
 const cap1=t=>t.charAt(0).toUpperCase()+t.slice(1);
 function viewTonight(){
@@ -703,15 +866,15 @@ function viewTonight(){
     <div class="vhead"><h1>${wk?"Dit weekend":"Vanavond"} in de buurt</h1><div class="s">Alles binnen ${TN.max} min rijden vanaf ${esc(home)}, over alle soorten heen${wk?"":", vanaf nu"}.</div></div>
     <div class="tnbar"><div class="chips">${chip("data-tn-when","today",!wk,"Vandaag")+chip("data-tn-when","weekend",wk,"Dit weekend")}</div>
     <div class="chips">${[15,30,45].map(m=>chip("data-tn-max",m,TN.max===m,m+" min")).join("")}</div>
-    <div class="chips">${chip("data-tn-radar","1",TN.radar,"Radar")}</div></div>
+    <div class="chips">${chip("data-tn-radar","1",TN.radar,"Radar")}${wk?"":chip("data-tn-haal","1",TN.haal,"Haal ik het?")}${kompasKan()?chip("data-tn-kompas","1",TN.kompas,"Kompas"):""}</div></div>
     <div class="chips tnkinds">${Object.entries(KIND).map(([k,l])=>chip("data-tn-kind",k,TN.kinds.has(k),l,` style="--acc:var(--${k})"`)).join("")}</div>
     ${dots.length?radarHtml(dots,wk):""}
     <div class="meta"><span>${TN.sel?`Alleen ${esc(V[TN.sel].name)}: `:""}${timed.length} met een tijd${period.length&&!TN.sel?`, ${period.length} doorlopend`:""}${hidNote()}${qs?` voor “${esc(qs)}”`:""}</span>${qs?'<button id="tnClearQ">Zoekterm wissen</button>':TN.sel?'<button data-rv="">Toon alles</button>':""}</div>`;
   if(!timed.length&&!period.length) return h+`<div class="empty"><strong>Niets gevonden</strong>Niets meer binnen ${TN.max} min ${wk?"dit weekend":"vandaag"}${qs?` voor “${esc(qs)}”`:""}. ${qs?"Wis de zoekterm of kies":"Kies"} een grotere afstand${wk?"":" of Dit weekend"}.${qs?'<br><button class="btn ghost" id="tnClearQ" style="display:inline-flex;flex:0">Zoekterm wissen</button>':""}</div>`;
   let cur=null;
   timed.slice(0,250).forEach(e=>{ if(wk&&e.d!==cur){cur=e.d;h+=`<h2 class="dh">${dayLabel(e.d)}</h2>`}
-    const busy=e.d===0&&e.time!=null&&e.time<=nm;
-    h+=evRow(e,{kind:true,reason:busy?"Al begonnen, nog bezig":""}) });
+    const busy=e.d===0&&e.time!=null&&e.time<=nm, hs=TN.haal&&!wk?haal(e):null;
+    h+=evRow(e,{kind:true,reason:hs?hs.txt:busy?"Al begonnen, nog bezig":"",cls:hs?"haal-"+hs.k:""}) });
   if(timed.length>250) h+=`<p class="note">De eerste 250 van ${timed.length} getoond. Kies een kleinere afstand of zet soorten uit.</p>`;
   if(period.length&&!TN.sel) h+=`<details class="tnper"${timed.length?"":" open"}><summary>Tentoonstellingen en festivals die nu lopen <small>${period.length}</small></summary><p class="s">Check de openingstijden op de site; musea zijn 's avonds meestal dicht.</p>${period.slice(0,150).map(e=>evRow(e,{kind:true})).join("")}</details>`;
   return h;
@@ -934,20 +1097,22 @@ function setupMap(){
 }
 
 function render(){
+  if(S.view!=="tonight"&&(TN.kompas||KP.on)) kompasStop();   // het kompas hoort alleen bij de radar
   if(!S.q.trim()) S.qAll=true;
   ["thea","film","expo","fest","kids"].forEach(t=>document.body.classList.toggle(t,S.type===t));
   document.querySelectorAll(".seg [data-type]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.type===S.type));
-  const navV=["tonight","cal","new","last"].includes(S.view)?"list":S.view;
+  const navV=["tonight","cal","new","last","night"].includes(S.view)?"list":S.view;
   document.querySelectorAll("nav.tabs button").forEach(b=>b.dataset.view===navV?b.setAttribute("aria-current","page"):b.removeAttribute("aria-current"));
   const n=fcount(); $("#fcount").hidden=!n; $("#fcount").textContent=n;
   $("#newDot").hidden=!EV.some(e=>NEW.has(e.id)&&(isFav(e)||alarmHit(e)||isFavV(e)));
   document.body.classList.toggle("venues",S.view==="venues");
   document.body.classList.toggle("tonight",S.view==="tonight");
   document.body.classList.toggle("favview",S.view==="fav");
-  $("#dates").style.display=["fav","venues","tonight","cal","new","last"].includes(S.view)?"none":"flex";
+  $("#dates").style.display=["fav","venues","tonight","cal","new","last","night"].includes(S.view)?"none":"flex";
   renderDates();
-  $("#main").innerHTML=staleBanner()+(S.view==="list"?viewList():S.view==="grid"?viewGrid():S.view==="venues"?viewVenues():S.view==="tonight"?viewTonight():S.view==="cal"?viewCal():S.view==="new"?viewNew():S.view==="last"?viewLast():viewFav());
+  $("#main").innerHTML=staleBanner()+(S.view==="list"?viewList():S.view==="grid"?viewGrid():S.view==="venues"?viewVenues():S.view==="tonight"?viewTonight():S.view==="cal"?viewCal():S.view==="new"?viewNew():S.view==="last"?viewLast():S.view==="night"?viewNight():viewFav());
   if(S.view==="fav") setupFav();
+  if(S.view==="night") nightInit(); else if(NIGHT.play) nightStop();
   if(S.view==="venues"&&!S.venuePage&&S.vmode==="map") drawMap();
   // Blokkenschema van vandaag: schuif naar nu (een klein uur terug in beeld), niet naar de ochtend
   const gw=S.view==="grid"&&$(".grid-wrap[data-nu]"); if(gw) gw.scrollLeft=Math.max(0,+gw.dataset.nu-72);
@@ -1215,9 +1380,16 @@ document.addEventListener("click",e=>{
   const fl=e.target.closest("[data-film]"); if(fl&&!e.target.closest("[data-ev]")){openFilm(fl.dataset.film,+fl.dataset.fday||0); return}
   const tm0=e.target.closest("[data-tourmore]"); if(tm0){const b=tm0.closest(".tour"); if(b) b.classList.add("all"); tm0.remove(); return}
   const go=e.target.closest("[data-view-go]"); if(go){if(go.classList.contains("tncta")) TN.when="today"; if(go.dataset.viewGo==="cal"){ if(S.month) S.calMonth=S.month; else if(S.day>=0) S.calMonth=mKey(dateOf(S.day)) } S.view=go.dataset.viewGo; render(); try{window.scrollTo(0,0)}catch{} showDay(); return}
-  const tw=e.target.closest("[data-tn-when]"); if(tw){TN.when=tw.dataset.tnWhen; render(); return}
+  const tw=e.target.closest("[data-tn-when]"); if(tw){TN.when=tw.dataset.tnWhen; if(TN.when!=="today") TN.haal=false; render(); return}
   const tm=e.target.closest("[data-tn-max]"); if(tm){TN.max=+tm.dataset.tnMax; store.set("pr_tnmax",TN.max); render(); return}
-  const rd=e.target.closest("[data-tn-radar]"); if(rd){TN.radar=!TN.radar; TN.sel=null; store.set("pr_tnradar",TN.radar); render(); return}
+  const rd=e.target.closest("[data-tn-radar]"); if(rd){TN.radar=!TN.radar; TN.sel=null; if(!TN.radar) kompasStop(); store.set("pr_tnradar",TN.radar); render(); return}
+  if(e.target.closest("[data-tn-haal]")){TN.haal=!TN.haal; if(TN.haal){TN.radar=true; TN.when="today"} else TN.dep=0; render(); return}
+  if(e.target.closest("[data-tn-kompas]")){kompasToggle(); return}
+  const nd=e.target.closest("[data-night-day]"); if(nd){nightStop(); NIGHT.day=+nd.dataset.nightDay; NIGHT.city=null; if(NIGHT.day!==0&&NIGHT.t<16*60) NIGHT.t=20*60+30; render(); return}
+  const nk=e.target.closest("[data-night-kind]"); if(nk){const k=nk.dataset.nightKind; NIGHT.kinds.has(k)?NIGHT.kinds.delete(k):NIGHT.kinds.add(k); if(!NIGHT.kinds.size) NIGHT.kinds.add(k); render(); return}
+  const nc=e.target.closest("[data-night-city]"); if(nc){NIGHT.city=NIGHT.city===nc.dataset.nightCity?null:nc.dataset.nightCity; nightUpdate(); return}
+  if(e.target.closest("#nightPlay")){nightPlayToggle(); return}
+  if(e.target.id==="nightCv"){nightPick(e); return}
   // Stip op de radar: dat podium kiezen (nog een tik, of 'Alle stippen', zet het weer uit); de pagina blijft staan waar hij stond
   const rv=e.target.closest("[data-rv]"); if(rv){const id=rv.dataset.rv, kb=rv.matches(":focus-visible"), y=scrollY; TN.sel=id&&TN.sel!==id?id:null; render(); try{window.scrollTo(0,y)}catch{}
     const c=kb&&(id&&document.querySelector(`.rdot[data-rv="${id}"]`)||document.querySelector(".rdot")); if(c) c.focus({preventScroll:true}); return}
@@ -1288,6 +1460,12 @@ document.addEventListener("wheel",e=>{
 },{passive:false});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheets();if(e.key==="Enter"&&e.target.id==="q")e.target.blur();if(e.key==="Enter"&&e.target.matches(".ev[data-ev]"))openDetail(e.target.dataset.ev);if(e.key==="Enter"&&e.target.matches(".ev[data-film]"))openFilm(e.target.dataset.film,+e.target.dataset.fday||0);if(e.key==="Enter"&&e.target.matches("[data-venue]"))e.target.click()});
 document.querySelectorAll(".seg [data-type]").forEach(b=>b.onclick=()=>{S.type=b.dataset.type;S.genre.clear();S.venue="";S.month="";if(S.q.trim())S.qAll=false;if(S.view!=="grid")S.day=-1;render()});
+// Schuif 'Ik vertrek over …': tijdens het schuiven alleen de stippen en de tekst bijwerken, bij loslaten ook de lijst
+document.addEventListener("input",e=>{ if(e.target.id==="nightT"){nightStop(); NIGHT.t=+e.target.value||NIGHT_T0; nightUpdate(); return}
+  if(e.target.id!=="tnDep") return; TN.dep=+e.target.value||0;
+  const t=$("#depTxt"); if(t) t.innerHTML=depTxt();
+  KP.dots.forEach(g=>{const b=document.querySelector(`.rdot[data-rv="${g.vid}"]`), hs=haalDot(g,TN.dep); if(b) b.style.setProperty("--c",hs?HAALCOL[hs.k]:HAALCOL.mis)}) });
+document.addEventListener("change",e=>{ if(e.target.id!=="tnDep") return; const y=scrollY; render(); try{window.scrollTo(0,y)}catch{} const sl=$("#tnDep"); if(sl) sl.focus({preventScroll:true}) });
 let qt;$("#q").oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{S.q=e.target.value;render()},150)};
 
 /* Kop inklappen bij naar beneden scrollen: alleen de datumrij blijft staan (of niets, als die er niet is); een stukje omhoog haalt alles terug */

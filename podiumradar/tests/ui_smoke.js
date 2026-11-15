@@ -270,6 +270,60 @@ const UPD = nlMs(real.updated);
     await p.context().close(); appVer = 1;
   }
 
+  // 12. 'Haal ik het nog?', de kompas-radar en Nederland bij nacht (eigen testgegevens, vaste klok op zondagavond 19:00)
+  {
+    const vids = Object.keys(real.venues), vT = vids.find(id => real.venues[id].city === 'Tilburg' && real.venues[id].type === 'pop' && real.venues[id].lat != null);
+    const vA = vids.find(id => real.venues[id].city === 'Amsterdam' && real.venues[id].type === 'pop' && real.venues[id].lat != null);
+    dataOverride = { updated: real.updated, venues: real.venues, events: [
+      { id: 'h1', v: vT, date: '2026-11-15', time: '20:30', title: 'Ruim Op Tijd', url: 'https://voorbeeld.test/h1', genre: 'Rock', first_seen: '2026-11-01' },
+      { id: 'h2', v: vA, date: '2026-11-15', time: '21:00', title: 'Hoofdstad Band', url: 'https://voorbeeld.test/h2', genre: 'Rock', first_seen: '2026-11-01' },
+      { id: 'h3', v: vA, date: '2026-11-16', time: '00:30', title: 'Nachtprogramma', url: 'https://voorbeeld.test/h3', genre: 'Dance', first_seen: '2026-11-01' }] };
+    p = await newPage({ hasTouch: true });
+    await p.context().grantPermissions(['accelerometer', 'gyroscope', 'magnetometer', 'clipboard-read', 'clipboard-write'], { origin: BASE.slice(0, -1) }).catch(() => {});
+    await p.addInitScript(() => { Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => 5 }); });
+    await p.clock.setFixedTime(new Date('2026-11-15T19:00:00+01:00')); await start(p);
+    // haal ik het nog?
+    await p.locator('[data-view-go="tonight"]').first().click(); await p.waitForSelector('[data-tn-haal]');
+    if (!(await p.locator('.radar').count())) await p.locator('[data-tn-radar]').first().click();
+    await p.locator('[data-tn-haal]').first().click(); await p.waitForSelector('#tnDep');
+    const kleur = () => p.evaluate(v => getComputedStyle(document.querySelector('.rdot[data-rv="' + v + '"]')).getPropertyValue('--c').trim().toUpperCase(), vT);
+    check('haal ik het: nu vertrekken is ruim op tijd (groen op de radar en in de lijst)', (await kleur()) === '#5AD69D' && (await p.locator('.ev[data-ev="h1"] .haal-ok').innerText()).startsWith('Haal je'), await kleur());
+    await p.evaluate(() => { const s = document.querySelector('#tnDep'); s.value = 120; s.dispatchEvent(new Event('input', { bubbles: true })); });
+    check('haal ik het: schuif naar over 2 uur en de stip verkleurt meteen', (await kleur()) !== '#5AD69D' && (await p.locator('#depTxt').innerText()).includes('120 min'), await kleur());
+    await p.evaluate(() => document.querySelector('#tnDep').dispatchEvent(new Event('change', { bubbles: true }))); await p.waitForTimeout(300);
+    check('haal ik het: de lijst zegt het ook', (await p.locator('.ev[data-ev="h1"] .haal-ok').count()) === 0 && (await p.locator('.ev[data-ev="h1"] [class*="haal-"]').count()) === 1);
+    // kompas: de radar draait mee; ergens in het rond ligt het podium recht voor je
+    check('kompas: knop staat er op een toestel met aanraakscherm', (await p.locator('[data-tn-kompas]').count()) === 1);
+    await p.locator('[data-tn-kompas]').first().click(); await p.waitForSelector('.radar.kompas', { timeout: 5000 }).catch(() => {});
+    const richt = async g => { await p.evaluate(g => window.dispatchEvent(new DeviceOrientationEvent('deviceorientationabsolute', { alpha: 360 - g, absolute: true })), g); await p.waitForTimeout(700); };
+    await richt(90);
+    const hd = parseFloat(await p.evaluate(() => { const r = document.querySelector('.radar.kompas'); return r ? r.style.getPropertyValue('--hd') : '' }));
+    check('kompas: de schijf draait naar de richting van de telefoon', Math.abs(hd - 90) < 8, hd);
+    let raak = false; for (let g = 0; g < 360 && !raak; g += 15) { await richt(g); raak = (await p.locator('.rdot.aim').count()) === 1 && (await p.locator('#kpCap').innerText()).includes('Recht voor je'); }
+    check('kompas: wat recht voor je ligt licht op, met naam eronder', raak);
+    await p.locator('[data-tn-kompas]').first().click(); await p.waitForTimeout(200);
+    check('kompas: uit te zetten', (await p.locator('.radar.kompas').count()) === 0);
+    // Nederland bij nacht
+    await p.locator('[data-view-go="list"]').first().click(); await p.locator('[data-view-go="night"]').first().click();
+    await p.waitForFunction(() => (document.querySelector('#nightStats') || {}).textContent, null, { timeout: 8000 }).catch(() => {});
+    const zet = async t => { await p.evaluate(t => { const s = document.querySelector('#nightT'); s.value = t; s.dispatchEvent(new Event('input', { bubbles: true })); }, t); return (await p.locator('#nightStats').innerText()).replace(/\s+/g, ' '); };
+    check('bij nacht: begint op het tijdstip van nu', (await p.locator('#nightClock').innerText()) === '19:00');
+    check('bij nacht: om 14:00 is er niets bezig', (await zet(14 * 60)).includes('niets bezig'));
+    check('bij nacht: om 20:45 brandt alleen Tilburg', (await zet(20 * 60 + 45)).includes('1 ding bezig op 1 plek in 1 stad'), await zet(20 * 60 + 45));
+    check('bij nacht: om 21:15 ook Amsterdam', (await zet(21 * 60 + 15)).includes('2 dingen bezig op 2 plekken in 2 steden'));
+    check('bij nacht: wat na middernacht begint hoort bij dezelfde avond', (await zet(24 * 60 + 45)).includes('1 ding bezig') && (await p.locator('#nightClock').innerText()) === '00:45');
+    const licht = await p.evaluate(() => { const c = document.querySelector('#nightCv'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let m = 0; for (let i = 0; i < d.length; i += 4) m = Math.max(m, d[i] + d[i + 1] + d[i + 2]); return [c.width, m]; });
+    check('bij nacht: de kaart is getekend en er brandt licht', licht[0] > 200 && licht[1] > 600, licht);
+    await p.locator('[data-night-city]').first().click();
+    check('bij nacht: tik op een stad en je ziet wat er speelt', (await p.locator('#nightList .ev[data-ev="h3"]').count()) === 1);
+    await zet(20 * 60); await p.locator('#nightPlay').click(); await p.waitForTimeout(1500);
+    const speelt = await p.locator('#nightClock').innerText(), aan = await p.locator('#nightPlay.on').count();
+    await p.locator('#nightPlay').click(); await p.waitForTimeout(200);
+    check('bij nacht: afspelen laat de klok lopen en is te pauzeren', aan === 1 && speelt > '20:10' && (await p.locator('#nightPlay.on').count()) === 0, speelt);
+    check('haal/kompas/nacht: geen fouten en geen verzoeken naar buiten', p.errs.length === 0 && p.ext.length === 0, [p.errs, p.ext]);
+    await p.context().close(); dataOverride = null;
+  }
+
   await browser.close(); server.close();
   console.log('\n' + (fouten ? fouten + ' FOUT(EN)' : 'ALLES GOED')); process.exit(fouten ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(2); });
