@@ -232,6 +232,29 @@ const UPD = nlMs(real.updated);
     await p.context().close(); dataOverride = null;
   }
 
+  // 10. reistijd dichtbij in loop- of fietsminuten, en 'Mijn locatie' die zichzelf ververst als er al toestemming is
+  {
+    const vids = Object.keys(real.venues), vT = vids.find(id => real.venues[id].city === 'Tilburg' && real.venues[id].type === 'pop' && real.venues[id].lat != null), V0 = real.venues[vT];
+    const vA = vids.find(id => real.venues[id].city === 'Amsterdam' && real.venues[id].type === 'pop' && real.venues[id].lat != null);
+    const dag = n => { const x = new Date(Date.now() + n * 864e5); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+    dataOverride = { updated: real.updated, venues: real.venues, events: [
+      { id: 'r1', v: vT, date: dag(2), time: '20:00', title: 'Dichtbij Band', url: 'https://voorbeeld.test/r1', genre: 'Rock', first_seen: dag(-9) },
+      { id: 'r2', v: vA, date: dag(3), time: '20:00', title: 'Verweg Band', url: 'https://voorbeeld.test/r2', genre: 'Rock', first_seen: dag(-9) }] };
+    p = await newPage(); await start(p);
+    check('reistijd: podium in de eigen stad in loop- of fietsminuten, ver weg met de auto', /min (lopen|fietsen)/.test(await p.locator('.ev[data-ev="r1"] .tt').innerText()) && (await p.locator('.ev[data-ev="r2"] .tt').innerText()).includes('met de auto'));
+    await p.context().close();
+    // 'Mijn locatie' stond aan op een oude plek (Amsterdam); de telefoon staat nu naast het podium in Tilburg en toestemming is er al
+    p = await newPage({ geolocation: { latitude: V0.lat + 0.001, longitude: V0.lon } });
+    await p.context().grantPermissions(['geolocation', 'clipboard-read', 'clipboard-write'], { origin: BASE.slice(0, -1) });
+    await p.addInitScript(() => { try { localStorage.setItem('pr_home', '"__geo"'); localStorage.setItem('pr_geo', '[52.37,4.9]'); } catch {} });
+    await start(p); await p.waitForFunction(() => { try { return JSON.parse(localStorage.getItem('pr_geo'))[0] < 52 } catch { return false } }, null, { timeout: 8000 }).catch(() => {});
+    const geo = await p.evaluate(() => JSON.parse(localStorage.getItem('pr_geo')));
+    check('mijn locatie: ververst zichzelf zonder te vragen', Math.abs(geo[0] - V0.lat) < 0.01, geo);
+    check('mijn locatie: het podium om de hoek is nu op loopafstand', (await p.locator('.ev[data-ev="r1"] .tt').innerText()).includes('lopen'));
+    check('reistijd/locatie: geen fouten en geen verzoeken naar buiten', p.errs.length === 0 && p.ext.length === 0, [p.errs, p.ext]);
+    await p.context().close(); dataOverride = null;
+  }
+
   await browser.close(); server.close();
   console.log('\n' + (fouten ? fouten + ' FOUT(EN)' : 'ALLES GOED')); process.exit(fouten ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(2); });

@@ -87,8 +87,15 @@ function km(a,b,c,d){const R=6371,x=(c-a)*Math.PI/180,y=(d-b)*Math.PI/180;const 
 // Schatting uit de afstand hemelsbreed, geen echte route: auto = 1,2 x omweg met 90 km/u + 10 min parkeren, OV = 1,2 x omweg met 70 km/u + 15 min lopen en overstappen
 // (ijkpunten vanuit Tilburg: Breda ±40, Eindhoven ±55, Utrecht ±70, Amsterdam ±105 min). Google Maps rekent vanaf je echte locatie met verkeer en dienstregeling.
 function travel(vid){const v=V[vid], h=S.homeXY; if(v.lat==null) return {car:null,ov:null,k:null}; const k=km(h[0],h[1],v.lat,v.lon);
-  if(k<3) return {car:Math.round(k*4+5),ov:Math.round(k*6+8),k};
-  return {car:Math.round(k*1.2/90*60+10), ov:Math.round(k*1.2/70*60+15), k}}
+  // Dichtbij zegt een autotijd weinig: tot ±1,2 km lopen (5 km/u), tot ±6 km fietsen (15 km/u + 2 min), steeds met 30% omweg.
+  // 'car' blijft de maat voor sorteren, filters en de radar; 'mode' bepaalt alleen wat er getoond wordt.
+  const walk=k<3?Math.max(2,Math.round(k*1.3*12)):null, bike=k<15?Math.round(k*1.3*4+2):null, mode=k<1.2?"walk":k<6?"bike":"car";
+  if(k<3) return {car:Math.round(k*4+5),ov:Math.round(k*6+8),k,walk,bike,mode};
+  return {car:Math.round(k*1.2/90*60+10), ov:Math.round(k*1.2/70*60+15), k,walk,bike,mode}}
+// Reistijd als tekst: lang ('± 9 min lopen', '± 12 min fietsen', '± 32 min met de auto') en kort (zonder 'met de auto')
+const tMin=tr=>tr.mode==="walk"?tr.walk:tr.mode==="bike"?tr.bike:tr.car;
+const tLong=vid=>{const tr=travel(vid); return tr.car==null?"reistijd onbekend":"± "+tMin(tr)+(tr.mode==="walk"?" min lopen":tr.mode==="bike"?" min fietsen":" min met de auto")};
+const tShort=vid=>{const tr=travel(vid); return tr.car==null?"":"± "+tMin(tr)+(tr.mode==="walk"?" min lopen":tr.mode==="bike"?" min fietsen":" min")};
 
 /* ---------- STATE ---------- */
 const store={get(k,f){try{const v=localStorage.getItem(k);if(!v) return f;const p=JSON.parse(v);return p===null||(f!==null&&(typeof p!==typeof f||Array.isArray(p)!==Array.isArray(f)))?f:p}catch{return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
@@ -346,7 +353,7 @@ function viewLast(){
 function tourHtml(e){
   const others=tourOf(e); if(!others.length) return "";
   const cities=new Set(others.map(x=>cityKey(V[x.v].city))), allC=new Set([e,...others].map(x=>cityKey(V[x.v].city)));
-  const row=(x,i)=>`<div class="ev${i>=5?" xtra":""}" role="button" tabindex="0" data-ev="${x.id}"><div class="t" style="font-size:15px">${x.date.getDate()} ${MON[x.date.getMonth()]}<small>${WD[x.date.getDay()]}${x.time!=null?" "+hm(x.time):""}</small></div><div><div class="a">${esc(V[x.v].name)}</div><div class="v">${esc(V[x.v].city)}${carOf(x)!==999?" · ± "+carOf(x)+" min":""}${x.title!==e.title?" · "+esc(x.title):""}</div>${x.status==="sold"?'<span class="tag sold">Uitverkocht</span>':""}${GO[x.id]?'<span class="tag going">✓ Ik ga</span>':""}</div><i class="chev" aria-hidden="true">›</i></div>`;
+  const row=(x,i)=>`<div class="ev${i>=5?" xtra":""}" role="button" tabindex="0" data-ev="${x.id}"><div class="t" style="font-size:15px">${x.date.getDate()} ${MON[x.date.getMonth()]}<small>${WD[x.date.getDay()]}${x.time!=null?" "+hm(x.time):""}</small></div><div><div class="a">${esc(V[x.v].name)}</div><div class="v">${esc(V[x.v].city)}${carOf(x)!==999?" · "+tShort(x.v):""}${x.title!==e.title?" · "+esc(x.title):""}</div>${x.status==="sold"?'<span class="tag sold">Uitverkocht</span>':""}${GO[x.id]?'<span class="tag going">✓ Ik ga</span>':""}</div><i class="chev" aria-hidden="true">›</i></div>`;
   return `<h3>Speelt ook <small class="s" style="font-weight:400">${others.length} ${others.length===1?"andere datum":"andere data"}${cities.size>1?" in "+cities.size+" steden":""}</small></h3>
    ${allC.size>=3?`<div class="tourmap" id="tourMap" aria-hidden="true"></div>`:""}
    <div class="simlist tour">${others.map(row).join("")}${others.length>5?`<button class="btn ghost more" type="button" data-tourmore>Toon alle ${others.length}</button>`:""}</div>`;
@@ -401,7 +408,7 @@ function filmRow(e){
   return `<div class="ev film" role="button" tabindex="0" data-film="${esc(filmKey(e))}" data-fday="${e.d}">
     <div class="t${lbl==="nu bezig"?" live":""}">${hm(e.time)}<small>${lbl}</small></div>
     <div><div class="a">${esc(e.title)}${nw?'<span class="new">Nieuw</span>':""}</div>
-      <div class="v">${esc(v.name)}, ${esc(v.city)}${c!==999?" · ± "+c+" min":""}</div>
+      <div class="v">${esc(v.name)}, ${esc(v.city)}${c!==999?" · "+tShort(e.v):""}</div>
       <div class="ftimes">${times.map(x=>`<span class="${x.d===0&&x.time<=nm?"past":""}${x.status==="sold"?" soldt":""}">${hm(x.time)}</span>`).join("")}${more>0?`<span class="more">+${more}</span>`:""}</div>
       ${g.venues>1?`<div class="tt">ook in ${g.venues-1} ${g.venues===2?"andere bioscoop":"andere bioscopen"}</div>`:""}
       ${price!=null?`<span class="tag price${price===0?" free":""}">${priceTxt(price)}</span>`:""}${e.dur?`<span class="tag">${e.dur} min</span>`:""}${g.all.some(x=>GO[x.id])?'<span class="tag going">✓ Ik ga</span>':""}</div>
@@ -417,7 +424,7 @@ function openFilm(key,fromDay=0){
   const dayHtml=(d,i)=>{ const by=new Map(); all.filter(e=>e.d===d).forEach(e=>{const k=vKey(e.v); if(!by.has(k)) by.set(k,[]); by.get(k).push(e)});
     const rows=[...by.values()].map(l=>l.sort((a,b)=>a.time-b.time)).sort((a,b)=>carOf(a[0])-carOf(b[0])||a[0].time-b[0].time);
     return `<div class="fday${i>=4?" xtra":""}"><h3>${dayLabel(d)} <small class="s" style="font-weight:400">${rows.length} ${rows.length===1?"bioscoop":"bioscopen"}</small></h3>
-      ${rows.map((l,j)=>{const v=V[l[0].v], c=carOf(l[0]); return `<div class="fven${j>=6?" xtra":""}"><div class="fvn"><b>${esc(v.name)}</b><span>${esc(v.city)}${c!==999?" · ± "+c+" min":""}</span></div><div class="fchips">${l.map(x=>`<button class="fchip${x.d===0&&x.time<=nm?" past":""}${x.status==="sold"?" soldt":""}${GO[x.id]?" going":""}" type="button" data-ev="${x.id}" aria-label="${hm(x.time)} bij ${esc(v.name)}${x.status==="sold"?", uitverkocht":""}">${hm(x.time)}</button>`).join("")}</div></div>`}).join("")}
+      ${rows.map((l,j)=>{const v=V[l[0].v], c=carOf(l[0]); return `<div class="fven${j>=6?" xtra":""}"><div class="fvn"><b>${esc(v.name)}</b><span>${esc(v.city)}${c!==999?" · "+tShort(l[0].v):""}</span></div><div class="fchips">${l.map(x=>`<button class="fchip${x.d===0&&x.time<=nm?" past":""}${x.status==="sold"?" soldt":""}${GO[x.id]?" going":""}" type="button" data-ev="${x.id}" aria-label="${hm(x.time)} bij ${esc(v.name)}${x.status==="sold"?", uitverkocht":""}">${hm(x.time)}</button>`).join("")}</div></div>`}).join("")}
       ${rows.length>6?`<button class="btn ghost more" type="button" data-fmore>Toon alle ${rows.length} bioscopen</button>`:""}</div>`};
   const shown=days.filter(d=>d>=start);
   $("#detailSheet").innerHTML=`<div class="sheetbar"><button class="sheetx" type="button" data-close><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>Sluiten</button><div class="grab"></div></div>
@@ -472,8 +479,8 @@ function evRow(e,o={}){
     <div><div class="a">${esc(e.artist)}${flag}</div>
       ${e.support.length?`<div class="s">met ${esc(e.support.join(", "))}</div>`:(e.title!==e.artist&&!e.title.startsWith(e.artist+" +")?`<div class="s">${esc(e.title.slice(e.artist.length).replace(/^\s*-\s*/,""))}</div>`:"")}
       <div class="v">${venueLine(e)}</div>
-      <div class="tt">${tr.car==null?"reistijd onbekend":"± "+tr.car+" min met de auto"}</div>
-      ${kind?`<span class="tag kind">${KIND[e.type]}</span>`:""}${kind&&e.genre===KIND[e.type]?"":`<span class="tag">${esc(e.genre)}</span>`}${e.price!=null?`<span class="tag price${e.price===0?" free":""}">${priceTxt(e.price)}</span>`:""}${GO[e.id]?'<span class="tag going">✓ Ik ga</span>':""}${e.status==="sold"?'<span class="tag sold">Uitverkocht</span>':""}${o.reason?`<div class="s${o.warn?" warn":""}" style="margin-top:4px">${esc(o.reason)}</div>`:""}${nr?`<div class="s nearer">Ook dichterbij: ${esc(V[nr.v].city)}, ${short(nr)} (± ${carOf(nr)} min)</div>`:""}</div>
+      <div class="tt">${tLong(e.v)}</div>
+      ${kind?`<span class="tag kind">${KIND[e.type]}</span>`:""}${kind&&e.genre===KIND[e.type]?"":`<span class="tag">${esc(e.genre)}</span>`}${e.price!=null?`<span class="tag price${e.price===0?" free":""}">${priceTxt(e.price)}</span>`:""}${GO[e.id]?'<span class="tag going">✓ Ik ga</span>':""}${e.status==="sold"?'<span class="tag sold">Uitverkocht</span>':""}${o.reason?`<div class="s${o.warn?" warn":""}" style="margin-top:4px">${esc(o.reason)}</div>`:""}${nr?`<div class="s nearer">Ook dichterbij: ${esc(V[nr.v].city)}, ${short(nr)} (${tShort(nr.v)})</div>`:""}</div>
     <button class="star" data-fav="${e.ak}" data-name="${esc(e.artist)}" aria-pressed="${S.fav.has(e.ak)}" aria-label="Volg ${esc(e.artist)}">★</button>
   </div>`;
 }
@@ -730,7 +737,7 @@ function viewGrid(){
     vids.forEach(vid=>{const v=V[vid]; const rows=byV[vid];
       // stack overlapping events at same venue
       const lanes=[]; rows.sort((a,b)=>a.time-b.time).forEach(e=>{const st=slots(e)[0].s;let i=lanes.findIndex(end=>end<=st);if(i<0){i=lanes.length;lanes.push(0)}lanes[i]=endOf(e);e._lane=i});
-      h+=`<div class="lane" style="min-height:${Math.max(1,lanes.length)*64+10}px"><div class="vname"><b>${esc(v.name)}</b><small>${esc(v.city)}${travel(vid).car!=null?", ± "+travel(vid).car+" min":""}</small></div><div class="track">`;
+      h+=`<div class="lane" style="min-height:${Math.max(1,lanes.length)*64+10}px"><div class="vname"><b>${esc(v.name)}</b><small>${esc(v.city)}${travel(vid).car!=null?", "+tShort(vid):""}</small></div><div class="track">`;
       rows.forEach(e=>slots(e).forEach(s=>{
         const left=(s.s-from)*px, w=Math.max(28,(s.e-s.s)*px-3), top=10+e._lane*64;
         const fav=(s.a&&S.fav.has(artistKey(s.a)))?" fav":"";
@@ -820,7 +827,7 @@ function viewVenues(){
     const tr=travel([...g.ids][0]);
     const list=EV.filter(e=>vidsOf(e).some(id=>g.ids.has(id))).sort((a,b)=>(b.started-a.started)||a.d-b.d||(a.time??1440)-(b.time??1440));
     let h=`<div class="meta"><button data-vback>‹ Alle podia</button></div>
-      <div class="vhead"><div class="dhead"><h1>${esc(g.name)}</h1>${vStar(g,true)}</div><div class="s">${esc(g.city)} · ${esc(VKIND[g.type]||"")}${tr.car!=null?` · ± ${tr.car} min met de auto`:""}</div>
+      <div class="vhead"><div class="dhead"><h1>${esc(g.name)}</h1>${vStar(g,true)}</div><div class="s">${esc(g.city)} · ${esc(VKIND[g.type]||"")}${tr.car!=null?" · "+tLong([...g.ids][0]):""}</div>
       <div class="s">${list.length} op de agenda${S.favV.has(g.key)?" · je volgt dit podium":""}</div></div>`;
     return h+dayRows(list,400,{from:0,months:true,door:"Nu te zien"});
   }
@@ -833,7 +840,7 @@ function viewVenues(){
   list.slice(0,300).forEach(g=>{const tr=travel([...g.ids][0]);
     h+=`<div class="ev venue" role="button" tabindex="0" data-venue="${esc(g.key)}" style="--acc:var(--${VCOL[g.type]||"pop"});--acc-soft:var(--${VCOL[g.type]||"pop"}-soft)"><div class="t" style="font-size:15px">${g.n}<small>op agenda</small></div>
       <div><div class="a">${esc(g.name)}</div><div class="v">${esc(g.city)} · ${esc(VKIND[g.type]||"")}</div>
-      <div class="tt">${tr.car==null?"reistijd onbekend":"± "+tr.car+" min met de auto"}${g.next?` · eerstvolgend ${g.next.started?"nu":short(g.next)}: ${esc(g.next.artist)}`:""}</div></div>${vStar(g)}</div>`});
+      <div class="tt">${tLong([...g.ids][0])}${g.next?` · eerstvolgend ${g.next.started?"nu":short(g.next)}: ${esc(g.next.artist)}`:""}</div></div>${vStar(g)}</div>`});
   return h;
 }
 
@@ -952,6 +959,17 @@ function buildHome(){
   $("#homeSel").innerHTML=(S.home==="__geo"?`<option value="__geo" selected>Mijn locatie</option>`:"")+Object.keys(HOMES).map(c=>`<option${c===S.home?" selected":""}>${c}</option>`).join("");
 }
 $("#homeSel").onchange=e=>{S.home=e.target.value; if(S.home!=="__geo"){S.homeXY=HOMES[S.home]} store.set("pr_home",S.home); buildHome(); render();};
+// Staat 'Mijn locatie' aan en heeft de browser al toestemming, dan de locatie stil verversen (er komt geen nieuwe vraag):
+// bij het openen van de app en als je er later naar terugkeert. Pas bij meer dan 300 m verschil rekent de app opnieuw.
+let geoAt=0;
+function refreshGeo(){
+  if(S.home!=="__geo"||!navigator.geolocation||!navigator.permissions||Date.now()-geoAt<120000) return;
+  geoAt=Date.now();
+  navigator.permissions.query({name:"geolocation"}).then(st=>{ if(st.state!=="granted") return;
+    navigator.geolocation.getCurrentPosition(p=>{const n=[p.coords.latitude,p.coords.longitude];
+      if(!n.every(isFinite)||km(n[0],n[1],S.homeXY[0],S.homeXY[1])<0.3) return;
+      S.homeXY=n; store.set("pr_geo",n); if(!document.querySelector(".sheet.open")) render()},()=>{},{timeout:8000,maximumAge:300000}) }).catch(()=>{});
+}
 $("#geoBtn").onclick=()=>{
   if(!navigator.geolocation){toast("Locatie is hier niet beschikbaar. Kies een plaats.");return}
   navigator.geolocation.getCurrentPosition(p=>{S.homeXY=[p.coords.latitude,p.coords.longitude];S.home="__geo";store.set("pr_geo",S.homeXY);store.set("pr_home","__geo");buildHome();render();toast("Reistijden vanaf je locatie")},
@@ -1103,8 +1121,8 @@ function openDetail(id,o={}){
      <div class="dsub">${venueLine(e)} · <button class="linkbtn" data-openvenue="${esc(vgOf(e.v))}">Alles bij dit podium</button></div>
      ${e.ook.length?`<div class="dsub">Zelfde evenement, ook op de agenda van ${e.ook.map(o=>esc(V[o.v].name)).join(", ")}</div>`:""}</div>
      <button class="star" data-fav="${e.ak}" data-name="${esc(e.artist)}" aria-pressed="${S.fav.has(e.ak)}" aria-label="Volg ${esc(e.artist)}" style="font-size:30px">★</button></div>
-   <div class="facts">${e.genre==="Overig"?"":`<div><small>Genre</small><b>${esc(e.genre)}</b></div>`}${tr.car!=null?`<div><small>Auto</small><b>± ${tr.car} min</b></div><div><small>OV</small><b>± ${tr.ov} min</b></div>`:""}${e.price!=null?`<div><small>${e.price===0?"Entree":"Prijs vanaf"}</small><b>${priceTxt(e.price)}</b></div>`:""}${e.status==="sold"?`<div><small>Kaarten</small><b style="color:var(--warn)">Uitverkocht</b></div>`:""}</div>
-   ${tr.car!=null?`<p class="s travnote">Reistijd is een schatting vanaf ${S.home==="__geo"?"je opgeslagen locatie":esc(S.home)} (afstand hemelsbreed). Google Maps rekent vanaf waar je nu bent, met verkeer en dienstregeling.</p>`:""}
+   <div class="facts">${e.genre==="Overig"?"":`<div><small>Genre</small><b>${esc(e.genre)}</b></div>`}${tr.car==null?"":tr.mode==="walk"?`<div><small>Lopen</small><b>± ${tr.walk} min</b></div><div><small>Fiets</small><b>± ${tr.bike} min</b></div>`:tr.mode==="bike"?`<div><small>Fiets</small><b>± ${tr.bike} min</b></div><div><small>Auto</small><b>± ${tr.car} min</b></div><div><small>OV</small><b>± ${tr.ov} min</b></div>`:`<div><small>Auto</small><b>± ${tr.car} min</b></div><div><small>OV</small><b>± ${tr.ov} min</b></div>`}${e.price!=null?`<div><small>${e.price===0?"Entree":"Prijs vanaf"}</small><b>${priceTxt(e.price)}</b></div>`:""}${e.status==="sold"?`<div><small>Kaarten</small><b style="color:var(--warn)">Uitverkocht</b></div>`:""}</div>
+   ${tr.car!=null?`<p class="s travnote">Reistijd is een schatting ${S.home==="__geo"?"vanaf je eigen locatie":"vanaf het centrum van "+esc(S.home)+", niet vanaf je huis"} (afstand hemelsbreed).${S.home==="__geo"?"":" Tik bovenin op het ronde knopje naast de plaatsnaam om vanaf je eigen locatie te rekenen."} Google Maps rekent vanaf waar je nu bent, met verkeer en dienstregeling.</p>`:""}
    ${tourTip(e)}
    ${e.type==="film"&&filmGroupable(e)?`<button class="tourtip" type="button" data-film="${esc(filmKey(e))}" data-fday="${e.d}"><b>Alle bioscopen en tijden</b> van deze film <span aria-hidden="true">›</span></button>`:""}
    <div class="timeline">${tl}</div>
@@ -1117,7 +1135,7 @@ function openDetail(id,o={}){
    <p class="note">Gegevens van ${SNAPSHOT}, overgenomen van de site van ${esc(V[e.v].name)}. Tijden, prijzen en beschikbaarheid kunnen veranderen: kijk altijd op die site voordat je gaat of kaarten koopt.${DATA.verouderd&&/^\d{4}-\d\d-\d\d$/.test(DATA.verouderd[e.v]||"")?` <strong>Let op: de site van dit podium was de laatste dagen niet uit te lezen; deze gegevens zijn van ${dm(new Date(DATA.verouderd[e.v]+"T12:00"))} of eerder.</strong>`:""}</p>
    ${tourHtml(e)}
    <h3>${simT}</h3>
-   <div class="simlist">${sims.length?sims.map(o=>`<div class="ev" role="button" tabindex="0" data-ev="${o.id}"><div><div class="a">${esc(o.artist)}</div><div class="v">${simT[0]==="O"&&o.time!=null?hm(o.time):short(o)}, ${esc(V[o.v].name)} ${travel(o.v).car!=null?"(± "+travel(o.v).car+" min)":""}</div></div><button class="star" data-fav="${o.ak}" data-name="${esc(o.artist)}" aria-pressed="${S.fav.has(o.ak)}" aria-label="Volg ${esc(o.artist)}">★</button></div>`).join(""):'<p class="s">Niets vergelijkbaars in de buurt gevonden.</p>'}</div>`;
+   <div class="simlist">${sims.length?sims.map(o=>`<div class="ev" role="button" tabindex="0" data-ev="${o.id}"><div><div class="a">${esc(o.artist)}</div><div class="v">${simT[0]==="O"&&o.time!=null?hm(o.time):short(o)}, ${esc(V[o.v].name)} ${travel(o.v).car!=null?"("+tShort(o.v)+")":""}</div></div><button class="star" data-fav="${o.ak}" data-name="${esc(o.artist)}" aria-pressed="${S.fav.has(o.ak)}" aria-label="Volg ${esc(o.artist)}">★</button></div>`).join(""):'<p class="s">Niets vergelijkbaars in de buurt gevonden.</p>'}</div>`;
   if(e.time!=null){ $("#gcal").href=gcalUrl(e); $("#icsBtn").onclick=()=>saveIcs(e); }
   lastDetail.row=linkRow(e);
   $("#shareBtn").onclick=()=>share(e);
@@ -1314,7 +1332,7 @@ let qt;$("#q").oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{S.q=e.target.valu
   try{history.replaceState(null,"",location.pathname+location.hash)}catch{}
 })();
 
-buildHome(); render(); document.body.dataset.ready="1";
+buildHome(); render(); document.body.dataset.ready="1"; refreshGeo();
 /* Gedeelde link (#id): meteen de details van dat item openen */
 function openFromHash(){
   let id=""; try{id=decodeURIComponent(location.hash.slice(1))}catch{} if(!id) return;
@@ -1323,5 +1341,5 @@ function openFromHash(){
 }
 openFromHash(); window.addEventListener("hashchange",openFromHash);
 // Na middernacht opnieuw laden: een scherm van gisteren zou anders nog "Vandaag" van gisteren tonen
-document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&new Date().getDate()!==today.getDate()) location.reload() });
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&new Date().getDate()!==today.getDate()) location.reload(); else if(!document.hidden) refreshGeo() });
 })().catch(()=>{ const m=document.querySelector("#main"); if(m&&!document.body.dataset.ready) m.innerHTML='<div class="empty"><strong>De app kon niet starten</strong>Ververs de pagina. Blijft het misgaan, laat het weten aan degene die je de link gaf.</div>'; });
