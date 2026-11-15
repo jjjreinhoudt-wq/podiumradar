@@ -594,7 +594,7 @@ def wp_shows(src, F, cfg, log):
     return out
 
 
-AFAS_ROL = re.compile(r"^(?:support(?:[ -]?acts?)?|opener|special\s+guests?|voorprogramma|gast(?:act)?)\b[\s:–-]*", re.I)
+AFAS_ROL = re.compile(r"^(?:support(?:[ -]?acts?)?|opener|(?:very\s+)?special\s+guests?|voorprogramma|gast(?:act)?)\b[\s:–-]*", re.I)
 AFAS_START = re.compile(r"^(?:aanvang|start|begin)\b[\s:–-]*", re.I)
 AFAS_KAAL = re.compile(r"^(?:de\s+|het\s+)?(?:show|concert|voorstelling|programma|optreden|hoofdact|hoofdprogramma|main\s*act|headliner)?$", re.I)
 AFAS_DATUM = re.compile(r"\b(\d{1,2})\s+([a-z]{3})[a-z]*\.?\s+(\d{4})\b", re.I)

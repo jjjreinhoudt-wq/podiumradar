@@ -413,6 +413,8 @@ check("afas: schema dat eerder begint dan de tweede show van de dag telt niet", 
       [("10:00", "10:00", [{"a": "Freek Vonk Live", "s": "10:00"}]), ("13:30", None, None)])
 check("afas: verplaatst: de nieuwe datum; 'Aanvang show' is de hoofdact, pauze telt niet", (kort("Brandi Carlile", f"{j + 1}-04-02")["start"], next(e["times"] for e in ae if e["title"] == "Brandi Carlile")),
       ("20:30", [{"a": "Brandi Carlile", "s": "20:30"}]))
+check("afas: 'Very Special Guest Pendulum' boven aan de pagina -> 'Pendulum'",
+      venues.afas_detail(BeautifulSoup('<ul class="act"><li><i></i> Very Special Guest <a>Pendulum</a></li><li>Support act: TBA</li></ul>', "html.parser"))["support"], ["Pendulum"])
 check("afas: pagina niet gekregen: de show blijft staan met wat de agenda geeft", kort("Pagina Stuk", f"{j + 1}-07-04"),
       {"time": None, "doors": None, "start": None, "support": None, "tot": None, "price": None, "status": None})
 n1 = fa.n
