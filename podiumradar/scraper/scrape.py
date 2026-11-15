@@ -382,7 +382,7 @@ def own_events(prev_events=()):
             except Exception as ex:
                 print(f"  {src['name']}: item overgeslagen ({ex.__class__.__name__}: {str(ex)[:80]})")
     fix_series_ends(events.values())
-    return dedupe(relocate(events))
+    return merge_zelfde_avond(dedupe(relocate(events)))
 
 
 def relocate(events):
@@ -508,6 +508,58 @@ def dedupe(events):
     return out
 
 
+def eerste_act(titel):
+    """Sleutel van de eerste act in een titel: 'CARSICK + CARNE' en 'Carsick' -> 'carsick', 'TAXITAXI (013 op locatie)' -> 'taxitaxi'."""
+    t = re.split(r"\s\+\s|\s/\s", genres.kop(titel))[0]
+    return genres.sleutel(re.sub(r"\s*\([^)]*\)", "", t))
+
+
+def merge_zelfde_avond(events):
+    """Dezelfde show twee keer bij hetzelfde podium, uit twee bronnen (Carsick, 16 nov 2026): 013 zet zijn shows 'op locatie'
+    in de eigen agenda ('Carsick', locatie Hall of Fame) en Hall of Fame zet dezelfde avond op zijn eigen site ('CARSICK + CARNE').
+    De titels verschillen, dus `relocate` en `dedupe` zagen het niet. Zelfde podium en dag, dezelfde eerste act, links van twee
+    verschillende sites en aanvangstijden hoogstens twee uur uit elkaar (of één onbekend): dan blijft het item met de meeste
+    tijden (deur, aanvang, voorprogramma) en krijgt het van het andere wat het zelf mist. Twee voorstellingen op één dag van
+    dezelfde site (matinee en avond) blijven twee items; algemene titels (pubquiz, open podium) doen niet mee."""
+    host = lambda u: re.sub(r"^www\.", "", (re.match(r"https?://([^/]+)", u or "") or [None, ""])[1].lower())
+    minuten = lambda t: int(t[:2]) * 60 + int(t[3:5]) if isinstance(t, str) and re.match(r"\d\d:\d\d", t) else None
+    rijk = lambda e: sum(1 for f in ("times", "doors", "start", "support", "time", "price") if e.get(f) not in (None, "", []))
+    groepen = {}
+    for k, e in events.items():
+        if e.get("end") or e.get("vtype") in ("film", "festival") or e.get("genre") in ("Film", "Tentoonstelling", "Festival"):
+            continue
+        act = eerste_act(e["title"])
+        if len(act) >= 4 and not GENERIEK_RE.search(e["title"]):
+            groepen.setdefault((e.get("venue") or e.get("v"), e.get("city", ""), e["date"], act), []).append(k)
+    for ks in groepen.values():
+        if len(ks) < 2:
+            continue
+        ks.sort(key=lambda k: -rijk(events[k]))
+        blijft = [ks[0]]
+        for k in ks[1:]:
+            b = events[k]
+            for hk in blijft:
+                h = events[hk]
+                th, tb = minuten(h.get("time")), minuten(b.get("time"))
+                if host(h["url"]) and host(b["url"]) and host(h["url"]) != host(b["url"]) and (th is None or tb is None or abs(th - tb) <= 120):
+                    for f in ("time", "doors", "start", "support", "times", "price", "status"):
+                        if h.get(f) in (None, "", []) and b.get(f) not in (None, "", []):
+                            h[f] = b[f]
+                    # voorprogramma dat alleen in de titel van het andere item staat ('Coilguns + Haatdrager') niet kwijtraken
+                    if not h.get("support"):
+                        extra = [re.sub(r"\s*\([^)]*\)", "", x).strip() for x in re.split(r"\s\+\s", genres.kop(b["title"]))[1:]]
+                        extra = [x for x in extra if 1 < len(x) <= 60 and genres.sleutel(x) not in genres.sleutel(h["title"])][:4]
+                        if extra:
+                            h["support"] = extra
+                    if b.get("first_seen") and b["first_seen"] < h.get("first_seen", "9"):
+                        h["first_seen"] = b["first_seen"]
+                    del events[k]
+                    break
+            else:
+                blijft.append(k)
+    return events
+
+
 GENERIEK_RE = re.compile(r"open ?(mic|podium|stage|jam)|jam ?sessi|pub ?quiz|\bquiz\b|karaoke|bingo|live ?muziek|live ?music|\bdj\b|borrel|"
                          r"happy hour|afterparty|after party|\bparty\b|\bfeest\b|\bsessie\b|\bsession\b|\bcover|dansavond|dance night|salsa|singalong", re.I)
 
@@ -597,7 +649,7 @@ def reclassify():
         e["vtype"] = data["venues"].get(e["v"], {}).get("type", "pop")
     fix_series_ends(keep)
     n0 = len(keep)
-    keep = list(dedupe({e["id"]: e for e in keep}).values())
+    keep = list(merge_zelfde_avond(dedupe({e["id"]: e for e in keep})).values())
     for e in keep:
         e.pop("vtype")
     changed += n0 - len(keep)

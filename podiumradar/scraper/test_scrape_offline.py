@@ -97,6 +97,27 @@ code, res, st = run(echt)
 check("de helft onbruikbaar: niet gepubliceerd (exit 2)", code, 2)
 bronnen = backup
 
+# 5b. merge_zelfde_avond(): dezelfde show twee keer bij één podium, uit twee bronnen (Carsick bij Hall of Fame, via 013 én de eigen site)
+def za(*evs):
+    r = scrape.merge_zelfde_avond({f"s{i}": dict({"v": "hof", "date": "2026-11-16", "genre": "Overig"}, **e) for i, e in enumerate(evs)})
+    return sorted((e["title"], e.get("time"), e.get("doors"), e.get("support"), e.get("first_seen")) for e in r.values())
+check("zelfde podium/dag/eerste act uit twee sites: één item, het rijkste blijft en krijgt het oudste first_seen",
+      za({"title": "CARSICK + CARNE", "time": "19:30", "url": "https://hall-fame.nl/programma/carsick", "first_seen": "2026-09-30"},
+         {"title": "Carsick", "time": "20:00", "doors": "19:30", "start": "21:30", "support": ["Carne"], "url": "https://www.013.nl/programma/1/carsick", "first_seen": "2026-11-12"}),
+      [("Carsick", "20:00", "19:30", ["Carne"], "2026-09-30")])
+check("... ook met '(013 op locatie)' achter de naam en als één tijd ontbreekt",
+      len(za({"title": "TAXITAXI (013 op locatie)", "time": None, "url": "https://culdesactilburg.nl/a"}, {"title": "TAXITAXI", "time": "20:30", "url": "https://www.013.nl/b"})), 1)
+check("voorprogramma dat alleen in de andere titel staat gaat mee",
+      za({"title": "Coilguns + Haatdrager (NL)", "time": None, "url": "https://littledevil.nl/a"}, {"title": "Coilguns", "time": "20:45", "doors": "20:00", "url": "https://www.013.nl/b"}),
+      [("Coilguns", "20:45", "20:00", ["Haatdrager"], None)])
+check("matinee en avond van dezelfde site: blijven twee items",
+      len(za({"title": "Hadestown", "time": "15:00", "url": "https://carre.nl/a"}, {"title": "Hadestown", "time": "20:00", "url": "https://carre.nl/b"})), 2)
+check("twee sites maar meer dan twee uur uit elkaar: blijven twee items",
+      len(za({"title": "Hadestown", "time": "14:00", "url": "https://a.nl/a"}, {"title": "Hadestown", "time": "20:00", "url": "https://b.nl/b"})), 2)
+check("andere eerste act of algemene titel: niet samengevoegd",
+      len(za({"title": "Carsick", "time": "20:00", "url": "https://a.nl/a"}, {"title": "Carne + Carsick", "time": "20:00", "url": "https://b.nl/b"},
+             {"title": "Pubquiz", "time": "20:00", "url": "https://a.nl/q"}, {"title": "Pubquiz", "time": "20:00", "url": "https://b.nl/q"})), 4)
+
 # 6. relocate(): show bij het juiste podium (Here's The Thing, 10 okt 2026)
 def ev6(venue, title, loc, date="2026-10-10", vtype="pop"):
     return {"venue": venue, "city": "Tilburg", "prov": "Noord-Brabant", "vtype": vtype, "kind": vtype, "date": date, "title": title, "loc": loc, "time": "15:00", "url": "https://x.nl/" + title}
