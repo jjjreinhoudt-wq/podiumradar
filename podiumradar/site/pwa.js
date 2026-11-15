@@ -6,9 +6,10 @@ function say(t){const el=document.getElementById("toast");if(!el)return;el.textC
 let inFrame; try{inFrame=window.self!==window.top}catch{inFrame=true}
 const standalone=(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)||navigator.standalone===true;
 
+if(ss.get("pr_sw_updated")){ss.del("pr_sw_updated");setTimeout(()=>say("Nieuwe versie geladen"),400)}
+
 /* ---------- service worker ---------- */
 if("serviceWorker" in navigator && !inFrame && (location.protocol==="https:"||location.hostname==="localhost"||location.hostname==="127.0.0.1")){
-  if(ss.get("pr_sw_updated")){ss.del("pr_sw_updated");setTimeout(()=>say("Nieuwe versie geladen"),400)}
   const hadController=!!navigator.serviceWorker.controller;
   let reloading=false;
   navigator.serviceWorker.addEventListener("controllerchange",()=>{
@@ -28,6 +29,27 @@ if("serviceWorker" in navigator && !inFrame && (location.protocol==="https:"||lo
       const warm=()=>caches.match("data.json").then(hit=>{ if(!hit) ["data.json","spotify.json"].forEach(u=>fetch(u,{cache:"no-cache"}).catch(()=>{})) }).catch(()=>{});
       if(navigator.serviceWorker.controller) warm(); else navigator.serviceWorker.addEventListener("controllerchange",()=>setTimeout(warm,0),{once:true});
     }).catch(()=>{});
+  });
+}
+
+/* ---------- nieuwe versie van de app zelf ---------- */
+// Een app op het beginscherm blijft dagenlang open staan en heeft geen ververs-knop: zonder dit bleef hij op de oude
+// app.js draaien tot hij helemaal werd afgesloten. Daarom: bij terugkeren naar de app (hoogstens eens per 5 min) kijken
+// of app.js of index.html op de server veranderd is (alleen de kopregels, geen download) en dan één keer herladen.
+if(!inFrame && location.protocol.startsWith("http")){
+  const sig=()=>Promise.all(["app.js","index.html"].map(u=>fetch(u,{method:"HEAD",cache:"no-store"}).then(r=>r.ok?(r.headers.get("etag")||r.headers.get("last-modified")||r.headers.get("content-length")||""):null)))
+    .then(a=>a.some(x=>x===null||x==="")?null:a.join("|")).catch(()=>null);
+  let base=null, last=0;
+  window.addEventListener("load",()=>{ sig().then(v=>{base=v}) });
+  document.addEventListener("visibilitychange",()=>{
+    if(document.visibilityState!=="visible"||!base||Date.now()-last<300000) return;
+    last=Date.now();
+    sig().then(v=>{ if(!v||v===base) return;
+      // niet midden in iets herladen: open scherm of typen wacht tot de volgende keer
+      const bezig=document.querySelector(".sheet.open")||(document.activeElement&&/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName));
+      if(bezig){last=0; return}
+      if(Date.now()-(+ss.get("pr_app_reload")||0)<60000) return;
+      ss.set("pr_app_reload",String(Date.now())); ss.set("pr_sw_updated","1"); location.reload() });
   });
 }
 

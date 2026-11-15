@@ -4,7 +4,7 @@
    (network-first), dus updates komen direct door; de cache is alleen voor offline.
    data.json en spotify.json staan bewust NIET in SHELL: de pagina haalt ze zelf op (anders eerst twee keer 1 MB), de kopie
    voor offline wordt gemaakt door pwa.js (eerste bezoek) en daarna bij elk gewoon verzoek. */
-const VERSION = "v6";
+const VERSION = "v7";
 const CACHE = "podiumradar-" + VERSION;
 const FONTS = "podiumradar-fonts"; // los van VERSION: fonts veranderen niet
 const SHELL = ["./", "index.html", "over.html", "app.js", "pwa.js", "manifest.json", "fonts.css", "nl.json",

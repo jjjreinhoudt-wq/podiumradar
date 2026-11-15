@@ -9,12 +9,12 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const { chromium } = require(process.env.PWPATH || 'playwright');
 const SITE = path.resolve(__dirname, '../site');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
-let dataOverride = null;
+let dataOverride = null, appVer = 1;   // appVer: 'versie' van app.js op de server (kopregel etag), om een nieuwe uitrol na te spelen
 const server = http.createServer((req, res) => {
   const u = decodeURIComponent(req.url.split('?')[0]); let f = path.join(SITE, u === '/' ? 'index.html' : u);
   if (!f.startsWith(SITE) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end('nee'); }
   const body = (u === '/data.json' && dataOverride) ? Buffer.from(JSON.stringify(dataOverride)) : fs.readFileSync(f);
-  res.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream', 'cache-control': 'no-store' }); res.end(body);
+  res.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream', 'cache-control': 'no-store', ...(u === '/app.js' || u === '/index.html' ? { etag: '"v' + appVer + '"' } : {}) }); res.end(body);
 });
 let fouten = 0;
 const check = (naam, ok, extra) => { if (!ok) fouten++; console.log((ok ? 'ok   ' : 'FOUT ') + naam + (ok || extra === undefined ? '' : ' -> ' + JSON.stringify(extra))); };
@@ -253,6 +253,21 @@ const UPD = nlMs(real.updated);
     check('mijn locatie: het podium om de hoek is nu op loopafstand', (await p.locator('.ev[data-ev="r1"] .tt').innerText()).includes('lopen'));
     check('reistijd/locatie: geen fouten en geen verzoeken naar buiten', p.errs.length === 0 && p.ext.length === 0, [p.errs, p.ext]);
     await p.context().close(); dataOverride = null;
+  }
+
+  // 11. een app die open blijft staan merkt een nieuwe versie op de server en herlaadt zichzelf (één keer)
+  {
+    p = await newPage(); await start(p); await p.waitForTimeout(1200);
+    await p.evaluate(() => { window.__oud = 1; document.dispatchEvent(new Event('visibilitychange')); }); await p.waitForTimeout(1500);
+    check('zelfde versie op de server: niet herladen', (await p.evaluate(() => window.__oud)) === 1);
+    await p.context().close();
+    p = await newPage(); await start(p); await p.waitForTimeout(1200);
+    appVer = 2; await p.evaluate(() => { window.__oud = 1; document.dispatchEvent(new Event('visibilitychange')); });
+    await p.waitForFunction(() => !window.__oud && document.body.dataset.ready === '1', null, { timeout: 15000 }).catch(() => {});
+    check('nieuwe versie op de server: open app herlaadt zichzelf', (await p.evaluate(() => window.__oud)) !== 1);
+    await p.evaluate(() => { window.__oud = 1; document.dispatchEvent(new Event('visibilitychange')); }); await p.waitForTimeout(1500);
+    check('daarna niet opnieuw herladen', (await p.evaluate(() => window.__oud)) === 1 && p.ext.length === 0);
+    await p.context().close(); appVer = 1;
   }
 
   await browser.close(); server.close();
