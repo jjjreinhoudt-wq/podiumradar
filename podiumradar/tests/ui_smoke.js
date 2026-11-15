@@ -3,7 +3,8 @@
    (of zonder PWPATH als 'playwright' in node_modules staat). Verwacht: "ALLES GOED".
    Start zelf een webserver op een vrije poort voor site/, en test onder andere: opstarten zonder fouten, geen verzoeken naar
    buiten, tabbladen, zoeken, detailscherm, 'Klopt niet?' (geen openbaar bericht), Ik ga, agendabestand, Terug sluit schermen,
-   waarschuwing bij oude data, en dat kapotte rijen of kapotte opgeslagen gegevens de app niet leegmaken. */
+   waarschuwing bij oude data, dat kapotte rijen of kapotte opgeslagen gegevens de app niet leegmaken, en de tournee ('Speelt ook',
+   'Ook dichterbij'), de poster van je plannen, Laatste kans en het wegklappen van wat vandaag al afgelopen is. */
 const http = require('http'), fs = require('fs'), path = require('path');
 const { chromium } = require(process.env.PWPATH || 'playwright');
 const SITE = path.resolve(__dirname, '../site');
@@ -171,6 +172,42 @@ const UPD = nlMs(real.updated);
   await p.context().close();
   const alles = fs.readdirSync(SITE).filter(f => /\.(html|js|json|css|svg)$/.test(f) && f !== 'data.json' && f !== 'nl.json').map(f => fs.readFileSync(path.join(SITE, f), 'utf8')).join('\n');
   check('geen e-mailadres in de site', !/[\w.+-]+@(gmail|hotmail|outlook|icloud)\.[a-z]+/i.test(alles));
+
+  // 8. tournee, 'ook dichterbij', laatste kans, poster en wat vandaag al afgelopen is (eigen testgegevens, vaste klok)
+  {
+    const vids = Object.keys(real.venues), find = (stad, type) => vids.find(id => real.venues[id].city === stad && real.venues[id].type === type && real.venues[id].lat != null);
+    const vT = find('Tilburg', 'pop'), vG = find('Groningen', 'pop'), vA = find('Amsterdam', 'pop'), vM = vids.find(id => real.venues[id].type === 'museum' && real.venues[id].lat != null);
+    const dag = n => { const x = new Date(2026, 10, 15 + n); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+    const ev = (id, v, d, time, title, extra = {}) => ({ id, v, date: dag(d), time, title, url: 'https://voorbeeld.test/' + id, genre: 'Overig', first_seen: dag(-20), ...extra });
+    dataOverride = { updated: '2026-11-15 09:00', venues: real.venues, events: [
+      ev('t1', vG, 3, '20:00', 'Testband Zonnevlek'), ev('t2', vA, 5, '20:30', 'Testband Zonnevlek - Clubtour'), ev('t3', vT, 9, '20:00', 'Testband Zonnevlek'),
+      ev('t4', vT, 0, '10:00', 'Ochtendact Voorbij'), ev('t5', vT, 0, '21:00', 'Avondact Komt Nog'),
+      ev('x1', vM, -10, null, 'Proefexpo Bijna Weg', { end: dag(2), genre: 'Tentoonstelling' }), ev('x2', vM, -10, null, 'Proefexpo Loopt Lang', { end: dag(90), genre: 'Tentoonstelling' })] };
+    p = await newPage(); await p.clock.setFixedTime(new Date('2026-11-15T19:00:00+01:00')); await start(p);
+    check('vandaag: wat al afgelopen is staat niet bovenaan', (await p.locator('.overnote').count()) === 1 && !(await p.locator('#main').innerText()).includes('Ochtendact Voorbij'));
+    await p.click('[data-showover]'); check("vandaag: 'Toon toch' haalt het terug", (await p.locator('#main').innerText()).includes('Ochtendact Voorbij'));
+    const ver = p.locator('.ev[data-ev="t1"]');
+    check("kaartje ver weg: 'Ook dichterbij' met de stad van het dichtste podium", (await ver.locator('.nearer').innerText().catch(() => '')).includes('Tilburg'));
+    check("kaartje dichtbij: geen 'Ook dichterbij'", (await p.locator('.ev[data-ev="t3"] .nearer').count()) === 0);
+    await ver.click(); await p.waitForTimeout(600);
+    check('detail: tip bovenaan en lijst met de 2 andere data', (await p.locator('#detailSheet .tourtip').count()) === 1 && (await p.locator('#detailSheet .tour .ev').count()) === 2);
+    check('detail: kaartje van de tournee getekend', (await p.locator('#tourMap .t-dot').count()) === 3);
+    check('detail: geen verzonnen voorprogramma', !(await p.locator('#detailSheet .timeline').innerText()).toLowerCase().includes('voorprogramma'));
+    await p.click('#goBtn'); await p.click('#detailSheet .tourtip'); await p.waitForTimeout(400);
+    check('tip opent de datum dichterbij', (await p.locator('#detailSheet .dsub').first().innerText()).toLowerCase().includes('24 nov'));
+    await p.click('#goBtn'); await p.goBack(); await p.waitForTimeout(300);
+    await p.click('nav.tabs [data-view=fav]'); await p.click('#posterBtn'); await p.waitForTimeout(1500);
+    const px = await p.evaluate(() => { const c = document.querySelector('#posterCv'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let licht = 0; for (let i = 0; i < d.length; i += 400) if (d[i] > 200 && d[i + 1] > 200 && d[i + 2] > 200) licht++; return { w: c.width, h: c.height, licht }; });
+    check('poster: getekend op 1080 x 1350 met tekst erop', px.w === 1080 && px.h === 1350 && px.licht > 50, px);
+    const dl = p.waitForEvent('download', { timeout: 5000 }).catch(() => null); await p.click('#posterSave'); const f = await dl;
+    check('poster: opslaan geeft een png', !!f && f.suggestedFilename() === 'mijn-line-up.png');
+    await p.goBack(); await p.waitForTimeout(300);
+    await p.click('nav.tabs [data-view=list]'); await p.click('.seg [data-type=expo]'); await p.click('[data-view-go=last]'); await p.waitForTimeout(300);
+    const lk = await p.locator('#main').innerText();
+    check('laatste kans: alleen wat binnen twee weken afloopt', lk.includes('Proefexpo Bijna Weg') && !lk.includes('Proefexpo Loopt Lang') && lk.includes('Nog 2 dagen'));
+    check('nieuwe onderdelen: geen fouten en geen verzoeken naar buiten', p.errs.length === 0 && p.ext.length === 0, [p.errs, p.ext]);
+    await p.context().close(); dataOverride = null;
+  }
 
   await browser.close(); server.close();
   console.log('\n' + (fouten ? fouten + ' FOUT(EN)' : 'ALLES GOED')); process.exit(fouten ? 1 : 0);

@@ -404,6 +404,37 @@ html:has(#scrim.open){overflow:hidden}
 .installbar strong{display:block;font-size:14px}
 .installbar .btn{flex:0 0 auto;padding:8px 12px;font-size:13px}
 .installbar .x{border:0;background:none;color:var(--muted);font-size:22px;line-height:1;padding:4px 6px}
+/* --- nov 2026: live-label, mini-radar, tournee, signaal, poster --- */
+.ev .t.live small::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:4px;vertical-align:1px;animation:livep 1.6s ease-in-out infinite}
+@keyframes livep{50%{opacity:.25}}
+.ev .s.nearer{margin-top:4px;font-weight:600;color:color-mix(in srgb,var(--acc) 85%,var(--ink))}
+.overnote{margin:14px 0 -4px}
+.tncta svg.mrad{width:56px;height:56px;padding:0;border-radius:50%;background:radial-gradient(circle at 50% 50%,rgba(143,160,255,.28),rgba(16,20,43,.55) 72%);overflow:hidden;--pop:#8FA0FF;--thea:#F285B6;--film:#BBA6FF;--expo:#5AD69D;--fest:#FFAA66}
+.mrad circle{fill:none;stroke:rgba(255,255,255,.22);stroke-width:.7}
+.mrad .md{stroke:rgba(16,20,43,.7);stroke-width:.6}
+.mrad .mh{fill:#fff;stroke:none}
+.mrad .msw{fill:rgba(170,184,255,.38);transform-origin:30px 30px;animation:rsweep 6s linear infinite}
+.dsig{position:absolute;top:34px;right:-34px;width:190px;height:190px;color:var(--acc);opacity:.13;pointer-events:none}
+#detailSheet .dhead,#detailSheet .facts{position:relative}
+.tourtip{display:block;width:100%;text-align:left;border:0;color:var(--ink);font:inherit;cursor:pointer;margin:0 0 4px;padding:10px 12px;border-radius:12px;background:var(--acc-soft);font-size:14px;line-height:1.35}
+.tourmap{border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:10px;background:var(--map-sea)}
+.tourmap svg{display:block;width:100%;aspect-ratio:16/10}
+.tourmap .m-land{stroke-width:.6}
+.t-route{fill:none;stroke:var(--acc);opacity:.55;stroke-linecap:round;stroke-linejoin:round}
+.t-dot{fill:var(--acc);stroke:var(--card)}
+.t-dot.cur{fill:var(--star)}
+.t-home{fill:var(--card);stroke:var(--ink)}
+.t-lbl{fill:var(--ink);font-weight:700;text-anchor:middle;paint-order:stroke;stroke:var(--map-land);stroke-linejoin:round}
+.tourleg{display:flex;gap:14px;padding:7px 12px;font-size:12px;color:var(--muted);background:var(--card);border-top:1px solid var(--line)}
+.tourleg i{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--acc);margin-right:5px}
+.tourleg i.cur{background:var(--star)}.tourleg i.home{background:var(--card);border:1.5px solid var(--ink);box-sizing:border-box}
+.simlist.tour .ev{grid-template-columns:58px 1fr auto;padding:8px 10px 8px 8px}
+.simlist.tour .ev .t{min-height:48px;padding:6px 4px}
+.simlist.tour .ev.xtra{display:none}.simlist.tour.all .ev.xtra{display:grid}
+.simlist .chev{font-style:normal;font-size:22px;color:var(--muted);padding:0 4px}
+canvas.poster{display:block;width:100%;max-width:420px;height:auto;margin:14px auto 0;border-radius:14px;box-shadow:0 10px 30px rgba(18,22,47,.35);background:#12162F;aspect-ratio:4/5}
+.btn.poster-btn{background:linear-gradient(135deg,#1B2140,#3A2A7A);color:#fff;border:0}
+@media (prefers-reduced-motion:reduce){.mrad .msw{animation:none}.ev .t.live small::before{animation:none}}
 </style>
 </head>
 <body>
