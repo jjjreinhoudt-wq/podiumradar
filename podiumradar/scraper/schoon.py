@@ -75,7 +75,7 @@ def schoon_event(e):
     p = getal(e.get("price"), 0, 10000, 2)
     if p is not None:
         out["price"] = p
-    for k in ("doors", "start"):
+    for k in ("doors", "start", "tot"):   # tot = verwachte eindtijd volgens het podium
         if tijd(e.get(k)):
             out[k] = e[k]
     if e.get("status") == "sold":

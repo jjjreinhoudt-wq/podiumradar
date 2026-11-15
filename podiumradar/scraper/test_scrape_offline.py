@@ -331,4 +331,103 @@ s_out, _ = scrape.schoon.schoon_alles({"updated": "x", "venues": {k: dict(v, pro
                                                     "ook": [{"v": "wee", "url": "https://w.nl/x"}, {"v": "onbekend", "url": "https://q.nl"}, {"v": "cds", "url": "https://c.nl"}]}]})
 check("opschonen: 'ook' houdt alleen bekende andere podia, en dat podium blijft in venues", (s_out["events"][0]["ook"], sorted(s_out["venues"])), ([{"v": "wee", "url": "https://w.nl/x"}], ["cds", "wee"]))
 
+# AFAS Live: naam, datum en uitverkocht uit de agenda (één regel per speeldatum); tijden en prijs uit het datumblok en het
+# tijdschema onderaan de voorstellingspagina. Niet uit de paginatekst: daar staat de start van de voorverkoop ('om 10:00 uur').
+def _afas_rij(slug, titel, datum, tijd="", klasse="st-none", extra=""):
+    return (f'<article class="agendaV2-item {klasse}" id="_agenda_1"><div class="row inner"><a aria-hidden="true" class="rowImg" href="https://www.afaslive.nl/agenda/{slug}"><figure></figure></a>'
+            f'<div class="mid"><a class="rowMain" href="https://www.afaslive.nl/agenda/{slug}"><h4>{titel}{f" <time>{tijd}</time>" if tijd else ""}</h4>'
+            f'<p class="date">{extra}<span class="d">{datum}</span></p></a><div class="btns"><a class="btnV2 tickets" href="https://t.nl/x"><span class="lbl">tickets</span></a>'
+            f'{"<span>Uitverkocht!</span>" if "soldout" in klasse else ""}</div></div></div></article>')
+def _afas_blok(naam, datum, tijd="", prijzen_="<li>Entree vanaf<span>€ 78,54</span></li>"):
+    return (f'<details><summary><div class="desktop"><date>{datum}</date></div></summary><div class="gridFrame"><div class="grid-item left"><h3>{naam}</h3>'
+            f'<datetime>{datum}{f" - <time>{tijd}</time>" if tijd else ""}</datetime><ul>{prijzen_}</ul></div><div class="grid-item">De kaartverkoop start vrijdag om 10:00 uur.</div></div></details>')
+def _afas_pagina(blokken, tabs, acts=""):
+    knoppen = "".join(f'<button data-tab="_tab{i}">{k}</button>' for i, (k, _) in enumerate(tabs))
+    inhoud = "".join(f'<div class="floated tabsContent" id="_tab{i}">{c}</div>' for i, (_, c) in enumerate(tabs))
+    return (f'<html><head><title>X op 1 en 4 december {j} in AFAS Live - AFAS Live</title></head><body><h1>Agenda</h1><div class="row agenda-item"><ul class="act">{acts}</ul>'
+            f'<div class="floated intro"><p>De voorverkoop start vrijdag 29 mei om 10:00 uur.</p></div><div class="floated dates">{"".join(blokken)}</div>'
+            f'<div class="tabsContainer timesTable" id="timetable"><div class="tab _{len(tabs)}">{knoppen}</div>{inhoud}</div></div></body></html>')
+_li = lambda *rows: "<ul>" + "".join(f"<li> {l} <span>{t} uur</span> </li>" for l, t in rows) + "</ul>"
+_onbekend = '<p class="txt-white">Tijden nog niet bekend</p>'
+afas_agenda = "<html><body>" + "".join([
+    _afas_rij("good-charlotte", "Good Charlotte", f"maandag 16 november {j}"),
+    _afas_rij("bloc-party-interpol", "Bloc Party + Interpol", f"dinsdag 17 november {j}"),
+    _afas_rij("de-mega-sint-show", "De Mega Sint Show", f"woensdag 25 november {j}", "13:45"),
+    _afas_rij("de-mega-sint-show", "De Mega Sint Show", f"woensdag 25 november {j}", "16:45", "alt st-soldout"),
+    _afas_rij("beth-hart", "Beth Hart", f"dinsdag 01 december {j}"),
+    _afas_rij("beth-hart", "Beth Hart", f"vrijdag 04 december {j}", klasse="alt st-none"),
+    _afas_rij("vieze-asbak", "Vieze Asbak All Day Long", f"zaterdag 05 december {j}", klasse="st-soldout"),
+    _afas_rij("freek-vonk", "Freek Vonk Live", f"zaterdag 19 december {j}", "10:00"),
+    _afas_rij("freek-vonk", "Freek Vonk Live", f"zaterdag 19 december {j}", "13:30"),
+    _afas_rij("masego", "Masego", f"dinsdag 23 februari {j + 1}", klasse="st-moved"),
+    _afas_rij("brandi-carlile", "Brandi Carlile", f"vrijdag 02 april {j + 1}", klasse="st-moved", extra=f"<span class=\"old\">dinsdag 27 oktober {j}</span> "),
+    _afas_rij("stuk", "Pagina Stuk", f"zondag 04 juli {j + 1}"),
+    _afas_rij("geweest", "Al Geweest", "zondag 04 juli 2021")]) + "</body></html>"
+afas_paginas = {
+    "https://www.afaslive.nl/agenda": afas_agenda,
+    "https://www.afaslive.nl/agenda/good-charlotte": _afas_pagina([_afas_blok("Good Charlotte", f"maandag 16 november {j}", prijzen_="<li>Entree vanaf<span>€ 64,52</span></li>")],
+        [("ma. 16 nov.", _li(("Deuren Open", "18:30"), ("Aanvang Opener: Grave Secrets", "19:00"), ("Aanvang Special guest: Yellowcard", "19:45"), ("Aanvang: Good Charlotte", "21:05"), ("Verwacht einde show", "22:35")))],
+        '<li><i></i> Special Guest <a href="#">Yellowcard</a></li><li><i></i> Special Guest <a href="#">Grave Secrets</a></li>'),
+    "https://www.afaslive.nl/agenda/bloc-party-interpol": _afas_pagina([_afas_blok("Bloc Party + Interpol", f"dinsdag 17 november {j}")],
+        [("di. 17 nov.", _li(("Deuren open", "18:00"), ("Aanvang Support: Heartworms", "18:45"), ("Aanvang: Interpol", "19:45"), ("Aanvang: Bloc Party", "21:30"), ("Verwacht einde", "22:45")))]),
+    "https://www.afaslive.nl/agenda/de-mega-sint-show": _afas_pagina(
+        [_afas_blok("De Mega Sint Show", f"woensdag 25 november {j}", "13:45", "<li>Droomplaatsen<span>€ 37,-</span></li><li>Rang 2<span>€ 22,-</span></li>"),
+         _afas_blok("De Mega Sint Show", f"woensdag 25 november {j}", "16:45", "<li>Rang 1<span>€ 32,-</span></li>")],
+        [("wo. 25 nov.<br/>13:45", _li(("Deuren open", "13:45"))), ("wo. 25 nov.<br/>16:45", _li(("Deuren open", "16:45")))]),
+    "https://www.afaslive.nl/agenda/beth-hart": _afas_pagina([_afas_blok("Beth Hart", f"dinsdag 1 december {j}", "20:00"), _afas_blok("Beth Hart", f"vrijdag 4 december {j}", "20:00")],
+        [("di. 01 dec.<br/>20:00", _onbekend), ("vr. 04 dec.<br/>20:00", "<ul> </ul>")],
+        '<li><i></i> Support act <a href="#">Emmy d’Arc</a></li><li><i></i> Support act <a href="#">JEN</a></li>'),
+    "https://www.afaslive.nl/agenda/vieze-asbak": _afas_pagina([_afas_blok("Vieze Asbak", f"zaterdag 5 december {j}", prijzen_="")],
+        [("za. 05 dec.", _li(("Verwachtte eindtijd", "00:00"), ("Deuren open", "17:00")))]),
+    "https://www.afaslive.nl/agenda/freek-vonk": _afas_pagina([_afas_blok("Freek Vonk Live", f"zaterdag 19 december {j}", "10:00"), _afas_blok("Freek Vonk Live", f"zaterdag 19 december {j}", "13:30")],
+        [("za. 19 dec.<br/>10:00", _li(("Aanvang", "10:00"))), ("za. 19 dec.<br/>13:30", _li(("Aanvang", "10:00")))]),
+    "https://www.afaslive.nl/agenda/masego": _afas_pagina([_afas_blok("Masego", f"dinsdag 23 februari {j + 1}")], [("di. 23 feb.", _onbekend)]),
+    "https://www.afaslive.nl/agenda/brandi-carlile": _afas_pagina([_afas_blok("Brandi Carlile", f"vrijdag 2 april {j + 1}")], [("vr. 02 apr.", _li(("Aanvang show", "20:30"), ("Pauze", "21:15")))]),
+}
+class _FA:
+    def __init__(self, pages): self.pages, self.stats, self.n = pages, {}, 0
+    def get(self, url):
+        self.n += 1
+        return self.pages.get(url)
+afas_src = {"name": "AFAS Live", "agenda_url": "https://www.afaslive.nl/agenda", "platform": "afaslive"}
+afas_cache, fa = {}, _FA(afas_paginas)
+ae = venues.scrape(afas_src, fa, {}, lambda *a: None, afas_cache)
+kort = lambda t, d: next(({k: e.get(k) for k in ("time", "doors", "start", "support", "tot", "price", "status")} for e in ae if e["title"] == t and e["date"] == d), None)
+check("afas: één item per speeldatum, kale namen, verleden niet", [(e["title"], e["date"], e["time"]) for e in ae],
+      [("Good Charlotte", f"{j}-11-16", "19:00"), ("Bloc Party + Interpol", f"{j}-11-17", "18:45"), ("De Mega Sint Show", f"{j}-11-25", "13:45"), ("De Mega Sint Show", f"{j}-11-25", "16:45"),
+       ("Beth Hart", f"{j}-12-01", "20:00"), ("Beth Hart", f"{j}-12-04", "20:00"), ("Vieze Asbak All Day Long", f"{j}-12-05", "17:00"), ("Freek Vonk Live", f"{j}-12-19", "10:00"),
+       ("Freek Vonk Live", f"{j}-12-19", "13:30"), ("Masego", f"{j + 1}-02-23", None), ("Brandi Carlile", f"{j + 1}-04-02", "20:30"), ("Pagina Stuk", f"{j + 1}-07-04", None)])
+check("afas: tijdschema onderaan (deuren, voorprogramma's, hoofdact, einde) en prijs; niet de 10:00 van de voorverkoop", kort("Good Charlotte", f"{j}-11-16"),
+      {"time": "19:00", "doors": "18:30", "start": "21:05", "support": ["Grave Secrets", "Yellowcard"], "tot": "22:35", "price": 64.52, "status": None})
+check("afas: blokken per act", next(e["times"] for e in ae if e["title"] == "Good Charlotte"),
+      [{"a": "Grave Secrets", "s": "19:00"}, {"a": "Yellowcard", "s": "19:45"}, {"a": "Good Charlotte", "s": "21:05"}])
+check("afas: twee hoofdacts: aanvang is de eerste, support alleen wat ervoor komt", kort("Bloc Party + Interpol", f"{j}-11-17"),
+      {"time": "18:45", "doors": "18:00", "start": "19:45", "support": ["Heartworms"], "tot": "22:45", "price": 78.54, "status": None})
+check("afas: twee shows op één dag, elk hun tijd, prijs en uitverkocht", (kort("De Mega Sint Show", f"{j}-11-25"), [(e["time"], e.get("doors"), e.get("price"), e.get("status")) for e in ae if e["title"] == "De Mega Sint Show"]),
+      ({"time": "13:45", "doors": "13:45", "start": None, "support": None, "tot": None, "price": 22.0, "status": None}, [("13:45", "13:45", 22.0, None), ("16:45", "16:45", 32.0, "sold")]))
+check("afas: tijden nog niet bekend: aanvang uit het datumblok, voorprogramma van boven aan de pagina", kort("Beth Hart", f"{j}-12-01"),
+      {"time": "20:00", "doors": None, "start": None, "support": ["Emmy d’Arc", "JEN"], "tot": None, "price": 78.54, "status": None})
+check("afas: eindtijd boven deuren open, uitverkocht", kort("Vieze Asbak All Day Long", f"{j}-12-05"),
+      {"time": "17:00", "doors": "17:00", "start": None, "support": None, "tot": "00:00", "price": None, "status": "sold"})
+check("afas: schema dat eerder begint dan de tweede show van de dag telt niet", [(e["time"], e.get("start"), e.get("times")) for e in ae if e["title"] == "Freek Vonk Live"],
+      [("10:00", "10:00", [{"a": "Freek Vonk Live", "s": "10:00"}]), ("13:30", None, None)])
+check("afas: verplaatst: de nieuwe datum; 'Aanvang show' is de hoofdact, pauze telt niet", (kort("Brandi Carlile", f"{j + 1}-04-02")["start"], next(e["times"] for e in ae if e["title"] == "Brandi Carlile")),
+      ("20:30", [{"a": "Brandi Carlile", "s": "20:30"}]))
+check("afas: pagina niet gekregen: de show blijft staan met wat de agenda geeft", kort("Pagina Stuk", f"{j + 1}-07-04"),
+      {"time": None, "doors": None, "start": None, "support": None, "tot": None, "price": None, "status": None})
+n1 = fa.n
+ae2 = venues.scrape(afas_src, fa, {}, lambda *a: None, afas_cache)
+check("afas: tweede keer uit de cache (alleen de agenda en de pagina die mislukte opnieuw), zelfde uitkomst", (fa.n - n1, ae2 == ae), (2, True))
+try:
+    venues.scrape(afas_src, _FA({}), {}, lambda *a: None, {})
+    fout_afas = None
+except RuntimeError as ex:
+    fout_afas = "fout"
+check("afas: agenda niet gekregen -> fout (geen terugval op de gewone uitlezer, oude items blijven)", fout_afas, "fout")
+check("afas: staat als platform bij de bron", next(b.get("platform") for b in json.loads((sources.ROOT / "scraper/bronnen.json").read_text(encoding="utf-8")) if b["name"] == "AFAS Live"), "afaslive")
+s_tot, _ = scrape.schoon.schoon_alles({"updated": "x", "venues": {"cds": dict(VN["cds"], prov="NB")}, "events": [
+    {"id": "e1", "v": "cds", "title": "A", "date": f"{j}-11-04", "time": "20:30", "url": "https://c.nl", "tot": "22:35"},
+    {"id": "e2", "v": "cds", "title": "B", "date": f"{j}-11-04", "time": "20:30", "url": "https://c.nl", "tot": "laat"}]})
+check("opschonen: eindtijd 'tot' blijft alleen als het een tijd is", [e.get("tot") for e in s_tot["events"]], ["22:35", None])
+
 print("\n" + ("ALLES GOED" if not fouten else f"{fouten} FOUT(EN)")); sys.exit(1 if fouten else 0)

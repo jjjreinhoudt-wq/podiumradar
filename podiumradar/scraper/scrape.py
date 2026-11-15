@@ -325,7 +325,7 @@ def verwerk_item(src, ev, events, seen):
     # (anders crasht later het sorteren of vergelijken, ook met items uit lokaal.json)
     if not schoon.datum(e.get("date"), laatst="2100-01-01"):
         raise ValueError("ongeldige datum")
-    for k in ("time", "doors", "start"):
+    for k in ("time", "doors", "start", "tot"):
         if k in e:
             e[k] = schoon.tijd(e[k])
             if e[k] is None and k != "time":
@@ -542,7 +542,7 @@ def merge_zelfde_avond(events):
                 h = events[hk]
                 th, tb = minuten(h.get("time")), minuten(b.get("time"))
                 if host(h["url"]) and host(b["url"]) and host(h["url"]) != host(b["url"]) and (th is None or tb is None or abs(th - tb) <= 120):
-                    for f in ("time", "doors", "start", "support", "times", "price", "status"):
+                    for f in ("time", "doors", "start", "support", "times", "tot", "price", "status"):
                         if h.get(f) in (None, "", []) and b.get(f) not in (None, "", []):
                             h[f] = b[f]
                     # voorprogramma dat alleen in de titel van het andere item staat ('Coilguns + Haatdrager') niet kwijtraken
@@ -682,6 +682,12 @@ def main():
         return reclassify()
     prev = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() else {"events": []}
     first_seen = {e["id"]: e.get("first_seen", TODAY.isoformat()) for e in prev.get("events", [])}
+    # Verandert de naam van een show (betere uitlezer: 'Beth Hart op 1 en 4 december 2026' -> 'Beth Hart') dan verandert de id;
+    # zelfde podium, link en dag is dan nog steeds dezelfde show en hoort niet opnieuw bij 'Nieuw'
+    first_seen_plek = {}
+    for e in prev.get("events", []):
+        k = (e.get("v"), (e.get("url") or "").split("?")[0].rstrip("/"), e.get("date"))
+        first_seen_plek[k] = min(first_seen_plek.get(k, "9"), e.get("first_seen", TODAY.isoformat()))
 
     events = own_events(prev.get("events", []))
     print(f"Eigen bronnen: {len(events)} items")
@@ -719,7 +725,7 @@ def main():
             venues[vid] = {"name": e["venue"], "city": city, "prov": e["prov"], "type": e["vtype"],
                            "lat": ll[0] if ll else None, "lon": ll[1] if ll else None}
         e["v"] = vid
-        e["first_seen"] = first_seen.get(e["id"], TODAY.isoformat())
+        e["first_seen"] = first_seen.get(e["id"]) or first_seen_plek.get((vid, (e.get("url") or "").split("?")[0].rstrip("/"), e["date"])) or TODAY.isoformat()
         for k in ("venue", "city", "prov", "kind", "vtype"):
             e.pop(k, None)
     n0 = len(events)

@@ -275,7 +275,7 @@ const UPD = nlMs(real.updated);
     const vids = Object.keys(real.venues), vT = vids.find(id => real.venues[id].city === 'Tilburg' && real.venues[id].type === 'pop' && real.venues[id].lat != null);
     const vA = vids.find(id => real.venues[id].city === 'Amsterdam' && real.venues[id].type === 'pop' && real.venues[id].lat != null);
     dataOverride = { updated: real.updated, venues: real.venues, events: [
-      { id: 'h1', v: vT, date: '2026-11-15', time: '20:30', title: 'Ruim Op Tijd', url: 'https://voorbeeld.test/h1', genre: 'Rock', first_seen: '2026-11-01' },
+      { id: 'h1', v: vT, date: '2026-11-15', time: '20:30', tot: '23:30', title: 'Ruim Op Tijd', url: 'https://voorbeeld.test/h1', genre: 'Rock', first_seen: '2026-11-01' },
       { id: 'h2', v: vA, date: '2026-11-15', time: '21:00', title: 'Hoofdstad Band', url: 'https://voorbeeld.test/h2', genre: 'Rock', first_seen: '2026-11-01' },
       { id: 'h3', v: vA, date: '2026-11-16', time: '00:30', title: 'Nachtprogramma', url: 'https://voorbeeld.test/h3', genre: 'Dance', first_seen: '2026-11-01' }] };
     p = await newPage({ hasTouch: true });
@@ -311,6 +311,7 @@ const UPD = nlMs(real.updated);
     check('bij nacht: om 14:00 is er niets bezig', (await zet(14 * 60)).includes('niets bezig'));
     check('bij nacht: om 20:45 brandt alleen Tilburg', (await zet(20 * 60 + 45)).includes('1 ding bezig op 1 plek in 1 stad'), await zet(20 * 60 + 45));
     check('bij nacht: om 21:15 ook Amsterdam', (await zet(21 * 60 + 15)).includes('2 dingen bezig op 2 plekken in 2 steden'));
+    check('bij nacht: de eindtijd van het podium zelf telt (tot 23:30 in plaats van geschat 22:30)', (await zet(23 * 60 + 15)).includes('1 ding bezig op 1 plek'), await zet(23 * 60 + 15));
     check('bij nacht: wat na middernacht begint hoort bij dezelfde avond', (await zet(24 * 60 + 45)).includes('1 ding bezig') && (await p.locator('#nightClock').innerText()) === '00:45');
     const licht = await p.evaluate(() => { const c = document.querySelector('#nightCv'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let m = 0; for (let i = 0; i < d.length; i += 4) m = Math.max(m, d[i] + d[i + 1] + d[i + 2]); return [c.width, m]; });
     check('bij nacht: de kaart is getekend en er brandt licht', licht[0] > 200 && licht[1] > 600, licht);

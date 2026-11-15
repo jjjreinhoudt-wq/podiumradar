@@ -7,6 +7,7 @@ import datetime as dt, json, re, time
 from zoneinfo import ZoneInfo
 from bs4 import BeautifulSoup
 from html import unescape
+from urllib.parse import urljoin
 import prijzen
 
 NL = ZoneInfo("Europe/Amsterdam")
@@ -593,13 +594,227 @@ def wp_shows(src, F, cfg, log):
     return out
 
 
+AFAS_ROL = re.compile(r"^(?:support(?:[ -]?acts?)?|opener|special\s+guests?|voorprogramma|gast(?:act)?)\b[\s:–-]*", re.I)
+AFAS_START = re.compile(r"^(?:aanvang|start|begin)\b[\s:–-]*", re.I)
+AFAS_KAAL = re.compile(r"^(?:de\s+|het\s+)?(?:show|concert|voorstelling|programma|optreden|hoofdact|hoofdprogramma|main\s*act|headliner)?$", re.I)
+AFAS_DATUM = re.compile(r"\b(\d{1,2})\s+([a-z]{3})[a-z]*\.?\s+(\d{4})\b", re.I)
+AFAS_V = 1  # ophogen als afas_detail iets anders teruggeeft (dan worden gecachte pagina's opnieuw gelezen)
+
+
+def _hhmm(txt):
+    m = HHMM.search(txt or "")
+    return f"{int(m.group(1)):02d}:{m.group(2)}" if m else None
+
+
+def afas_tijdschema(rows, title):
+    """Tijdschema van AFAS Live [('Deuren open', '18:30 uur'), ('Aanvang support: Tsatsamis', '20:00 uur'),
+    ('Aanvang: Jessie Ware', '21:00 uur'), ('Verwacht einde show', '22:45 uur')] -> {"doors", "start", "support", "times", "tot"}.
+    'Aanvang', 'Aanvang show' en 'Start Show' zonder naam zijn de hoofdact (naam = de titel); 'Opener', 'Special guest' en
+    'Support' zijn voorprogramma. De regels staan niet altijd op volgorde (eindtijd soms bovenaan)."""
+    out, acts = {}, []
+    for label, t in rows:
+        t = _hhmm(t)
+        label = " ".join((label or "").split()).strip(" :-–")
+        if not t or not label or re.search(r"\bvip\b|meet ?(&|and|n) ?greet|\bm&g\b|early entry", label, re.I):
+            continue
+        if re.search(r"eind|\bend\b|curfew", label, re.I):
+            out.setdefault("tot", t)
+        elif DOORS_RE.search(label):
+            out.setdefault("doors", t)
+        else:
+            rest, sup = AFAS_START.sub("", label), False
+            if AFAS_ROL.match(rest):
+                rest, sup = AFAS_ROL.sub("", rest).strip(" :-–"), True
+            elif rest == label:
+                continue  # geen 'Aanvang ...' en geen voorprogramma: pauze, signeersessie e.d.
+            if AFAS_KAAL.match(rest):
+                if sup:
+                    continue  # 'Aanvang support' zonder naam
+                rest = title
+            if len(rest) <= 80:
+                acts.append({"a": rest, "s": t, "sup": sup})
+    if not acts:
+        return out
+    mn = lambda x: int(x["s"][:2]) * 60 + int(x["s"][3:])
+    laat = max(mn(x) for x in acts) >= 720
+    acts.sort(key=lambda x: mn(x) + 1440 if laat and mn(x) < 360 else mn(x))  # 00:30 komt na 23:00
+    hoofd = next((i for i, x in enumerate(acts) if not x["sup"]), None)
+    sup = [x["a"] for i, x in enumerate(acts) if x["sup"] and (hoofd is None or i < hoofd)]
+    if sup:
+        out["support"] = sup[:6]
+    if hoofd is not None:  # zonder hoofdact in het schema geen blokken: de app zou de laatste act als hoofdact tonen
+        out["start"] = acts[hoofd]["s"]
+        out["times"] = [{"a": x["a"], "s": x["s"]} for x in acts[:12]]
+    return out
+
+
+def afas_detail(soup):
+    """Voorstellingspagina van AFAS Live -> {"shows": [{"date", "time", "price", "rows"}], "support": [...]}.
+    Elke speeldatum heeft een eigen uitklapblok (datum, eventueel tijd, prijzen) en een eigen tabblad in het tijdschema
+    onderaan de pagina. De tekst van de pagina zelf lezen we niet: daar staat ook wanneer de voorverkoop begint."""
+    shows = []
+    for det in soup.select("div.dates details"):
+        el = det.find("datetime") or det.find("date")
+        m = AFAS_DATUM.search(el.get_text(" ", strip=True)) if el else None
+        if not m or m.group(2).lower() not in _MON:
+            continue
+        try:
+            d = dt.date(int(m.group(3)), _MON[m.group(2).lower()], int(m.group(1))).isoformat()
+        except ValueError:
+            continue
+        tm = el.find("time")
+        bedragen = [int(a) + (int(b) if b else 0) / 100 for li in det.select("ul li")
+                    for a, b in re.findall(r"€\s*(\d{1,4})(?:[.,](\d{2}))?", li.get_text(" ", strip=True))]
+        bedragen = [b for b in bedragen if 1 <= b <= 1000]
+        shows.append({"date": d, "time": _hhmm(tm.get_text()) if tm else None, "price": min(bedragen) if bedragen else None, "rows": []})
+    tt, tabs = soup.select_one("div.timesTable"), []
+    for b in (tt.select("div.tab button") if tt else []):
+        inh = tt.find(id=b.get("data-tab")) if b.get("data-tab") else None
+        rows = []
+        for li in (inh.find_all("li") if inh else []):
+            sp = li.find("span")
+            if sp:
+                tijd = sp.get_text(" ", strip=True)
+                sp.extract()
+                rows.append([li.get_text(" ", strip=True), tijd])
+        m = re.search(r"\b(\d{1,2})\s+([a-z]{3})", b.get_text(" ", strip=True), re.I)
+        txt = re.sub(r"^.*?\b\d{1,2}\s+[a-z]{3}[a-z]*\.?", "", b.get_text(" ", strip=True), flags=re.I)
+        tabs.append({"dm": (int(m.group(1)), _MON.get(m.group(2).lower())) if m else None, "time": _hhmm(txt), "rows": rows})
+    dm = lambda s: (int(s["date"][8:]), int(s["date"][5:7]))
+    if len(tabs) == len(shows) and all(t["dm"] == dm(s) for t, s in zip(tabs, shows)):
+        for t, s in zip(tabs, shows):
+            s["rows"] = t["rows"]
+    else:  # aantallen verschillen: alleen koppelen wat op datum (en tijd) eenduidig is
+        for s in shows:
+            kand = [t for t in tabs if t["dm"] == dm(s)]
+            if len(kand) > 1:
+                kand = [t for t in kand if t["time"] == s["time"]]
+            if len(kand) == 1:
+                s["rows"] = kand[0]["rows"]
+    sup = []
+    for li in soup.select("ul.act li"):
+        naam = AFAS_ROL.sub("", " ".join(li.get_text(" ", strip=True).split())).strip(" :-–+")
+        if naam and len(naam) <= 80 and not NO_ACT_RE.search(naam):
+            sup.append(naam)
+    return {"shows": shows, "support": sup[:6]}
+
+
+def afas_show(rij, info, meerdere):
+    """Eén regel uit de agenda + wat de voorstellingspagina over die speeldatum zegt -> event.
+    Tijd: staat er een tijd bij de show zelf (twee shows op één dag, of '20:00' in het datumblok) dan is dat de aanvang;
+    anders de eerste act uit het tijdschema, anders deuren open. Bij meer shows op één dag vertrouwen we een schema dat
+    eerder begint dan de show niet (Freek Vonk: 'Aanvang 10:00' bij de show van 13:30)."""
+    ev = {"date": rij["date"], "time": rij.get("time"), "title": rij["title"], "url": rij["url"]}
+    if rij.get("status"):
+        ev["status"] = rij["status"]
+    if not info:
+        return ev
+    show, sup = info.get("show") or {}, info.get("support") or []
+    lt = rij.get("time") or show.get("time")
+    s = afas_tijdschema(show.get("rows") or [], rij["title"])
+    eerste = s["times"][0]["s"] if s.get("times") else None
+    if lt and meerdere:
+        if eerste and eerste < lt:
+            for k in ("times", "start", "support"):
+                s.pop(k, None)
+        ev["time"] = lt
+    else:
+        ev["time"] = eerste or lt or s.get("doors")
+    if s.get("doors") and ev["time"] and s["doors"] > ev["time"]:
+        s.pop("doors")
+    ev.update(s)
+    if sup and not ev.get("support") and not s.get("times"):
+        ev["support"] = sup  # nog geen tijdschema: de namen die boven aan de pagina staan
+    if show.get("price") is not None:
+        ev["price"] = show["price"]
+    return ev
+
+
+def afaslive(src, F, cfg, log, cache=None):
+    """AFAS Live: de agenda heeft per speeldatum een eigen regel met de kale naam ('Beth Hart', twee regels: 1 en 4 december;
+    twee shows op één dag elk met hun tijd). De voorstellingspagina heet 'Beth Hart op 1 en 4 december 2026 in AFAS Live' en
+    noemt in de tekst de start van de voorverkoop ('vrijdag om 10:00 uur'); de gewone uitlezer maakte daar één show op de
+    laatste datum om 10:00 van. Daarom: naam, datum en uitverkocht uit de agenda, tijden en prijs uit het datumblok en het
+    tijdschema van de voorstellingspagina (afas_detail). Lukt de agenda niet, dan een fout (geen terugval op de gewone
+    uitlezer en geen halve lijst)."""
+    html = F.get(src["agenda_url"])
+    arts = BeautifulSoup(html, "html.parser").select("article.agendaV2-item") if html else []
+    rijen = []
+    for art in arts:
+        a = art.select_one("a.rowMain[href]") or art.find("a", href=True)
+        h = art.find(["h4", "h3", "h2"])
+        if not a or not h:
+            continue
+        tm = h.find("time")
+        tijd = _hhmm(tm.get_text()) if tm else None
+        if tm:
+            tm.extract()
+        titel = " ".join(h.get_text(" ", strip=True).split())
+        p = art.select_one("p.date") or art
+        data = []
+        for m in AFAS_DATUM.finditer(p.get_text(" ", strip=True)):
+            try:
+                data.append(dt.date(int(m.group(3)), _MON[m.group(2).lower()], int(m.group(1))))
+            except (ValueError, KeyError):
+                pass
+        if not titel or not data:
+            continue
+        d = data[-1]  # verplaatste show: eerst de oude datum, dan de nieuwe
+        klassen, tekst = " ".join(art.get("class") or []), art.get_text(" ", strip=True)
+        status = "cancelled" if re.search(r"st-cancel|st-afgelast", klassen) or re.search(r"\b(afgelast|geannuleerd|gaat niet door)\b", tekst, re.I) \
+            else "sold" if "st-soldout" in klassen or re.search(r"\buitverkocht\b", tekst, re.I) else None
+        url = urljoin(src["agenda_url"], a["href"]).split("#")[0]
+        if d >= TODAY:
+            rijen.append({"date": d.isoformat(), "time": tijd, "title": titel, "url": url, "status": status})
+    if not rijen:
+        raise RuntimeError(f"AFAS Live: agenda niet gekregen of leeg (antwoorden: {F.stats.get('afaslive.nl', {})})")
+    fresh = (TODAY - dt.timedelta(days=cfg.get("detail_refresh_days", 7))).isoformat()
+    binnenkort = (TODAY + dt.timedelta(days=14)).isoformat()
+    infos, opgehaald = {}, 0
+    for u in dict.fromkeys(r["url"] for r in rijen):
+        c = (cache or {}).get(u) or {}
+        soon = min(r["date"] for r in rijen if r["url"] == u) <= binnenkort
+        if (c.get("afas") or {}).get("v") == AFAS_V and c.get("at", "") >= fresh and not (soon and c.get("at") != TODAY.isoformat()):
+            infos[u] = c["afas"]
+            continue
+        page = F.get(u)
+        opgehaald += 1
+        if not page:
+            continue  # pagina lukt niet: de show blijft staan met wat de agenda geeft
+        infos[u] = dict(afas_detail(BeautifulSoup(page, "html.parser")), v=AFAS_V)
+        if cache is not None:
+            cache[u] = {"at": TODAY.isoformat(), "v": 0, "ev": None, "afas": infos[u]}
+    out, gebruikt = [], {}
+    per_dag = {}
+    for r in rijen:
+        per_dag[(r["url"], r["date"])] = per_dag.get((r["url"], r["date"]), 0) + 1
+    for r in rijen:
+        info = infos.get(r["url"])
+        show = None
+        if info:
+            kand = [s for s in info["shows"] if s["date"] == r["date"]]
+            if r["time"] and any(s["time"] == r["time"] for s in kand):
+                kand = [s for s in kand if s["time"] == r["time"]]
+            if kand:  # zelfde datum zonder tijd in de agenda: op volgorde
+                i = gebruikt.get((r["url"], r["date"], r["time"]), 0)
+                show = kand[min(i, len(kand) - 1)]
+                gebruikt[(r["url"], r["date"], r["time"])] = i + 1
+        out.append(afas_show(r, {"show": show, "support": info["support"]} if info else None, per_dag[(r["url"], r["date"])] > 1))
+    log(f"  {src['name']}: {len(rijen)} speeldata op {len(infos)} pagina's ({opgehaald} opgehaald)")
+    return out
+
+
 PLATFORMS = {"paradiso": paradiso, "ziggodome": ziggodome, "melkweg": melkweg, "tolhuistuin": tolhuistuin, "musis": musis,
              "cre8ion": cre8ion, "render_api": render_api, "umbraco_agenda": umbraco_agenda,
-             "umbraco_getshows": umbraco_getshows, "itix": itix, "peppered": peppered, "wp_shows": wp_shows}
+             "umbraco_getshows": umbraco_getshows, "itix": itix, "peppered": peppered, "wp_shows": wp_shows, "afaslive": afaslive}
 
 
-def scrape(src, F, cfg, log):
-    evs = PLATFORMS[src["platform"]](src, F, cfg, log)
+MET_CACHE = {"afaslive"}  # uitlezers die voorstellingspagina's ophalen en daarvoor de detail-cache gebruiken
+
+
+def scrape(src, F, cfg, log, cache=None):
+    fn = PLATFORMS[src["platform"]]
+    evs = fn(src, F, cfg, log, cache) if src["platform"] in MET_CACHE else fn(src, F, cfg, log)
     if evs is None:  # platform herkent de site niet (meer): de gewone uitlezer neemt het over
         log(f"  {src['name']}: {src['platform']} gaf niets bruikbaars, terug naar de gewone uitlezer")
         return None

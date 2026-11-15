@@ -51,7 +51,7 @@ let BAD=0;
   const im=r.title.match(/Instore:\s*(.+)$/); if(im) acts=[im[1]];
   const support=Array.isArray(r.support)&&r.support.length?r.support.map(String):acts.slice(1);
   EV.push({id:r.id,title:r.title,artist:acts[0],support,v:r.v,genre:r.genre,type,date,d,
-    time:toMin(r.time)??toMin(r.start)??toMin(r.doors), doors:toMin(r.doors), start:toMin(r.start),
+    time:toMin(r.time)??toMin(r.start)??toMin(r.doors), doors:toMin(r.doors), start:toMin(r.start), tot:toMin(r.tot),
     // alleen echte webadressen als link (geen javascript:-links uit een bron)
     url:/^https?:\/\/[^\s<>"]+$/i.test(String(r.url||"").trim().replace(/ /g,"%20"))?String(r.url).trim().replace(/ /g,"%20"):"#",isFest:r.id[0]==="f"||type==="fest",status:r.status||null,firstSeen:r.first_seen,
     dur:r.dur||null,kids:!!r.kids||isKids(r.title,r.genre),endD,endDate:r.end?new Date(...r.end.split("-").map((x,i)=>i===1?x-1:+x)):null,started,
@@ -168,6 +168,11 @@ const alarmHit=e=>S.alarms.find(a=>(e.title+" "+V[e.v].name+" "+V[e.v].city).toL
 
 /* timetable: bron geeft één tijd; de rest is een schatting */
 function slots(e){
+  // Verwachte eindtijd van het podium zelf (`tot`, bv. AFAS Live 'Verwacht einde show 22:35'): het laatste blok loopt tot dan
+  const out=slots0(e); if(e.tot!=null&&out.length){const l=out[out.length-1]; let t=e.tot; if(t<=l.s) t+=1440; if(t-l.s<=14*60){l.e=t; if(l.est) l.est=false}}
+  return out;
+}
+function slots0(e){
   // Echte settijden van het podium: die gebruiken, niets schatten
   if(e.times){
     const T=e.times, fi=T.findIndex(x=>artistKey(x.a)===e.ak), main=fi<0?T.length-1:fi;

@@ -723,7 +723,7 @@ def scrape_source(src, F, cache, cfg, log):
     if src.get("platform") in museum.PLATFORMS:
         return museum.scrape(src, F, cfg, log)
     if src.get("platform") in venues.PLATFORMS:
-        evs = venues.scrape(src, F, cfg, log)
+        evs = venues.scrape(src, F, cfg, log, cache)
         if evs is not None:  # None: platform herkende de site niet, dan de gewone uitlezer
             return evs
     # Tentoonstellingen: periode ("t/m ...") in plaats van één datum
