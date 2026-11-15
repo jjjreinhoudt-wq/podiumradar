@@ -230,7 +230,7 @@ const cityKey=c=>{c=String(c||""); let r=CKC.get(c); if(r===undefined){const k=c
 const inCity=vid=>{const v=V[vid]; if(!v) return false; if(S.home==="__geo"){const k=travel(vid).k; return k!=null&&k<5}
   return cityKey(v.city)===cityKey(S.home)};
 function similar(e,n=4){
-  if(["Overig","Feest"].includes(e.genre)) return [];
+  if(["Overig","Feest","Theater"].includes(e.genre)) return [];
   const seenA=new Set([e.ak]);
   return EV.filter(x=>x.type===e.type&&x.genre===e.genre&&!seenA.has(x.ak)&&(seenA.add(x.ak),true))
     .sort((a,b)=>(travel(a.v).car??999)-(travel(b.v).car??999)||a.d-b.d).slice(0,n);
@@ -374,6 +374,61 @@ function tourMap(e){
     ${lbl.map(p=>{const k=cityKey(p.city); if(done.has(k)) return ""; done.add(k); return `<text class="t-lbl" x="${f1(p.x)}" y="${f1(p.y-u*9)}" style="font-size:${f1(u*11)}px;stroke-width:${f1(u*3)}">${esc(p.city)}</text>`}).join("")}</svg>
     <div class="tourleg"><span><i class="cur"></i>deze avond</span><span><i></i>andere data</span><span><i class="home"></i>jij</span></div>`;
 }
+/* ---------- FILM PER TITEL: één kaartje per film per dag, met daarachter alle bioscopen en tijden ---------- */
+const filmKey=e=>e.fk||(e.fk=artistKey(String(e.title).replace(/\s*\([^)]*\)/g,""))||artistKey(e.title)||e.id);
+const filmGroupable=e=>e.type==="film"&&e.endD==null&&e.time!=null;
+// Maakt van een (gefilterde, gesorteerde) lijst vertoningen een lijst met per dag en film één vertegenwoordiger:
+// de eerstvolgende vertoning in de dichtstbijzijnde bioscoop. Periodes (filmprogramma's) blijven losse kaartjes.
+function filmGroups(list){
+  const out=[], by=new Map();
+  list.forEach(e=>{ if(!filmGroupable(e)){out.push(e); return}
+    const k=e.d+"|"+filmKey(e); let g=by.get(k); if(!g){g={all:[],rep:null}; by.set(k,g)} g.all.push(e)});
+  const nm=nowMin();
+  by.forEach(g=>{ // liefst een vertoning die nog moet beginnen; daarvan de dichtstbijzijnde bioscoop, en daar de eerste tijd
+    const komt=g.all.filter(x=>x.d>0||x.time>nm), pool=komt.length?komt:g.all, near=Math.min(...pool.map(carOf));
+    const v0=pool.filter(x=>carOf(x)===near).sort((a,b)=>a.time-b.time)[0].v;
+    g.here=g.all.filter(x=>x.v===v0).sort((a,b)=>a.time-b.time); g.rep=(komt.length?g.here.find(x=>x.d>0||x.time>nm):null)||g.here[0]; g.venues=new Set(g.all.map(x=>vKey(x.v))).size; out.push(g.rep); FILMG.set(g.rep,g)});
+  const tm=e=>e.time==null?1200:e.time;
+  // Doorlopende programma's (periodes) komen na de films van vandaag, niet ervoor
+  return out.sort((a,b)=>a.d-b.d||(a.started-b.started)||carOf(a)-carOf(b)||tm(a)-tm(b));
+}
+const FILMG=new WeakMap();
+function filmRow(e){
+  const g=FILMG.get(e); if(!g) return evRow(e);
+  const v=V[e.v], c=carOf(e), nm=nowMin(), times=g.here.slice(0,5), more=g.here.length-times.length;
+  const price=g.here.reduce((m,x)=>x.price!=null&&(m==null||x.price<m)?x.price:m,null), nw=g.all.every(x=>NEW.has(x.id)||recent(x));
+  const lbl=e.d===0?(e.time<=nm?"nu bezig":e.time-nm<=90?"over "+(e.time-nm)+" min":"aanvang"):"aanvang";
+  return `<div class="ev film" role="button" tabindex="0" data-film="${esc(filmKey(e))}" data-fday="${e.d}">
+    <div class="t${lbl==="nu bezig"?" live":""}">${hm(e.time)}<small>${lbl}</small></div>
+    <div><div class="a">${esc(e.title)}${nw?'<span class="new">Nieuw</span>':""}</div>
+      <div class="v">${esc(v.name)}, ${esc(v.city)}${c!==999?" · ± "+c+" min":""}</div>
+      <div class="ftimes">${times.map(x=>`<span class="${x.d===0&&x.time<=nm?"past":""}${x.status==="sold"?" soldt":""}">${hm(x.time)}</span>`).join("")}${more>0?`<span class="more">+${more}</span>`:""}</div>
+      ${g.venues>1?`<div class="tt">ook in ${g.venues-1} ${g.venues===2?"andere bioscoop":"andere bioscopen"}</div>`:""}
+      ${price!=null?`<span class="tag price${price===0?" free":""}">${priceTxt(price)}</span>`:""}${e.dur?`<span class="tag">${e.dur} min</span>`:""}${g.all.some(x=>GO[x.id])?'<span class="tag going">✓ Ik ga</span>':""}</div>
+    <i class="chev" aria-hidden="true">›</i>
+  </div>`;
+}
+// Het filmscherm: alle dagen, per dag de bioscopen (dichtstbij eerst) met hun tijden; een tijd opent die vertoning
+function openFilm(key,fromDay=0){
+  const all=EV.filter(e=>filmGroupable(e)&&filmKey(e)===key&&!hiddenLoc(e.v)); if(!all.length) return;
+  lastDetail=null;
+  const nm=nowMin(), title=all.map(e=>e.title).sort((a,b)=>a.length-b.length)[0], dur=(all.find(e=>e.dur)||{}).dur;
+  const days=[...new Set(all.map(e=>e.d))].sort((a,b)=>a-b), start=days.includes(fromDay)?fromDay:days.find(d=>d>=fromDay)??days[0];
+  const dayHtml=(d,i)=>{ const by=new Map(); all.filter(e=>e.d===d).forEach(e=>{const k=vKey(e.v); if(!by.has(k)) by.set(k,[]); by.get(k).push(e)});
+    const rows=[...by.values()].map(l=>l.sort((a,b)=>a.time-b.time)).sort((a,b)=>carOf(a[0])-carOf(b[0])||a[0].time-b[0].time);
+    return `<div class="fday${i>=4?" xtra":""}"><h3>${dayLabel(d)} <small class="s" style="font-weight:400">${rows.length} ${rows.length===1?"bioscoop":"bioscopen"}</small></h3>
+      ${rows.map((l,j)=>{const v=V[l[0].v], c=carOf(l[0]); return `<div class="fven${j>=6?" xtra":""}"><div class="fvn"><b>${esc(v.name)}</b><span>${esc(v.city)}${c!==999?" · ± "+c+" min":""}</span></div><div class="fchips">${l.map(x=>`<button class="fchip${x.d===0&&x.time<=nm?" past":""}${x.status==="sold"?" soldt":""}${GO[x.id]?" going":""}" type="button" data-ev="${x.id}" aria-label="${hm(x.time)} bij ${esc(v.name)}${x.status==="sold"?", uitverkocht":""}">${hm(x.time)}</button>`).join("")}</div></div>`}).join("")}
+      ${rows.length>6?`<button class="btn ghost more" type="button" data-fmore>Toon alle ${rows.length} bioscopen</button>`:""}</div>`};
+  const shown=days.filter(d=>d>=start);
+  $("#detailSheet").innerHTML=`<div class="sheetbar"><button class="sheetx" type="button" data-close><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>Sluiten</button><div class="grab"></div></div>
+    ${sigSvg(key,"dsig")}
+    <div class="dhead"><div><div class="dsub">Film${dur?" · "+dur+" min":""}</div><div class="dtitle">${esc(title)}</div>
+      <div class="dsub">${nf(all.length)} ${all.length===1?"vertoning":"vertoningen"} in ${new Set(all.map(e=>vKey(e.v))).size} bioscopen en filmhuizen, dichtstbij eerst. Tik op een tijd voor kaarten en route.</div></div></div>
+    <div class="row2" style="margin:12px 0 2px"><a class="btn brand b-youtube" href="https://www.youtube.com/results?search_query=${encodeURIComponent(title+" trailer")}" target="_blank" rel="noopener noreferrer">${LOGO.youtube}Trailer</a></div>
+    <div class="fdays">${shown.map(dayHtml).join("")}${shown.length>4?`<button class="btn ghost more" type="button" data-fdaysmore>Toon ook de ${shown.length-4} latere dagen</button>`:""}</div>
+    <p class="note">Tijden van ${SNAPSHOT}, overgenomen van de sites van de bioscopen. Kijk daar voordat je gaat.</p>`;
+  openSheet("#detailSheet"); $("#detailSheet").scrollTop=0;
+}
 /* ---------- RENDER ---------- */
 // Gemarkeerde datum in het midden van de rij zetten (na wisselen van weergave of kiezen in de Kalender)
 const showDay=()=>{const dp=$('#dates .day[aria-pressed="true"]:not(.all)'), dd=$("#dates"); if(dp&&dd.offsetParent){const a=dp.getBoundingClientRect(), b=dd.getBoundingClientRect(); if(a.left<b.left||a.right>b.right) dd.scrollLeft+=a.left-b.left-(dd.clientWidth-dp.offsetWidth)/2}};
@@ -440,9 +495,9 @@ function dayRows(list,n,o){
   if(o.month){curM=o.month;h+=`<h2 class="mh">${cap(monthLabel(o.month))}</h2>`}
   list.slice(0,n).forEach(e=>{const door=e.started||e.d<o.from, k=door?"door":e.d;
     if(k!==cur){cur=k;
-      if(!door&&o.months){const m=mKey(e.date); if(m!==curM){curM=m;h+=`<h2 class="mh">${cap(monthLabel(m))}</h2>`}}
+      if(!door&&o.months){const m=mKey(e.date); if(m!==curM){const eerste=curM===null&&m===mKey(today); curM=m; if(!eerste) h+=`<h2 class="mh">${cap(monthLabel(m))}</h2>`}}
       h+=`<h2 class="dh">${door?o.door:dayLabel(e.d)}</h2>`}
-    h+=evRow(e)});
+    h+=(o.row||evRow)(e)});
   return h;
 }
 // Aantal per maand (alleen bij Alle data): [["2026-10",812],...]
@@ -543,20 +598,22 @@ function viewList(){
   const sig=[S.type,S.day,month,S.q,S.sort,S.venue,S.time,S.maxTravel,S.onlyFav,S.onlyFree,[...S.genre],[...S.regio],S.hideC.size,S.hideV.size].join("|");
   if(sig!==LIM.sig){LIM.sig=sig;LIM.n=300}
   const n=LIM.n;
-  let h=scopeChips()+tonightCta()+quickRow()+monthBar(mc)+`<div class="meta"><span>${nf(list.length)} ${LBL[S.type][list.length===1?0:1]}${month?" in "+monthLabel(month):""}${hidNote()}</span>${fcount()||S.q?'<button id="clearAll">Alles wissen</button>':""}</div>`;
-  if(!list.length){const alt=month&&mc.find(([k,c])=>c&&k!==month);
+  // Vandaag: wat al afgelopen is staat niet meer bovenaan (wel terug te halen)
+  const nm=nowMin(), over=e=>e.d===0&&!e.started&&e.endD==null&&e.time!=null&&(endOf(e)??e.time+120)<=nm;
+  const nOver=S.sort!=="date"||S.showOver?0:list.reduce((c,e)=>c+(over(e)?1:0),0), total=list.length;
+  if(nOver){ const keep=list.filter(e=>!over(e)); list.length=0; keep.forEach(e=>list.push(e)) }
+  // Film: één kaartje per film per dag in plaats van één per vertoning
+  const films=S.type==="film"&&S.sort==="date", rows=films?filmGroups(list):list;
+  const cnt=films?`${nf(new Set(list.filter(filmGroupable).map(filmKey)).size)} films, ${nf(list.length)} vertoningen`:`${nf(list.length)} ${LBL[S.type][list.length===1?0:1]}`;
+  let h=scopeChips()+tonightCta()+quickRow()+monthBar(mc)+`<div class="meta"><span>${cnt}${month?" in "+monthLabel(month):""}${hidNote()}${nOver?` · <span class="overnote">${nOver} van vandaag al afgelopen, <button class="linkbtn" type="button" data-showover>toon</button></span>`:""}</span>${fcount()||S.q?'<button id="clearAll">Alles wissen</button>':""}</div>`;
+  if(!total){const alt=month&&mc.find(([k,c])=>c&&k!==month);
     return h+(alt?`<div class="empty"><strong>Niets in ${monthLabel(month)}</strong>Wel in andere maanden, bijvoorbeeld ${monthLabel(alt[0])} (${nf(alt[1])}).<br><button class="btn ghost" data-month="${alt[0]}" style="display:inline-flex;flex:0">Toon ${monthLabel(alt[0])}</button> <button class="btn ghost" data-month="" style="display:inline-flex;flex:0">Alle maanden</button></div>`:(S.q.trim()&&elders(false))||emptyState())+srcNote()}
   if(S.sort==="date"){
     const from=S.day>=0?S.day:mr?Math.max(0,mr[0]):0;
-    // Vandaag: wat al afgelopen is staat niet meer bovenaan (wel terug te halen)
-    const nm=nowMin(), over=e=>e.d===0&&!e.started&&e.endD==null&&e.time!=null&&(endOf(e)??e.time+120)<=nm;
-    const nOver=S.showOver?0:list.reduce((c,e)=>c+(over(e)?1:0),0);
-    if(nOver){ const keep=list.filter(e=>!over(e)); list.length=0; keep.forEach(e=>list.push(e));
-      h+=`<p class="s overnote">${nOver} van vandaag ${nOver===1?"is":"zijn"} al afgelopen. <button class="linkbtn" type="button" data-showover>Toon toch</button></p>`; }
-    h+=dayRows(list,n,{from,months:S.day<0,month,door:from===0?"Nu te zien":S.day>=0?"Loopt al, ook te zien op deze dag":"Al begonnen, loopt nog"});
+    h+=dayRows(rows,n,{from,months:S.day<0,month,row:films?filmRow:null,door:films?"Doorlopende programma's":from===0?"Nu te zien":S.day>=0?"Loopt al, ook te zien op deze dag":"Al begonnen, loopt nog"});
   }
   else list.slice(0,n).forEach(e=>h+=evRow(e,{showDate:true}));
-  if(list.length>n) h+=`<button class="btn ghost more" id="moreBtn">Toon meer <small>nog ${nf(list.length-n)}</small></button>`;
+  if(rows.length>n) h+=`<button class="btn ghost more" id="moreBtn">Toon meer <small>nog ${nf(rows.length-n)}</small></button>`;
   else if(month){const i=mc.findIndex(([k])=>k===month), nx=mc.slice(i+1).find(([,c])=>c); if(nx) h+=`<button class="btn ghost more" data-month="${nx[0]}" data-month-top>Verder in ${monthLabel(nx[0])} ›</button>`}
   return h+srcNote();
 }
@@ -736,7 +793,7 @@ function viewFav(){
   const own=EV.filter(e=>inTab(e)&&isFav(e)).sort((a,b)=>a.d-b.d||(a.time??0)-(b.time??0));
   h+=`<h2 class="dh">Waar ze spelen <small>${own.length}</small></h2>`+(own.length?own.map(e=>evRow(e,{showDate:true})).join(""):`<p class="s">Geen shows in de huidige agenda.</p>`);
   // genre-tips
-  const favGenres={}; EV.filter(isFav).forEach(e=>{if(!["Overig","Feest"].includes(e.genre)) favGenres[e.genre]=e.artist});
+  const favGenres={}; EV.filter(isFav).forEach(e=>{if(!["Overig","Feest","Theater"].includes(e.genre)) favGenres[e.genre]=e.artist});
   const seenA=new Set(favs);
   const recs=EV.filter(e=>inTab(e)&&favGenres[e.genre]&&!seenA.has(e.ak)&&(seenA.add(e.ak),true)).sort((a,b)=>(travel(a.v).car??999)-(travel(b.v).car??999)||a.d-b.d).slice(0,6);
   h+=`<h2 class="dh">Zelfde genre, dichtbij</h2>`+(recs.length?recs.map(e=>evRow(e,{showDate:true,reason:e.genre+", net als "+favGenres[e.genre]})).join(""):`<p class="s">Volg nog iemand om tips te krijgen.</p>`);
@@ -1046,9 +1103,10 @@ function openDetail(id,o={}){
      <div class="dsub">${venueLine(e)} · <button class="linkbtn" data-openvenue="${esc(vgOf(e.v))}">Alles bij dit podium</button></div>
      ${e.ook.length?`<div class="dsub">Zelfde evenement, ook op de agenda van ${e.ook.map(o=>esc(V[o.v].name)).join(", ")}</div>`:""}</div>
      <button class="star" data-fav="${e.ak}" data-name="${esc(e.artist)}" aria-pressed="${S.fav.has(e.ak)}" aria-label="Volg ${esc(e.artist)}" style="font-size:30px">★</button></div>
-   <div class="facts"><div><small>Genre</small><b>${esc(e.genre)}</b></div>${tr.car!=null?`<div><small>Auto</small><b>± ${tr.car} min</b></div><div><small>OV</small><b>± ${tr.ov} min</b></div>`:""}${e.price!=null?`<div><small>${e.price===0?"Entree":"Prijs vanaf"}</small><b>${priceTxt(e.price)}</b></div>`:""}${e.status==="sold"?`<div><small>Kaarten</small><b style="color:var(--warn)">Uitverkocht</b></div>`:""}</div>
+   <div class="facts">${e.genre==="Overig"?"":`<div><small>Genre</small><b>${esc(e.genre)}</b></div>`}${tr.car!=null?`<div><small>Auto</small><b>± ${tr.car} min</b></div><div><small>OV</small><b>± ${tr.ov} min</b></div>`:""}${e.price!=null?`<div><small>${e.price===0?"Entree":"Prijs vanaf"}</small><b>${priceTxt(e.price)}</b></div>`:""}${e.status==="sold"?`<div><small>Kaarten</small><b style="color:var(--warn)">Uitverkocht</b></div>`:""}</div>
    ${tr.car!=null?`<p class="s travnote">Reistijd is een schatting vanaf ${S.home==="__geo"?"je opgeslagen locatie":esc(S.home)} (afstand hemelsbreed). Google Maps rekent vanaf waar je nu bent, met verkeer en dienstregeling.</p>`:""}
    ${tourTip(e)}
+   ${e.type==="film"&&filmGroupable(e)?`<button class="tourtip" type="button" data-film="${esc(filmKey(e))}" data-fday="${e.d}"><b>Alle bioscopen en tijden</b> van deze film <span aria-hidden="true">›</span></button>`:""}
    <div class="timeline">${tl}</div>
    <div class="row2"><a class="btn" href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">Info en kaarten bij ${esc(V[e.v].name)}</a></div>
    ${e.ook.filter(o=>o.url).map(o=>`<div class="row2" style="margin-top:6px"><a class="btn ghost" href="${esc(o.url)}" target="_blank" rel="noopener noreferrer">Info bij ${esc(V[o.v].name)}</a></div>`).join("")}
@@ -1134,6 +1192,9 @@ document.addEventListener("click",e=>{
     else if(z==="home"){const [x,y]=proj(S.homeXY[0],S.homeXY[1]); zoomTo(x,y,NL.w/4)} else {MAPV.vb=[0,0,NL.w,NL.h]; applyView()}
     return}
   if(e.target.closest("[data-showover]")){S.showOver=true; render(); return}
+  const fm=e.target.closest("[data-fmore]"); if(fm){fm.closest(".fday").classList.add("all"); fm.remove(); return}
+  const fdm=e.target.closest("[data-fdaysmore]"); if(fdm){fdm.closest(".fdays").classList.add("all"); fdm.remove(); return}
+  const fl=e.target.closest("[data-film]"); if(fl&&!e.target.closest("[data-ev]")){openFilm(fl.dataset.film,+fl.dataset.fday||0); return}
   const tm0=e.target.closest("[data-tourmore]"); if(tm0){const b=tm0.closest(".tour"); if(b) b.classList.add("all"); tm0.remove(); return}
   const go=e.target.closest("[data-view-go]"); if(go){if(go.classList.contains("tncta")) TN.when="today"; if(go.dataset.viewGo==="cal"){ if(S.month) S.calMonth=S.month; else if(S.day>=0) S.calMonth=mKey(dateOf(S.day)) } S.view=go.dataset.viewGo; render(); try{window.scrollTo(0,0)}catch{} showDay(); return}
   const tw=e.target.closest("[data-tn-when]"); if(tw){TN.when=tw.dataset.tnWhen; render(); return}
@@ -1207,7 +1268,7 @@ document.addEventListener("wheel",e=>{
   const max=el.scrollWidth-el.clientWidth; if((e.deltaY>0&&el.scrollLeft>=max-1)||(e.deltaY<0&&el.scrollLeft<=0)) return;
   el.scrollLeft+=e.deltaY; e.preventDefault();
 },{passive:false});
-document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheets();if(e.key==="Enter"&&e.target.id==="q")e.target.blur();if(e.key==="Enter"&&e.target.matches(".ev[data-ev]"))openDetail(e.target.dataset.ev);if(e.key==="Enter"&&e.target.matches("[data-venue]"))e.target.click()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheets();if(e.key==="Enter"&&e.target.id==="q")e.target.blur();if(e.key==="Enter"&&e.target.matches(".ev[data-ev]"))openDetail(e.target.dataset.ev);if(e.key==="Enter"&&e.target.matches(".ev[data-film]"))openFilm(e.target.dataset.film,+e.target.dataset.fday||0);if(e.key==="Enter"&&e.target.matches("[data-venue]"))e.target.click()});
 document.querySelectorAll(".seg [data-type]").forEach(b=>b.onclick=()=>{S.type=b.dataset.type;S.genre.clear();S.venue="";S.month="";if(S.q.trim())S.qAll=false;if(S.view!=="grid")S.day=-1;render()});
 let qt;$("#q").oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{S.q=e.target.value;render()},150)};
 

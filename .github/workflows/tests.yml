@@ -32,6 +32,7 @@ jobs:
           python scraper/test_fetch.py
           python scraper/test_scrape_offline.py
           python scraper/test_titeldatum.py
+          python scraper/test_genres.py
       - name: Persoonlijke gegevens
         env:
           VERBODEN: ${{ secrets.IDENTITEIT_VERBODEN }}

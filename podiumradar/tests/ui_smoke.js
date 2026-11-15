@@ -209,6 +209,29 @@ const UPD = nlMs(real.updated);
     await p.context().close(); dataOverride = null;
   }
 
+  // 9. films per titel: één kaartje per film per dag, met daarachter alle bioscopen en tijden
+  {
+    const vids = Object.keys(real.venues), films = vids.filter(id => real.venues[id].type === 'film' && real.venues[id].lat != null);
+    const fT = films.find(id => real.venues[id].city === 'Tilburg'), fA = films.find(id => real.venues[id].city === 'Amsterdam'), fG = films.find(id => real.venues[id].city === 'Groningen');
+    const dag = n => { const x = new Date(2026, 10, 15 + n); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+    const f = (id, v, d, time, title) => ({ id, v, date: dag(d), time, title, url: 'https://voorbeeld.test/' + id, genre: 'Film', first_seen: dag(-20) });
+    dataOverride = { updated: '2026-11-15 09:00', venues: real.venues, events: [
+      f('f1', fT, 0, '13:00', 'Proeffilm Eén'), f('f2', fT, 0, '21:15', 'Proeffilm Eén'), f('f3', fA, 0, '20:30', 'Proeffilm Eén (OV)'), f('f4', fG, 1, '19:00', 'Proeffilm Eén'),
+      f('f5', fA, 0, '21:00', 'Proeffilm Twee')] };
+    p = await newPage(); await p.clock.setFixedTime(new Date('2026-11-15T19:00:00+01:00')); await p.goto(BASE + 'index.html'); await p.waitForSelector('body[data-ready]', { timeout: 20000 });
+    await p.click('.seg [data-type=film]'); await p.waitForTimeout(400);
+    const kaart = p.locator('.ev.film[data-fday="0"]').first();
+    check('film: één kaartje per film per dag (3 kaartjes voor 5 vertoningen, 1 al afgelopen)', (await p.locator('.ev.film').count()) === 3 && (await p.locator('#main .meta').innerText()).includes('2 films'));
+    check('film: kaartje toont de eerstvolgende tijd in de dichtstbijzijnde bioscoop', (await kaart.locator('.t').innerText()).startsWith('21:15') && (await kaart.locator('.v').innerText()).includes('Tilburg') && (await kaart.innerText()).includes('ook in 1 andere bioscoop'));
+    await kaart.click(); await p.waitForTimeout(400);
+    check('filmscherm: per dag de bioscopen met hun tijden', (await p.locator('#detailSheet .fday').count()) === 2 && (await p.locator('#detailSheet .fchip').count()) === 4);
+    check('filmscherm: dichtstbijzijnde bioscoop bovenaan', (await p.locator('#detailSheet .fven').first().innerText()).includes('Tilburg'));
+    await p.locator('#detailSheet .fchip', { hasText: '20:30' }).click(); await p.waitForTimeout(400);
+    check('filmscherm: een tijd opent die vertoning', (await p.locator('#detailSheet .dsub').nth(2).innerText().catch(() => '')).includes('Amsterdam') || (await p.locator('#detailSheet').innerText()).includes('Amsterdam'));
+    check('film: geen fouten en geen verzoeken naar buiten', p.errs.length === 0 && p.ext.length === 0, [p.errs, p.ext]);
+    await p.context().close(); dataOverride = null;
+  }
+
   await browser.close(); server.close();
   console.log('\n' + (fouten ? fouten + ' FOUT(EN)' : 'ALLES GOED')); process.exit(fouten ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(2); });

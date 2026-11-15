@@ -10,7 +10,7 @@ from html import unescape
 from urllib import robotparser
 import requests
 from bs4 import BeautifulSoup
-import schoon, sources
+import genres, schoon, sources
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CFG = json.loads((ROOT / "scraper/config.json").read_text(encoding="utf-8"))
@@ -262,11 +262,13 @@ def mark_known_films(items):
 
 
 def guess_genre(title, vtype):
+    """Genre van een item: bekende artiest/voorstelling (genres_bekend.json) gaat voor op een trefwoord in de titel;
+    alleen 'Jeugd' uit de titel ('(4+)', 'kindervoorstelling') wint altijd. Anders het standaardgenre van het soort podium."""
     low = " " + title.lower()
-    for g, words in GENRE_WORDS:
-        if any(w in low for w in words):
-            return g
-    return DEFAULT_GENRE.get(vtype, "Overig")
+    woord = next((g for g, words in GENRE_WORDS if any(w in low for w in words)), None)
+    if woord == "Jeugd":
+        return woord
+    return genres.bekend_genre(title) or woord or DEFAULT_GENRE.get(vtype, "Overig")
 
 
 def norm(t):
@@ -571,6 +573,11 @@ def night_show(e):
 def reclassify():
     """Genres in de bestaande data.json opnieuw bepalen, zonder de bronnen opnieuw op te halen."""
     data = json.loads(OUT.read_text(encoding="utf-8"))
+    # Podia waarvan de bron zelf een vast genre meegeeft (bronnen.json: "genre"): daar blijft dat genre staan
+    try:
+        bron_genre = {b["name"] for b in json.loads((ROOT / "scraper/bronnen.json").read_text(encoding="utf-8")) if b.get("genre")}
+    except (OSError, ValueError):
+        bron_genre = set()
     changed = 0
     keep = []
     for e in data["events"]:
@@ -600,6 +607,9 @@ def reclassify():
         # Alleen films erbij zoeken: of de site zelf 'filmvertoning' zei, weten we hier niet meer
         g = "Film" if is_film(e["title"], e["url"], vtype) else \
             (guess_genre(e["title"], vtype) if e["genre"] == "Film" and LIVE_MUSIC_RE.search(e["title"]) else e["genre"])
+        # Bekende artiest of voorstelling (genres_bekend.json): ook hier toepassen, behalve op wat de titel of de bron zelf zegt
+        if g not in ("Film", "Tentoonstelling", "Festival", "Jeugd") and data["venues"].get(e["v"], {}).get("name") not in bron_genre:
+            g = genres.bekend_genre(e["title"]) or g
         if g != e["genre"]:
             print(f"  {e['genre']:>12} -> {g:<12} {e['title'][:70]}")
             e["genre"], changed = g, changed + 1
